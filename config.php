@@ -5,17 +5,18 @@
 
 // Cargar variables de entorno desde .env
 function loadEnv($file = '.env') {
-    if (!file_exists($file)) {
+    $envFile = __DIR__ . '/' . $file;
+    if (!file_exists($envFile)) {
         return;
     }
-    
-    $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+
+    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
         // Ignorar comentarios
         if (strpos(trim($line), '#') === 0) {
             continue;
         }
-        
+
         // Parsear variable
         if (strpos($line, '=') !== false) {
             list($name, $value) = explode('=', $line, 2);

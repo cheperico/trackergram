@@ -4,20 +4,40 @@
  * Permite configurar credenciales y actualizar el webhook de Telegram
  */
 
+// Habilitar visualización de errores para diagnóstico
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 session_start();
 require_once 'config.php';
 
-// Función para cargar variables de entorno
-function loadEnv() {
+// Función para guardar variables de entorno
+function saveEnv($env) {
+    $envFile = __DIR__ . '/.env';
+    $content = "# trackerGram - Variables de Entorno\n";
+    $content .= "# Generado automáticamente por admin.php\n\n";
+
+    foreach ($env as $key => $value) {
+        $content .= "$key=$value\n";
+    }
+
+    return file_put_contents($envFile, $content) !== false;
+}
+
+// Función para cargar variables de entorno desde archivo (para saveEnv)
+function loadEnvFromFile() {
     $envFile = __DIR__ . '/.env';
     if (!file_exists($envFile)) {
         return [];
     }
-    
+
     $env = [];
     $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
         if (strpos(trim($line), '#') === 0) {
+            continue;
+        }
+        if (strpos($line, '=') === false) {
             continue;
         }
         list($name, $value) = explode('=', $line, 2);
@@ -26,25 +46,11 @@ function loadEnv() {
     return $env;
 }
 
-// Función para guardar variables de entorno
-function saveEnv($env) {
-    $envFile = __DIR__ . '/.env';
-    $content = "# trackerGram - Variables de Entorno\n";
-    $content .= "# Generado automáticamente por admin.php\n\n";
-    
-    foreach ($env as $key => $value) {
-        $content .= "$key=$value\n";
-    }
-    
-    return file_put_contents($envFile, $content) !== false;
-}
-
 // Verificar autenticación
 function checkAuth() {
-    $env = loadEnv();
-    $username = $env['ADMIN_USERNAME'] ?? 'admin';
-    $password = $env['ADMIN_PASSWORD'] ?? '';
-    
+    $username = $_ENV['ADMIN_USERNAME'] ?? 'admin';
+    $password = $_ENV['ADMIN_PASSWORD'] ?? '';
+
     if (!isset($_SESSION['authenticated'])) {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_username']) && isset($_POST['login_password'])) {
             if ($_POST['login_username'] === $username && $_POST['login_password'] === $password) {
@@ -68,14 +74,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
 
 // Procesar formulario de configuración
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save_config') {
-    $env = loadEnv();
-    
+    $env = loadEnvFromFile();
+
     $env['TELEGRAM_BOT_TOKEN'] = $_POST['telegram_bot_token'] ?? '';
     $env['TELEGRAM_WEBHOOK_SECRET'] = $_POST['telegram_webhook_secret'] ?? '';
     $env['TIKIWIKI_API_URL'] = $_POST['tikiwiki_api_url'] ?? '';
     $env['TIKIWIKI_TOKEN'] = $_POST['tikiwiki_token'] ?? '';
     $env['TIKIWIKI_TRACKER_ID'] = $_POST['tikiwiki_tracker_id'] ?? '1';
-    
+
     if (saveEnv($env)) {
         $success = "Configuración guardada exitosamente";
     } else {
@@ -85,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 // Procesar actualización de webhook
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_webhook') {
-    $env = loadEnv();
+    $env = loadEnvFromFile();
     $botToken = $env['TELEGRAM_BOT_TOKEN'] ?? '';
     $secretToken = $env['TELEGRAM_WEBHOOK_SECRET'] ?? '';
     
@@ -119,7 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 }
 
 // Cargar configuración actual
-$env = loadEnv();
+$env = loadEnvFromFile();
 $config = [
     'telegram_bot_token' => $env['TELEGRAM_BOT_TOKEN'] ?? '',
     'telegram_webhook_secret' => $env['TELEGRAM_WEBHOOK_SECRET'] ?? '',

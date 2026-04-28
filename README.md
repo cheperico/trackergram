@@ -259,6 +259,16 @@ Si ModSecurity bloquea las peticiones a TikiWiki:
 - Verificación de firma de mensajes de Telegram (opcional)
 - IP whitelisting para restringir acceso a endpoints administrativos
 - Monitoreo de anomalías en patrones de mensajes
+- **CRITICAL**: Fix admin.php line 23 - Add validation before explode to handle .env lines without '='
+- **CRITICAL**: Fix admin.php line 45 - Require ADMIN_PASSWORD to be set (currently allows empty password)
+- **CRITICAL**: Add CSRF protection to admin.php forms
+- **CRITICAL**: Add rate limiting to login attempts (brute force protection)
+- **CRITICAL**: Fix HTTPS detection in admin.php and setup_webhook.php (currently only checks 'on')
+- **CRITICAL**: Add session security (timeout, secure cookie flags)
+- **CRITICAL**: Fix config.php line 56 - Make DEBUG_MODE configurable via .env instead of hardcoded true
+- **CRITICAL**: Fix config.php line 8 - Use absolute path (__DIR__) for .env file
+- **CRITICAL**: Add input validation for all POST data in admin.php (prevent arbitrary content injection)
+- **CRITICAL**: Fix setup_webhook.php line 92 - Incorrect verification logic (checks has_custom_certificate instead of secret token)
 
 ### Roadmap de Funcionalidades
 
@@ -271,6 +281,15 @@ Si ModSecurity bloquea las peticiones a TikiWiki:
 - **Interfaz web de configuración**: Crear interfaz minimalista (sin CSS) para configurar credenciales del bot, token de API de TikiWiki, y otros parámetros desde el navegador
 - **Autenticación para interfaz de configuración**: Implementar autenticación básica (usuario/contraseña) para proteger el acceso a la interfaz de configuración
 - **Actualización de webhook desde interfaz**: Integrar botón en la interfaz para actualizar automáticamente el webhook de Telegram cuando se cambie la URL del servidor
+- **Fix api.php line 298**: Log message has incorrect spacing ("Reintento $i + 1" should be "Reintento " . ($i + 1))
+- **Fix api.php line 278**: media_url assigned to both media_url and file_url fields unintentionally
+- **Fix api.php line 299**: Remove or fix sleep(1) in retry loop (blocks PHP process, could exhaust process pool)
+- **Fix api.php lines 263-283**: Add validation that required fields exist in $message array before accessing
+- **Fix api.php line 232**: Fix log truncation that could leave incomplete HTML tags
+- **Fix api.php**: Make error handling consistent (some functions return null, others return false)
+- **Fix admin.php line 177**: Increase input size for bot token (currently 50, should accommodate longer tokens)
+- **Fix admin.php**: Remove duplicate code for protocol detection and webhook URL construction
+- **Fix setup_webhook.php lines 24-26**: Inconsistent requirement - script requires TELEGRAM_WEBHOOK_SECRET but api.php allows webhook without it
 
 ## Autores
 
