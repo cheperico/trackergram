@@ -1,0 +1,47 @@
+# Configuración Apache para trackerGram
+
+# Deshabilitar listado de directorios
+Options -Indexes
+
+# Evitar acceso a archivos sensibles
+<Files "config.php">
+    Require all denied
+</Files>
+
+<Files ".env">
+    Require all denied
+</Files>
+
+<Files ".env.example">
+    Require all denied
+</Files>
+
+<Files "*.log">
+    Require all denied
+</Files>
+
+<Files "*.md">
+    Require all denied
+</Files>
+
+<Files "*.sql">
+    Require all denied
+</Files>
+
+# setup_webhook.php y admin.php requieren autenticación propia
+# No se bloquean en .htaccess para permitir acceso administrativo
+
+# Headers de seguridad HTTP
+<IfModule mod_headers.c>
+    # Protección contra clickjacking
+    Header set X-Frame-Options "DENY"
+    
+    # Evitar MIME sniffing
+    Header set X-Content-Type-Options "nosniff"
+    
+    # Protección XSS
+    Header set X-XSS-Protection "1; mode=block"
+    
+    # Política de referer
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
