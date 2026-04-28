@@ -12,31 +12,6 @@ trackerGram es una aplicación independiente que recibe webhooks de Telegram y e
 Telegram → trackerGram → TikiWiki Tracker
 ```
 
-### Arquitectura Distribuida (Opcional)
-
-Para evitar bloqueos de firewall o problemas de red, puedes implementar una arquitectura distribuida:
-
-```
-Telegram → trackerGram (Servidor A) → TikiWiki (Servidor B)
-```
-
-**Ventajas:**
-- Evita bloqueos de IPs de Telegram en el firewall del servidor de TikiWiki
-- Permite separar la carga de procesamiento de webhooks del almacenamiento
-- Flexibilidad para escalar componentes independientemente
-
-**Configuración:**
-1. Instala trackerGram en un servidor accesible desde Telegram (Servidor A)
-2. Configura TikiWiki en otro servidor (Servidor B)
-3. En el `.env` de trackerGram, apunta `TIKIWIKI_API_URL` al servidor de TikiWiki
-4. Configura el webhook de Telegram para apuntar al Servidor A
-
-**Ejemplo:**
-- trackerGram: `https://trackergram.cheps.chela.org.ar`
-- TikiWiki: `https://wiki.chela.org.ar`
-- Webhook: `https://trackergram.cheps.chela.org.ar/api.php`
-- TikiWiki API: `https://wiki.chela.org.ar/api/`
-
 ## Características
 
 - **Webhook endpoint**: Recibe actualizaciones de Telegram en tiempo real
@@ -242,6 +217,8 @@ Si ModSecurity bloquea las peticiones a TikiWiki:
 
 ## Seguridad
 
+### Características de Seguridad Implementadas
+
 - **Secret Token de Webhook**: Validación del header `X-Telegram-Bot-Api-Secret-Token` para prevenir spoofing de webhooks
 - **Credenciales en .env**: Las credenciales se almacenan en `.env` (protegido por `.htaccess`)
 - **Sanitización XSS**: Campos de texto sanitizados con `htmlspecialchars()` antes de enviar a TikiWiki
@@ -250,15 +227,32 @@ Si ModSecurity bloquea las peticiones a TikiWiki:
 - **Archivos sensibles protegidos**: `.env`, `config.php`, `test_webhook.php` bloqueados por `.htaccess`
 - **Permisos de archivos**: `.env` debe tener permisos 600 o 640
 
+### Mejoras de Seguridad Críticas (v1.1)
+
+- **Autenticación robusta en admin.php**: 
+  - Requerimiento obligatorio de contraseña ADMIN_PASSWORD
+  - Rate limiting: 5 intentos máximos, bloqueo de 15 minutos
+  - Timeout de sesión: 30 minutos de inactividad
+  - Regeneración periódica de ID de sesión (cada 15 minutos)
+- **Protección CSRF**: Tokens CSRF en todos los formularios de administración
+- **Validación estricta de inputs**: 
+  - URLs: Validación de formato http/https sin espacios
+  - Tokens: Solo caracteres alfanuméricos, guiones y guiones bajos
+  - Números: Enteros positivos validados
+  - Strings: Sin caracteres de control, longitud máxima 1000 caracteres
+- **Sesión segura**: 
+  - Cookies HttpOnly, Secure y SameSite Strict
+  - Modo estricto de sesión habilitado
+  - Timeout automático y destrucción de sesión
+- **Configuración segura**:
+  - DEBUG_MODE configurable vía .env (antes hardcoded true)
+  - Paths absolutos para evitar problemas de contexto
+  - Detección robusta de HTTPS compatible con diferentes servidores
+- **Validación de archivos**: Manejo seguro de archivos .env con líneas malformadas
+
 ### Roadmap de Seguridad
 
-**Mejoras planeadas:**
-- Rate limiting para prevenir abuso del webhook
-- Validación más estricta de contenido (longitud máxima, caracteres permitidos)
-- Logging de intentos de acceso no autorizados
-- Verificación de firma de mensajes de Telegram (opcional)
-- IP whitelisting para restringir acceso a endpoints administrativos
-- Monitoreo de anomalías en patrones de mensajes
+#### ✅ Completado (v1.1)
 - **CRITICAL**: Fix admin.php line 23 - Add validation before explode to handle .env lines without '='
 - **CRITICAL**: Fix admin.php line 45 - Require ADMIN_PASSWORD to be set (currently allows empty password)
 - **CRITICAL**: Add CSRF protection to admin.php forms
@@ -270,17 +264,29 @@ Si ModSecurity bloquea las peticiones a TikiWiki:
 - **CRITICAL**: Add input validation for all POST data in admin.php (prevent arbitrary content injection)
 - **CRITICAL**: Fix setup_webhook.php line 92 - Incorrect verification logic (checks has_custom_certificate instead of secret token)
 
+#### 🔄 Próximas Mejoras
+- Rate limiting para prevenir abuso del webhook (API endpoint)
+- Logging de intentos de acceso no autorizados
+- Verificación de firma de mensajes de Telegram (opcional)
+- IP whitelisting para restringir acceso a endpoints administrativos
+- Monitoreo de anomalías en patrones de mensajes
+- Validación más estricta de contenido (longitud máxima, caracteres permitidos) - parcialmente implementado
+
 ### Roadmap de Funcionalidades
 
-**Mejoras planeadas:**
+#### ✅ Completado (v1.1)
+- **Interfaz web de configuración**: Interfaz minimalista para configurar credenciales desde navegador
+- **Autenticación para interfaz de configuración**: Autenticación básica (usuario/contraseña) implementada
+- **Actualización de webhook desde interfaz**: Botón para actualizar webhook automáticamente
+
+#### 🔄 Próximas Mejoras
 - **Mejorar interpretación de mensajes**: Expandir soporte para tipos de mensajes de Telegram (encuestas, ubicaciones, contactos, etc.)
 - **Lectura de topic ID**: Mostrar nombre del topic en lugar del ID numérico, o agregar columnas separadas para ID y nombre
 - **Lectura de nombre de chat ID**: Mostrar nombre del chat en lugar del ID numérico, o agregar columnas separadas para ID y nombre
 - **Manejo de mensajes no soportados**: Corregir el problema donde mensajes no soportados se muestran como link a "Mensaje no soportado" en lugar de mostrar información útil
 - **Evitar duplicado de mensajes**: Implementar deduplicación basada en message_id para evitar que el mismo mensaje se envíe múltiples veces a TikiWiki
-- **Interfaz web de configuración**: Crear interfaz minimalista (sin CSS) para configurar credenciales del bot, token de API de TikiWiki, y otros parámetros desde el navegador
-- **Autenticación para interfaz de configuración**: Implementar autenticación básica (usuario/contraseña) para proteger el acceso a la interfaz de configuración
-- **Actualización de webhook desde interfaz**: Integrar botón en la interfaz para actualizar automáticamente el webhook de Telegram cuando se cambie la URL del servidor
+
+#### 🐛 Bugs por Corregir
 - **Fix api.php line 298**: Log message has incorrect spacing ("Reintento $i + 1" should be "Reintento " . ($i + 1))
 - **Fix api.php line 278**: media_url assigned to both media_url and file_url fields unintentionally
 - **Fix api.php line 299**: Remove or fix sleep(1) in retry loop (blocks PHP process, could exhaust process pool)

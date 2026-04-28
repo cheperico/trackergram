@@ -8,7 +8,7 @@
 require_once 'config.php';
 
 // Detectar URL del servidor
-$protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
+$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
 $host = $_SERVER['HTTP_HOST'];
 $script_path = dirname($_SERVER['SCRIPT_NAME']);
 $webhook_url = $protocol . '://' . $host . $script_path . '/api.php';
@@ -22,7 +22,9 @@ if (!$bot_token) {
 }
 
 if (!$secret_token) {
-    die("Error: TELEGRAM_WEBHOOK_SECRET no está configurado en .env\n");
+    echo "ADVERTENCIA: TELEGRAM_WEBHOOK_SECRET no está configurado en .env\n";
+    echo "El webhook se configurará sin secret token (menos seguro)\n";
+    echo "Se recomienda configurar TELEGRAM_WEBHOOK_SECRET en .env para mayor seguridad\n\n";
 }
 
 // Construir URL de la API de Telegram
@@ -30,9 +32,13 @@ $api_url = "https://api.telegram.org/bot{$bot_token}/setWebhook";
 
 // Parámetros del webhook
 $params = [
-    'url' => $webhook_url,
-    'secret_token' => $secret_token
+    'url' => $webhook_url
 ];
+
+// Agregar secret token solo si está configurado
+if ($secret_token) {
+    $params['secret_token'] = $secret_token;
+}
 
 // Configurar cURL
 $ch = curl_init();
@@ -89,6 +95,6 @@ $verify_result = json_decode($verify_response, true);
 
 if ($verify_result && $verify_result['ok']) {
     echo "✅ URL del webhook: {$verify_result['result']['url']}\n";
-    echo "✅ Secret Token configurado: " . ($verify_result['result']['has_custom_certificate'] ? 'Sí' : 'No') . "\n";
+    echo "✅ Secret Token configurado: " . (isset($verify_result['result']['secret_token']) ? 'Sí' : 'No') . "\n";
     echo "✅ Pendiente de actualización: " . ($verify_result['result']['pending_update_count'] ?? 0) . " mensajes\n";
 }

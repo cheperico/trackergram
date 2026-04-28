@@ -4,8 +4,8 @@
  */
 
 // Cargar variables de entorno desde .env
-function loadEnv($file = '.env') {
-    $envFile = __DIR__ . '/' . $file;
+function loadEnv($file = __DIR__ . '/.env') {
+    $envFile = $file;
     if (!file_exists($envFile)) {
         return;
     }
@@ -54,7 +54,7 @@ define('ALLOWED_CHAT_IDS', []); // Vacío = procesar todos los chats
 date_default_timezone_set(TIMEZONE);
 
 // Modo debug (desactivar en producción)
-define('DEBUG_MODE', true);
+define('DEBUG_MODE', getenv('DEBUG_MODE') === 'true' ? true : false);
 
 // Deshabilitar visualización de errores en producción
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE);

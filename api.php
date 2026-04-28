@@ -27,12 +27,12 @@ function getFileUrl($fileId)
     $response = @file_get_contents($url, false, $ctx);
 
     if ($response === false) {
-        return null;
+        return false; // Consistente: return false en caso de error
     }
 
     $data = json_decode($response, true);
     if (!$data || !isset($data['result']['file_path'])) {
-        return null;
+        return false; // Consistente: return false en caso de error
     }
 
     return 'https://api.telegram.org/file/bot' . TELEGRAM_BOT_TOKEN . '/' . $data['result']['file_path'];
@@ -229,7 +229,14 @@ function sendToTikiWiki($data)
     // Validar que la respuesta sea JSON y contenga itemId (para detectar errores PHP que devuelven 200)
     $responseData = json_decode($response, true);
     if (!$responseData || !isset($responseData['itemId'])) {
-        $cleanResponse = substr(strip_tags(str_replace(["\r", "\n"], ' ', $response)), 0, 300);
+        // Limpiar respuesta para logging: remover tags y newlines, truncar a 300 chars
+        // Evitar truncar en medio de tags HTML
+        $cleanResponse = strip_tags($response);
+        $cleanResponse = str_replace(["\r", "\n"], ' ', $cleanResponse);
+        $cleanResponse = substr($cleanResponse, 0, 300);
+        if (strlen($cleanResponse) >= 300) {
+            $cleanResponse .= '... [truncated]';
+        }
         log_message("Error de formato en respuesta de TikiWiki (Status $httpCode): $cleanResponse");
         return false;
     }
@@ -250,6 +257,35 @@ function processUpdate($update)
     }
 
     $message = $update['message'];
+    
+    // Validar campos requeridos del mensaje
+    $requiredFields = ['message_id', 'chat', 'from', 'date'];
+    foreach ($requiredFields as $field) {
+        if (!isset($message[$field])) {
+            log_message("ERROR: Campo requerido '$field' no encontrado en el mensaje");
+            return;
+        }
+    }
+    
+    // Validar subcampos requeridos
+    $requiredSubFields = [
+        'chat.id',
+        'from.id',
+        'from.first_name'
+    ];
+    
+    foreach ($requiredSubFields as $fieldPath) {
+        $keys = explode('.', $fieldPath);
+        $value = $message;
+        foreach ($keys as $key) {
+            if (!isset($value[$key])) {
+                log_message("ERROR: Subcampo requerido '$fieldPath' no encontrado en el mensaje");
+                return;
+            }
+            $value = $value[$key];
+        }
+    }
+    
     $chatId = $message['chat']['id'];
 
     // Validar chat_id si ALLOWED_CHAT_IDS está configurado
@@ -275,7 +311,7 @@ function processUpdate($update)
         'message_type' => $messageData['type'],
         'text' => $messageData['text'],
         'media_url' => $messageData['media_url'],
-        'file_url' => $messageData['media_url'],
+        'file_url' => $messageData['media_url'], // Mismo campo que media_url para compatibilidad
         'media_type' => $messageData['media_type'],
         'media_size' => $messageData['media_size'],
         'media_caption' => $messageData['media_caption'],
@@ -295,8 +331,10 @@ function processUpdate($update)
         }
 
         if ($i < $maxRetries - 1) {
-            log_message("Reintento $i + 1 para message_id={$tikiData['message_id']}");
-            sleep(1); // Esperar 1 segundo antes de reintentar
+            log_message("Reintento " . ($i + 1) . " para message_id={$tikiData['message_id']}");
+            // Usar usleep en lugar de sleep para evitar bloquear el proceso por completo
+            // 100000 microsegundos = 0.1 segundos
+            usleep(100000); // Esperar 0.1 segundos antes de reintentar
         }
     }
 
