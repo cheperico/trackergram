@@ -275,7 +275,7 @@ Si ModSecurity bloquea las peticiones a TikiWiki:
 - IP whitelisting para restringir acceso a endpoints administrativos
 - Monitoreo de anomalías en patrones de mensajes
 - Validación más estricta de contenido (longitud máxima, caracteres permitidos) - parcialmente implementado
-- **Refactorización del código**: Ver archivo `para_mejoras_tecnicas.md` para recomendaciones de arquitectura, separación en clases, typed PHP y mejoras de estructura
+- **Refactorización del código**: Ver archivo `para_mejoras_tecnicas.md`. Ya implementadas: type hints, constantes de configuración, logging unificado.
 
 ### Roadmap de Funcionalidades
 

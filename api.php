@@ -5,6 +5,27 @@
 
 require_once 'config.php';
 
+// Cache para el galleryId (usando variable estática en función en vez de global)
+$mediaGalleryIdCache = null;
+
+/**
+ * Establecer el galleryId en caché
+ */
+function setMediaGalleryId(?int $galleryId): void
+{
+    global $mediaGalleryIdCache;
+    $mediaGalleryIdCache = $galleryId;
+}
+
+/**
+ * Obtener el galleryId desde la caché
+ */
+function getCachedMediaGalleryId(): ?int
+{
+    global $mediaGalleryIdCache;
+    return $mediaGalleryIdCache;
+}
+
 // Validar secret token del webhook si está configurado
 if (TELEGRAM_WEBHOOK_SECRET) {
     $secretToken = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '';
@@ -17,13 +38,13 @@ if (TELEGRAM_WEBHOOK_SECRET) {
 /**
  * Obtener URL de archivo de Telegram
  */
-function getFileUrl($fileId)
+function getFileUrl(string $fileId): ?string
 {
     $url = TELEGRAM_API_URL . 'getFile?file_id=' . $fileId;
 
     // Usar context para evitar que file_get_contents se quede colgado indefinidamente
     // (FIX: Previene timeouts cuando la API de Telegram tarda en responder)
-    $ctx = stream_context_create(['http' => ['timeout' => 5]]);
+    $ctx = stream_context_create(['http' => ['timeout' => TIMEOUT_TELEGRAM_API]]);
     $response = @file_get_contents($url, false, $ctx);
 
     if ($response === false) {
@@ -41,7 +62,7 @@ function getFileUrl($fileId)
 /**
  * Verificar si un message_id ya existe en el tracker (para evitar duplicados)
  */
-function messageExistsInTracker($messageId)
+function messageExistsInTracker(int $messageId): bool
 {
     $trackerId = TIKIWIKI_TRACKER_ID;
     // Buscar items con ese message_id
@@ -55,7 +76,7 @@ function messageExistsInTracker($messageId)
         "Accept: application/json"
     ]);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TELEGRAM_API);
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -80,7 +101,7 @@ function messageExistsInTracker($messageId)
 /**
  * Obtener el galleryId del campo de archivo en el tracker
  */
-function getMediaGalleryId()
+function getMediaGalleryId(): ?int
 {
     $trackerId = TIKIWIKI_TRACKER_ID;
     $url = TIKIWIKI_API_URL . "trackers/{$trackerId}/fields";
@@ -93,7 +114,7 @@ function getMediaGalleryId()
         "Accept: application/json"
     ]);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TELEGRAM_API);
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -135,7 +156,7 @@ $mediaGalleryIdCache = null;
 /**
  * Subir archivo a TikiWiki file gallery
  */
-function uploadToTikiWiki($filePath, $fileName, $mimeType = null)
+function uploadToTikiWiki(string $filePath, string $fileName, ?string $mimeType = null): ?string
 {
     global $mediaGalleryIdCache;
     
@@ -169,7 +190,7 @@ function uploadToTikiWiki($filePath, $fileName, $mimeType = null)
         "Accept: application/json"
     ]);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TIKIWIKI_UPLOAD);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
     
     $response = curl_exec($ch);
@@ -202,7 +223,7 @@ function uploadToTikiWiki($filePath, $fileName, $mimeType = null)
 /**
  * Descargar archivo de Telegram y subir a TikiWiki
  */
-function downloadAndUploadMedia($fileId, $fileName = null, $mimeType = null)
+function downloadAndUploadMedia(string $fileId, ?string $fileName = null, ?string $mimeType = null): ?string
 {
     $fileUrl = getFileUrl($fileId);
     if (!$fileUrl) {
@@ -231,8 +252,10 @@ function downloadAndUploadMedia($fileId, $fileName = null, $mimeType = null)
 
 /**
  * Extraer datos de mensaje según el tipo (texto, multimedia, sistema)
+ * @param array $message Datos del mensaje de Telegram
+ * @return array Datos extraídos del mensaje
  */
-function extractMessageData($message)
+function extractMessageData(array $message): array
 {
     $data = [
         'type' => 'text',
@@ -461,8 +484,10 @@ function extractMessageData($message)
 
 /**
  * Enviar mensaje a TikiWiki tracker
+ * @param array $data Datos del mensaje a enviar
+ * @return bool True si se envió correctamente
  */
-function sendToTikiWiki($data)
+function sendToTikiWiki(array $data): bool
 {
     $trackerId = TIKIWIKI_TRACKER_ID;
     $url = TIKIWIKI_API_URL . "trackers/{$trackerId}/items";
@@ -505,9 +530,7 @@ function sendToTikiWiki($data)
     ]);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // Seguir redirecciones (error 302)
-    // Reducido de 10 a 5 segundos para evitar que los procesos de PHP se acumulen
-    // y saturen el servidor (FIX: Límite de procesos en hosting compartido)
-    curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+    curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TIKIWIKI_API);
 
     $response = curl_exec($ch);
     $error = curl_error($ch);
@@ -545,8 +568,9 @@ function sendToTikiWiki($data)
 
 /**
  * Procesar actualización de Telegram
+ * @param array $update Datos de la actualización recibida del webhook
  */
-function processUpdate($update)
+function processUpdate(array $update): void
 {
     error_log("processUpdate iniciado");
 
@@ -628,9 +652,7 @@ function processUpdate($update)
     ];
 
     // Intentar enviar a TikiWiki con reintentos
-    // Reducido de 3 a 2 para evitar bloqueo prolongado de procesos de PHP
-    // (FIX: Límite de procesos en hosting compartido)
-    $maxRetries = 2;
+    $maxRetries = RETRY_MAX_ATTEMPTS;
     $success = false;
 
     for ($i = 0; $i < $maxRetries; $i++) {
@@ -641,9 +663,7 @@ function processUpdate($update)
 
         if ($i < $maxRetries - 1) {
             error_log("Reintento " . ($i + 1) . " para message_id={$tikiData['message_id']}");
-            // Usar usleep en lugar de sleep para evitar bloquear el proceso por completo
-            // 100000 microsegundos = 0.1 segundos
-            usleep(100000); // Esperar 0.1 segundos antes de reintentar
+            usleep(RETRY_DELAY_MICROSECONDS);
         }
     }
 

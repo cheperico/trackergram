@@ -56,14 +56,32 @@ date_default_timezone_set(TIMEZONE);
 // Modo debug (desactivar en producción)
 define('DEBUG_MODE', getenv('DEBUG_MODE') === 'true' ? true : false);
 
+// Configuración de timeouts (en segundos)
+define('TIMEOUT_TELEGRAM_API', 5);
+define('TIMEOUT_TELEGRAM_DOWNLOAD', 10);
+define('TIMEOUT_TIKIWIKI_API', 30);
+define('TIMEOUT_TIKIWIKI_UPLOAD', 30);
+
+// Configuración de reintentos
+define('RETRY_MAX_ATTEMPTS', 2);
+define('RETRY_DELAY_MICROSECONDS', 100000); // 0.1 segundos
+
+// Configuración de caché
+define('CACHE_ENABLED', true);
+
 // Deshabilitar visualización de errores en producción
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE);
 ini_set('display_errors', 0);
 
 /**
- * Función de logging
+ * Función de logging - única función de logging del proyecto
+ * Usa error_log() que está disponible en todos los entornos
  */
-function log_message($message) {
+function log_message(string $message): void
+{
+    // Siempre escribir al error log del sistema
+    error_log('trackerGram: ' . $message);
+    
     if (DEBUG_MODE) {
         $logFile = __DIR__ . '/debug.log';
         $timestamp = date('[Y-m-d H:i:s] ');
@@ -75,9 +93,6 @@ function log_message($message) {
             $tempLog = sys_get_temp_dir() . '/trackergram_debug.log';
             @file_put_contents($tempLog, $logLine, FILE_APPEND);
         }
-        
-        // También al error_log del sistema
-        error_log($message);
     }
 }
 ?>

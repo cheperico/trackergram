@@ -1,12 +1,8 @@
 # Mejoras Técnicas Recomendadas
 
-## Estado Actual del Proyecto
+> **Estado**: Las siguientes mejoras ya fueron implementadas en el proyecto.
 
-El proyecto trackerGram funciona correctamente pero tiene una estructura técnica que puede mejorarse significativamente.
-
----
-
-## Lo Que Está Bien
+## Lo Que Ya Está Bien
 
 - Separación básica de archivos (api.php, config.php, admin.php)
 - Uso de constantes para configuración
@@ -14,9 +10,83 @@ El proyecto trackerGram funciona correctamente pero tiene una estructura técnic
 - Seguridad básica implementada: CSRF, rate limiting, sanitización XSS
 - Integración con API de Telegram y TikiWiki funcionando
 
+## Mejoras Implementadas en v0.1.1
+
+### 1. Type Hints Agregados
+
+Todas las funciones principales ahora tienen type hints:
+
+```php
+function getFileUrl(string $fileId): ?string
+function uploadToTikiWiki(string $filePath, string $fileName, ?string $mimeType = null): ?string
+function downloadAndUploadMedia(string $fileId, ?string $fileName = null, ?string $mimeType = null): ?string
+function extractMessageData(array $message): array
+function sendToTikiWiki(array $data): bool
+function processUpdate(array $update): void
+function messageExistsInTracker(int $messageId): bool
+function getMediaGalleryId(): ?int
+```
+
+### 2. Constantes de Configuración
+
+Las configuraciones ahora están centralizadas en `config.php`:
+
+```php
+// Timeouts (en segundos)
+define('TIMEOUT_TELEGRAM_API', 5);
+define('TIMEOUT_TELEGRAM_DOWNLOAD', 10);
+define('TIMEOUT_TIKIWIKI_API', 30);
+define('TIMEOUT_TIKIWIKI_UPLOAD', 30);
+
+// Reintentos
+define('RETRY_MAX_ATTEMPTS', 2);
+define('RETRY_DELAY_MICROSECONDS', 100000);
+```
+
+### 3. Función de Logging Unificada
+
+Ahora se usa solo `log_message()` en todo el código:
+
+```php
+function log_message(string $message): void
+```
+
+### 4. Constantes Usadas en Todo el Código
+
+Los valores hardcodeados fueron reemplazados por constantes:
+
+- Timeouts de cURL → `TIMEOUT_TELEGRAM_API`, `TIMEOUT_TIKIWIKI_API`, etc.
+- Reintentos → `RETRY_MAX_ATTEMPTS`
+- Delay → `RETRY_DELAY_MICROSECONDS`
+
 ---
 
-## Problemas Estructurales Identificados
+## Mejoras Futuras (Pendientes)
+
+### Prioridad Alta
+- Extraer clases para APIs externas (TelegramClient, TikiWikiClient)
+- Implementar patrón de inyección de dependencias
+- Eliminar variables globales ($mediaGalleryIdCache)
+
+### Prioridad Media
+- Agregar tests unitarios
+- Implementar PSR-4 autoloading
+- Crear documentación de API interna
+
+### Prioridad Baja
+- Agregar tipos estrictos (strict_types)
+- Agregar anotaciones de tipo para arrays (phpdoc)
+
+---
+
+## Cómo Contribuir
+
+Si querés ayudar a mejorar el código, podés:
+
+1. Revisar las funciones que aún usan arrays genéricos y agregar phpdoc
+2. Proponer refactorización de funciones grandes en funciones más pequeñas
+3. Agregar tests para funciones críticas
+4. Revisar y mejorar la documentación técnica
 
 ### 1. Archivo Monolítico (api.php tiene ~560 líneas)
 
