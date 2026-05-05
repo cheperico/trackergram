@@ -93,7 +93,9 @@ X-Telegram-Bot-Api-Secret-Token: <secret_token_configurado>
 |----------------|--------|---------|
 | `telegrammessageTelegramMessageId` | `message.message_id` | Integer |
 | `telegrammessageChatId` | `message.chat.id` | Integer |
+| `telegrammessageChatTitle` | `message.chat.title` o `username` | String |
 | `telegrammessageTopicId` | `message.message_thread_id` | Integer/String |
+| `telegrammessageTopicName` | Hardcoded "General" | String |
 | `telegrammessageUserId` | `message.from.id` | Integer |
 | `telegrammessageUsername` | `message.from.username` | String |
 | `telegrammessageFirstName` | `message.from.first_name` | String |
@@ -167,7 +169,12 @@ DEBUG_MODE=false
 | Sticker | `message.sticker` | Sube a TikiWiki gallery, texto: "Sticker: image/webp" |
 | Voz | `message.voice` | Sube a TikiWiki gallery, texto: "Nota de voz: audio/ogg" |
 | Video Nota | `message.video_note` | Sube a TikiWiki gallery, texto: "Video circular: video/mp4" |
+| Ubicación | `message.location` | Link a Google Maps |
+| Contacto | `message.contact` | Nombre y teléfono |
+| Encuesta | `message.poll` | Pregunta y opciones |
+| Animation | `message.animation` | Tipo de archivo |
 | Sistema | `message.forum_topic_*` | Texto descriptivo |
+| No soportado | (otros) | Muestra tipo de mensaje |
 
 ### Flujo de Procesamiento
 
@@ -337,7 +344,14 @@ El sistema mapea automáticamente los campos de Telegram a los campos del tracke
 
 ## Versiones y Cambios
 
-### v0.1.0 (Alpha) - Actual
+### v0.1.1 (Alpha) - Actual
+- Deduplicación de mensajes basada en message_id
+- Agregado soporte para ubicaciones, contactos, encuestas, animations
+- Captura de nombre del chat (chat_title)
+- Tema del topic (topic_name)
+- Mejor manejo de mensajes no soportados (muestra el tipo)
+
+### v0.1.0 (Alpha)
 - Subida de archivos multimedia a TikiWiki file gallery
 - Los archivos se vinculan al campo `telegrammessageMedia` del tracker
 - El galleryId se obtiene dinámicamente desde la configuración del tracker via API (no hardcodeado)

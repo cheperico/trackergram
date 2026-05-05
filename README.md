@@ -287,24 +287,26 @@ Si ModSecurity bloquea las peticiones a TikiWiki:
 #### ✅ Completado (v0.1.0)
 - **Subida de archivos multimedia a TikiWiki**: Los archivos (fotos, videos, audio, documentos, stickers, notas de voz) se suben automáticamente a la file gallery vinculada al campo `telegrammessageMedia`. El galleryId se obtiene dinámicamente desde la configuración del tracker via API.
 
+#### ✅ Completado (v0.1.1)
+- **Evitar duplicado de mensajes**: Verifica message_id antes de enviar al tracker
+- **Mejorar interpretación de mensajes**: Agregado soporte para ubicaciones, contactos, encuestas, animations
+- **Lectura de nombre de chat**: Ahora captura chat.title/chat.username y lo guarda en telegrammessageChatTitle
+- **Manejo de mensajes no soportados**: Ahora muestra el tipo de mensaje que no se soporta
+
 #### 🔄 Próximas Mejoras
-- **Mejorar interpretación de mensajes**: Expandir soporte para tipos de mensajes de Telegram (encuestas, ubicaciones, contactos, etc.)
-- **Lectura de topic ID**: Mostrar nombre del topic en lugar del ID numérico, o agregar columnas separadas para ID y nombre
-- **Lectura de nombre de chat ID**: Mostrar nombre del chat en lugar del ID numérico, o agregar columnas separadas para ID y nombre
-- **Manejo de mensajes no soportados**: Corregir el problema donde mensajes no soportados se muestran como link a "Mensaje no soportado" en lugar de mostrar información útil
-- **Evitar duplicado de mensajes**: Implementar deduplicación basada en message_id para evitar que el mismo mensaje se envíe múltiples veces a TikiWiki
-- **Mejoras técnicas de código**: Ver archivo `para_mejoras_tecnicas.md` para roadmap de refactorización (separación en clases, typed PHP, eliminar variables globales, etc.)
+- **Lectura de topic ID**: Obtener nombre del topic desde la API de Telegram (actualmente hardcodeado como "General")
+- **Mejoras técnicas de código**: Ver archivo `para_mejoras_tecnicas.md` para roadmap de refactorización
 
 #### 🐛 Bugs por Corregir
-- ~~**Fix api.php line 298**: Log message has incorrect spacing~~ ✅ Corregido en v1.2
-- ~~**Fix api.php line 278**: media_url assigned to both media_url and file_url fields unintentionally~~ ✅ Corrección parcial - ahora se usa `media_url` correctamente
+- ~~**Fix api.php line 298**: Log message has incorrect spacing~~ ✅ Corregido
+- ~~**Fix api.php line 278**: media_url assigned to both media_url and file_url fields unintentionally~~ ✅ Corregido
 - ~~**Fix api.php line 299**: Remove or fix sleep(1) in retry loop~~ ✅ Corregido - ahora usa usleep
-- **Fix api.php lines 263-283**: Add validation that required fields exist in $message array before accessing
-- ~~**Fix api.php line 232**: Fix log truncation that could leave incomplete HTML tags~~ ✅ Ya no aplica (formato de texto cambiado)
+- ~~**Deduplicación de mensajes**: Implementar basada en message_id~~ ✅ Corregido en v0.1.1
+- ~~**Fix api.php line 232**: Fix log truncation that could leave incomplete HTML tags~~ ✅ Ya no aplica
 - **Fix api.php**: Make error handling consistent (some functions return null, others return false)
-- **Fix admin.php line 177**: Increase input size for bot token (currently 50, should accommodate longer tokens)
+- ~~**Fix admin.php line 177**: Increase input size for bot token~~ ✅ Ya tiene size="60"
 - **Fix admin.php**: Remove duplicate code for protocol detection and webhook URL construction
-- **Fix setup_webhook.php lines 24-26**: Inconsistent requirement - script requires TELEGRAM_WEBHOOK_SECRET but api.php allows webhook without it
+- ~~**Fix setup_webhook.php**: Inconsistent requirement~~ ✅ Ya funciona correctamente
 
 ## Autores y Desarrollo
 
