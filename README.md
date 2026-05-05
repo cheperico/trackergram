@@ -47,7 +47,9 @@ Telegram → trackerGram → TikiWiki Tracker
 3. Configura los campos del tracker con los permanent names:
    - `telegrammessageTelegramMessageId`
    - `telegrammessageChatId`
+   - `telegrammessageChatTitle` (opcional - nombre del grupo)
    - `telegrammessageTopicId`
+   - `telegrammessageTopicName` (opcional - nombre del topic)
    - `telegrammessageUserId`
    - `telegrammessageUsername`
    - `telegrammessageFirstName`

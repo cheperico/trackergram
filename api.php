@@ -39,6 +39,45 @@ function getFileUrl($fileId)
 }
 
 /**
+ * Verificar si un message_id ya existe en el tracker (para evitar duplicados)
+ */
+function messageExistsInTracker($messageId)
+{
+    $trackerId = TIKIWIKI_TRACKER_ID;
+    // Buscar items con ese message_id
+    $url = TIKIWIKI_API_URL . "trackers/{$trackerId}/items?filters[telegrammessageTelegramMessageId]=$messageId";
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "Authorization: Bearer " . TIKIWIKI_TOKEN,
+        "User-Agent: trackerGram/1.0",
+        "Accept: application/json"
+    ]);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($httpCode !== 200) {
+        error_log("trackerGram: ERROR checking duplicate: HTTP $httpCode");
+        return false; // En caso de error, permitir envío
+    }
+    
+    $data = json_decode($response, true);
+    $count = $data['count'] ?? 0;
+    
+    if ($count > 0) {
+        error_log("trackerGram: DUPLICATE detected for message_id: $messageId");
+        return true;
+    }
+    
+    return false;
+}
+
+/**
  * Obtener el galleryId del campo de archivo en el tracker
  */
 function getMediaGalleryId()
@@ -363,10 +402,58 @@ function extractMessageData($message)
         $data['text'] = 'Topic reabierto';
     }
 
+    // Ubicación
+    if (isset($message['location'])) {
+        $location = $message['location'];
+        $data['type'] = 'location';
+        $data['media_type'] = 'location';
+        $data['text'] = '📍 Ubicación: https://maps.google.com/?q=' . $location['latitude'] . ',' . $location['longitude'];
+        if (isset($location['horizontal_accuracy'])) {
+            $data['text'] .= ' (precisión: ' . $location['horizontal_accuracy'] . 'm)';
+        }
+    }
+
+    // Contacto
+    if (isset($message['contact'])) {
+        $contact = $message['contact'];
+        $data['type'] = 'contact';
+        $data['media_type'] = 'contact';
+        $phone = $contact['phone_number'] ?? '';
+        $firstName = $contact['first_name'] ?? '';
+        $lastName = $contact['last_name'] ?? '';
+        $data['text'] = '👤 Contacto: ' . $firstName . ' ' . $lastName . ' (' . $phone . ')';
+    }
+
+    // Encuesta
+    if (isset($message['poll'])) {
+        $poll = $message['poll'];
+        $data['type'] = 'poll';
+        $data['media_type'] = 'poll';
+        $question = $poll['question'] ?? 'Sin pregunta';
+        $options = count($poll['options'] ?? []);
+        $data['text'] = '📊 Encuesta: ' . $question . ' (' . $options . ' opciones)';
+    }
+
+    // Sticker animated (sin archivo)
+    if (isset($message['animation'])) {
+        $data['type'] = 'animation';
+        $data['media_type'] = $message['animation']['mime_type'] ?? 'animation/gif';
+        $data['text'] = '🎬 Animation: ' . $data['media_type'];
+    }
+
     // Otros tipos no manejados específicamente
     if ($data['type'] === 'text' && !isset($message['text'])) {
-        $data['type'] = 'other';
-        $data['text'] = '[Mensaje no soportado]';
+        // Obtener las claves del mensaje para mostrar qué tipo es
+        $messageKeys = array_keys($message);
+        $unknownTypes = array_diff($messageKeys, ['message_id', 'from', 'chat', 'date', 'text', 'photo', 'video', 'audio', 'document', 'sticker', 'voice', 'video_note', 'location', 'contact', 'poll', 'animation', 'forum_topic_edited', 'forum_topic_closed', 'forum_topic_reopened', 'caption', 'edit_date', 'entities', 'forward_from', 'forward_from_chat', 'reply_to_message', 'via_bot']);
+        
+        if (!empty($unknownTypes)) {
+            $data['type'] = 'other';
+            $data['text'] = '[Tipo no soportado: ' . implode(', ', $unknownTypes) . ']';
+        } else {
+            $data['type'] = 'other';
+            $data['text'] = '[Mensaje sin texto]';
+        }
     }
 
     return $data;
@@ -384,7 +471,9 @@ function sendToTikiWiki($data)
     $postFields = [
         'fields[telegrammessageTelegramMessageId]' => $data['message_id'],
         'fields[telegrammessageChatId]' => $data['chat_id'],
+        'fields[telegrammessageChatTitle]' => htmlspecialchars($data['chat_title'] ?? '', ENT_QUOTES, 'UTF-8'),
         'fields[telegrammessageTopicId]' => $data['topic_id'],
+        'fields[telegrammessageTopicName]' => htmlspecialchars($data['topic_name'] ?? '', ENT_QUOTES, 'UTF-8'),
         'fields[telegrammessageUserId]' => $data['user_id'],
         'fields[telegrammessageUsername]' => htmlspecialchars($data['username'] ?? '', ENT_QUOTES, 'UTF-8'),
         'fields[telegrammessageFirstName]' => htmlspecialchars($data['first_name'] ?? '', ENT_QUOTES, 'UTF-8'),
@@ -496,6 +585,7 @@ function processUpdate($update)
     }
     
     $chatId = $message['chat']['id'];
+    $chatTitle = $message['chat']['title'] ?? $message['chat']['username'] ?? 'Chat ' . $chatId;
 
     // Validar chat_id si ALLOWED_CHAT_IDS está configurado
     if (!empty(ALLOWED_CHAT_IDS) && !in_array($chatId, ALLOWED_CHAT_IDS)) {
@@ -504,15 +594,24 @@ function processUpdate($update)
     }
 
     $topicId = $message['message_thread_id'] ?? 'general';
+    $topicName = 'General'; // Por ahora hardcodeado, luego se puede obtener de la API
 
     // Determinar tipo de mensaje y extraer datos
     $messageData = extractMessageData($message);
+
+    // Verificar si el mensaje ya existe (evitar duplicados)
+    if (messageExistsInTracker($message['message_id'])) {
+        error_log("trackerGram: SKIPPING duplicate message_id={$message['message_id']}");
+        return;
+    }
 
     // Enviar mensaje a TikiWiki
     $tikiData = [
         'message_id' => $message['message_id'],
         'chat_id' => $chatId,
+        'chat_title' => $chatTitle,
         'topic_id' => $topicId,
+        'topic_name' => $topicName,
         'user_id' => $message['from']['id'],
         'username' => $message['from']['username'] ?? null,
         'first_name' => $message['from']['first_name'] ?? '',
