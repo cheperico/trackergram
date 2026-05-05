@@ -301,10 +301,18 @@ Si ModSecurity bloquea las peticiones a TikiWiki:
 - **Fix admin.php**: Remove duplicate code for protocol detection and webhook URL construction
 - **Fix setup_webhook.php lines 24-26**: Inconsistent requirement - script requires TELEGRAM_WEBHOOK_SECRET but api.php allows webhook without it
 
-## Autores
+## Autores y Desarrollo
 
-- cheperico
-- Cascade (SWE-1.5 y SWE-1.6 - Cognition AI Assistant)
+- **cheperico**: Dirección del proyecto, pruebas y validación
+- **Cascade (minimax-m2.5-free)**: Asistencia de programación durante esta sesión
+
+### Sobre el desarrollo
+
+Este proyecto fue desarrollado con asistencia de LLMs. El director del proyecto (cheperico) no es programador profesional y utiliza agentes de IA para implementar las funcionalidades. Esta metodología de desarrollo tiene características particulares:
+
+- Los LLMs son buenos para implementar features específicas, optimizar código y buscar bugs
+- Pueden escribir código funcional pero pueden perder contexto en sesiones largas
+- La validación final siempre requiere pruebas humanas
 
 ## Licencia
 
