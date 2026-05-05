@@ -340,6 +340,7 @@ El sistema mapea automáticamente los campos de Telegram a los campos del tracke
 ### v0.1.0 (Alpha) - Actual
 - Subida de archivos multimedia a TikiWiki file gallery
 - Los archivos se vinculan al campo `telegrammessageMedia` del tracker
+- El galleryId se obtiene dinámicamente desde la configuración del tracker via API (no hardcodeado)
 - Campo de texto ahora muestra solo el MIME type (no HTML)
 - Mejoras de seguridad en admin.php
 

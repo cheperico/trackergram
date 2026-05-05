@@ -39,11 +39,75 @@ function getFileUrl($fileId)
 }
 
 /**
+ * Obtener el galleryId del campo de archivo en el tracker
+ */
+function getMediaGalleryId()
+{
+    $trackerId = TIKIWIKI_TRACKER_ID;
+    $url = TIKIWIKI_API_URL . "trackers/{$trackerId}/fields";
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "Authorization: Bearer " . TIKIWIKI_TOKEN,
+        "User-Agent: trackerGram/1.0",
+        "Accept: application/json"
+    ]);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($httpCode !== 200) {
+        error_log("trackerGram: ERROR getting tracker fields: HTTP $httpCode");
+        return null;
+    }
+    
+    $data = json_decode($response, true);
+    if (!$data || !isset($data['fields'])) {
+        error_log("trackerGram: ERROR parsing tracker fields response");
+        return null;
+    }
+    
+    // Buscar el campo telegrammessageMedia
+    foreach ($data['fields'] as $field) {
+        if (($field['permName'] ?? '') === 'telegrammessageMedia') {
+            $options = $field['options'] ?? [];
+            
+            // El galleryId puede estar en diferentes formatos
+            $galleryId = $options['galleryId'] ?? $options['gallery_id'] ?? $options['id'] ?? null;
+            
+            if ($galleryId) {
+                error_log("trackerGram: Found media field galleryId: $galleryId");
+                return (int)$galleryId;
+            }
+        }
+    }
+    
+    error_log("trackerGram: WARNING - telegrammessageMedia field not found or has no galleryId configured");
+    return null;
+}
+
+// Cache del galleryId para no consultarlo en cada mensaje
+$mediaGalleryIdCache = null;
+
+/**
  * Subir archivo a TikiWiki file gallery
  */
 function uploadToTikiWiki($filePath, $fileName, $mimeType = null)
 {
-    $galleryId = 29;
+    global $mediaGalleryIdCache;
+    
+    // Usar cache si ya se obtuvo el galleryId
+    if ($mediaGalleryIdCache === null) {
+        $mediaGalleryIdCache = getMediaGalleryId();
+    }
+    
+    // Si no se pudo obtener dinámicamente, usar fallback hardcodeado
+    $galleryId = $mediaGalleryIdCache ?? 29;
+    error_log("trackerGram: Using galleryId: $galleryId");
     $uploadUrl = TIKIWIKI_API_URL . 'galleries/upload';
     
     $cfile = curl_file_create($filePath, $mimeType ?: 'application/octet-stream', $fileName);

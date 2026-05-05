@@ -281,7 +281,7 @@ Si ModSecurity bloquea las peticiones a TikiWiki:
 - **Actualización de webhook desde interfaz**: Botón para actualizar webhook automáticamente
 
 #### ✅ Completado (v0.1.0)
-- **Subida de archivos multimedia a TikiWiki**: Los archivos (fotos, videos, audio, documentos, stickers, notas de voz) se suben a la file gallery de TikiWiki y se vinculan al campo `telegrammessageMedia` del tracker
+- **Subida de archivos multimedia a TikiWiki**: Los archivos (fotos, videos, audio, documentos, stickers, notas de voz) se suben automáticamente a la file gallery vinculada al campo `telegrammessageMedia`. El galleryId se obtiene dinámicamente desde la configuración del tracker via API.
 
 #### 🔄 Próximas Mejoras
 - **Mejorar interpretación de mensajes**: Expandir soporte para tipos de mensajes de Telegram (encuestas, ubicaciones, contactos, etc.)
