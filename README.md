@@ -69,11 +69,12 @@ Telegram → trackerGram → TikiWiki Tracker
 2. Copia `.env.example` a `.env`
 3. Configura las variables en `.env`:
    ```env
-   TELEGRAM_BOT_TOKEN=tu_token_aqui
-   TELEGRAM_WEBHOOK_SECRET=tu_token_secreto_webhook_aqui
-   TIKIWIKI_API_URL=http://localhost/tikigram/api/
-   TIKIWIKI_TOKEN=tu_token_tikiwiki_aqui
-   TIKIWIKI_TRACKER_ID=1
+TELEGRAM_BOT_TOKEN=tu_token_aqui
+TELEGRAM_WEBHOOK_SECRET=tu_token_secreto_webhook_aqui
+TIKIWIKI_API_URL=http://localhost/tikigram/api/
+TIKIWIKI_TOKEN=tu_token_tikiwiki_aqui
+TIKIWIKI_TRACKER_ID=1
+DEBUG_MODE=false
    ```
 4. Configura `ALLOWED_CHAT_IDS` en `config.php` si quieres restringir a chats específicos
 
@@ -168,7 +169,7 @@ Las credenciales sensibles se almacenan en `.env`:
 
 ## Logging
 
-Los logs se guardan en `debug.log` cuando `DEBUG_MODE` está habilitado en `config.php`.
+Los logs se guardan en `debug.log` cuando `DEBUG_MODE=true` está configurado en `.env`.
 
 ## Troubleshooting
 
@@ -272,6 +273,7 @@ Si ModSecurity bloquea las peticiones a TikiWiki:
 - IP whitelisting para restringir acceso a endpoints administrativos
 - Monitoreo de anomalías en patrones de mensajes
 - Validación más estricta de contenido (longitud máxima, caracteres permitidos) - parcialmente implementado
+- **Refactorización del código**: Ver archivo `para_mejoras_tecnicas.md` para recomendaciones de arquitectura, separación en clases, typed PHP y mejoras de estructura
 
 ### Roadmap de Funcionalidades
 
@@ -289,6 +291,7 @@ Si ModSecurity bloquea las peticiones a TikiWiki:
 - **Lectura de nombre de chat ID**: Mostrar nombre del chat en lugar del ID numérico, o agregar columnas separadas para ID y nombre
 - **Manejo de mensajes no soportados**: Corregir el problema donde mensajes no soportados se muestran como link a "Mensaje no soportado" en lugar de mostrar información útil
 - **Evitar duplicado de mensajes**: Implementar deduplicación basada en message_id para evitar que el mismo mensaje se envíe múltiples veces a TikiWiki
+- **Mejoras técnicas de código**: Ver archivo `para_mejoras_tecnicas.md` para roadmap de refactorización (separación en clases, typed PHP, eliminar variables globales, etc.)
 
 #### 🐛 Bugs por Corregir
 - ~~**Fix api.php line 298**: Log message has incorrect spacing~~ ✅ Corregido en v1.2
