@@ -100,9 +100,16 @@ function messageExistsInTracker(int $messageId): bool
 
 /**
  * Obtener el galleryId del campo de archivo en el tracker
+ * Usa caché estático para evitar múltiples llamadas a la API
  */
 function getMediaGalleryId(): ?int
 {
+    static $cachedGalleryId = null;
+    
+    if ($cachedGalleryId !== null) {
+        return $cachedGalleryId;
+    }
+    
     $trackerId = TIKIWIKI_TRACKER_ID;
     $url = TIKIWIKI_API_URL . "trackers/{$trackerId}/fields";
     
@@ -141,17 +148,16 @@ function getMediaGalleryId(): ?int
             
             if ($galleryId) {
                 error_log("trackerGram: Found media field galleryId: $galleryId");
-                return (int)$galleryId;
+                $cachedGalleryId = (int)$galleryId;
+                return $cachedGalleryId;
             }
         }
     }
     
     error_log("trackerGram: WARNING - telegrammessageMedia field not found or has no galleryId configured");
-    return null;
+    $cachedGalleryId = 29; // Fallback
+    return $cachedGalleryId;
 }
-
-// Cache del galleryId para no consultarlo en cada mensaje
-$mediaGalleryIdCache = null;
 
 /**
  * Subir archivo a TikiWiki file gallery
@@ -498,7 +504,7 @@ function sendToTikiWiki(array $data): bool
         'fields[telegrammessageChatId]' => $data['chat_id'],
         'fields[telegrammessageChatTitle]' => htmlspecialchars($data['chat_title'] ?? '', ENT_QUOTES, 'UTF-8'),
         'fields[telegrammessageTopicId]' => $data['topic_id'],
-        'fields[telegrammessageTopicName]' => htmlspecialchars($data['topic_name'] ?? '', ENT_QUOTES, 'UTF-8'),
+        'fields[telegrammessageTopicName]' => htmlspecialchars($data['topic_title'] ?? '', ENT_QUOTES, 'UTF-8'),
         'fields[telegrammessageUserId]' => $data['user_id'],
         'fields[telegrammessageUsername]' => htmlspecialchars($data['username'] ?? '', ENT_QUOTES, 'UTF-8'),
         'fields[telegrammessageFirstName]' => htmlspecialchars($data['first_name'] ?? '', ENT_QUOTES, 'UTF-8'),
@@ -635,7 +641,7 @@ function processUpdate(array $update): void
         'chat_id' => $chatId,
         'chat_title' => $chatTitle,
         'topic_id' => $topicId,
-        'topic_name' => $topicName,
+        'topic_title' => $topicName,
         'user_id' => $message['from']['id'],
         'username' => $message['from']['username'] ?? null,
         'first_name' => $message['from']['first_name'] ?? '',

@@ -95,7 +95,7 @@ X-Telegram-Bot-Api-Secret-Token: <secret_token_configurado>
 | `telegrammessageChatId` | `message.chat.id` | Integer |
 | `telegrammessageChatTitle` | `message.chat.title` o `username` | String |
 | `telegrammessageTopicId` | `message.message_thread_id` | Integer/String |
-| `telegrammessageTopicName` | Hardcoded "General" | String |
+| `telegrammessageTopicTitle` | Hardcoded "General" | String |
 | `telegrammessageUserId` | `message.from.id` | Integer |
 | `telegrammessageUsername` | `message.from.username` | String |
 | `telegrammessageFirstName` | `message.from.first_name` | String |
