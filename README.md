@@ -296,6 +296,9 @@ Si ModSecurity bloquea las peticiones a TikiWiki:
 
 #### 🔄 Próximas Mejoras
 - **Lectura de topic ID**: Obtener nombre del topic desde la API de Telegram (actualmente hardcodeado como "General")
+- **Topic dinámico**: Obtener nombre real del topic (opcional, requiere llamadas extra a API de Telegram)
+- **Rate limiting webhook**: Para prevenir abuso del endpoint (importante para producción)
+- **Monitoreo**: Métricas de uso y performance (uso de recursos, cantidad de mensajes, etc.)
 - **Mejoras técnicas de código**: Ver archivo `para_mejoras_tecnicas.md` para roadmap de refactorización
 
 #### 🐛 Bugs por Corregir
