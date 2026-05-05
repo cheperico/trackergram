@@ -54,6 +54,7 @@ Telegram → trackerGram → TikiWiki Tracker
    - `telegrammessageLastName`
    - `telegrammessageMessageType`
    - `telegrammessageText`
+   - `telegrammessageMedia` (campo de tipo archivo vinculado a la galería)
    - `telegrammessageMediaUrl`
    - `telegrammessageFileUrl`
    - `telegrammessageMediaType`
@@ -227,7 +228,7 @@ Si ModSecurity bloquea las peticiones a TikiWiki:
 - **Archivos sensibles protegidos**: `.env`, `config.php`, `test_webhook.php` bloqueados por `.htaccess`
 - **Permisos de archivos**: `.env` debe tener permisos 600 o 640
 
-### Mejoras de Seguridad Críticas (v1.1)
+### Mejoras de Seguridad (v0.0.1)
 
 - **Autenticación robusta en admin.php**: 
   - Requerimiento obligatorio de contraseña ADMIN_PASSWORD
@@ -252,7 +253,7 @@ Si ModSecurity bloquea las peticiones a TikiWiki:
 
 ### Roadmap de Seguridad
 
-#### ✅ Completado (v1.1)
+#### ✅ Completado (v0.0.1)
 - **CRITICAL**: Fix admin.php line 23 - Add validation before explode to handle .env lines without '='
 - **CRITICAL**: Fix admin.php line 45 - Require ADMIN_PASSWORD to be set (currently allows empty password)
 - **CRITICAL**: Add CSRF protection to admin.php forms
@@ -274,10 +275,13 @@ Si ModSecurity bloquea las peticiones a TikiWiki:
 
 ### Roadmap de Funcionalidades
 
-#### ✅ Completado (v1.1)
+#### ✅ Completado (v0.0.1)
 - **Interfaz web de configuración**: Interfaz minimalista para configurar credenciales desde navegador
 - **Autenticación para interfaz de configuración**: Autenticación básica (usuario/contraseña) implementada
 - **Actualización de webhook desde interfaz**: Botón para actualizar webhook automáticamente
+
+#### ✅ Completado (v0.1.0)
+- **Subida de archivos multimedia a TikiWiki**: Los archivos (fotos, videos, audio, documentos, stickers, notas de voz) se suben a la file gallery de TikiWiki y se vinculan al campo `telegrammessageMedia` del tracker
 
 #### 🔄 Próximas Mejoras
 - **Mejorar interpretación de mensajes**: Expandir soporte para tipos de mensajes de Telegram (encuestas, ubicaciones, contactos, etc.)
@@ -287,11 +291,11 @@ Si ModSecurity bloquea las peticiones a TikiWiki:
 - **Evitar duplicado de mensajes**: Implementar deduplicación basada en message_id para evitar que el mismo mensaje se envíe múltiples veces a TikiWiki
 
 #### 🐛 Bugs por Corregir
-- **Fix api.php line 298**: Log message has incorrect spacing ("Reintento $i + 1" should be "Reintento " . ($i + 1))
-- **Fix api.php line 278**: media_url assigned to both media_url and file_url fields unintentionally
-- **Fix api.php line 299**: Remove or fix sleep(1) in retry loop (blocks PHP process, could exhaust process pool)
+- ~~**Fix api.php line 298**: Log message has incorrect spacing~~ ✅ Corregido en v1.2
+- ~~**Fix api.php line 278**: media_url assigned to both media_url and file_url fields unintentionally~~ ✅ Corrección parcial - ahora se usa `media_url` correctamente
+- ~~**Fix api.php line 299**: Remove or fix sleep(1) in retry loop~~ ✅ Corregido - ahora usa usleep
 - **Fix api.php lines 263-283**: Add validation that required fields exist in $message array before accessing
-- **Fix api.php line 232**: Fix log truncation that could leave incomplete HTML tags
+- ~~**Fix api.php line 232**: Fix log truncation that could leave incomplete HTML tags~~ ✅ Ya no aplica (formato de texto cambiado)
 - **Fix api.php**: Make error handling consistent (some functions return null, others return false)
 - **Fix admin.php line 177**: Increase input size for bot token (currently 50, should accommodate longer tokens)
 - **Fix admin.php**: Remove duplicate code for protocol detection and webhook URL construction

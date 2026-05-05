@@ -155,12 +155,15 @@ DEBUG_MODE=false
 | Last Name | telegrammessageLastName | Text Field |
 | Message Type | telegrammessageMessageType | Text Field |
 | Text | telegrammessageText | Text Area |
+| Media | telegrammessageMedia | **File Gallery** (vinculado a galería) |
 | Media URL | telegrammessageMediaUrl | Text Field |
 | File URL | telegrammessageFileUrl | Text Field |
 | Media Type | telegrammessageMediaType | Text Field |
 | Media Size | telegrammessageMediaSize | Text Field |
 | Media Caption | telegrammessageMediaCaption | Text Field |
 | Message Date | telegrammessageMessageDate | Text Field |
+
+> **Nota**: El campo `telegrammessageMedia` debe ser de tipo **File Gallery** y estar vinculado a la galería donde se almacenarán los archivossubidos desde Telegram.
 
 #### 5.2 Generar Token de API
 

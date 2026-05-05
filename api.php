@@ -39,6 +39,94 @@ function getFileUrl($fileId)
 }
 
 /**
+ * Subir archivo a TikiWiki file gallery
+ */
+function uploadToTikiWiki($filePath, $fileName, $mimeType = null)
+{
+    $galleryId = 29;
+    $uploadUrl = TIKIWIKI_API_URL . 'galleries/upload';
+    
+    $cfile = curl_file_create($filePath, $mimeType ?: 'application/octet-stream', $fileName);
+    
+    $postData = [
+        'galleryId' => $galleryId,
+        'data' => $cfile,
+        'name' => $fileName,
+        'title' => $fileName,
+        'description' => 'Archivo subido desde Telegram - ' . date('Y-m-d H:i:s')
+    ];
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $uploadUrl);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "Authorization: Bearer " . TIKIWIKI_TOKEN,
+        "User-Agent: trackerGram/1.0",
+        "Accept: application/json"
+    ]);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+    
+    $response = curl_exec($ch);
+    $error = curl_error($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($httpCode !== 200 && $httpCode !== 201) {
+        error_log("trackerGram: ERROR uploading file: HTTP $httpCode, Response: $response");
+        return false;
+    }
+    
+    $responseData = json_decode($response, true);
+    if (!$responseData) {
+        error_log("trackerGram: ERROR: Response is not valid JSON: $response");
+        return false;
+    }
+    
+    $fileId = $responseData['fileId'] ?? $responseData['file_id'] ?? null;
+    
+    if ($fileId) {
+        error_log("trackerGram: File uploaded to TikiWiki gallery, fileId: $fileId");
+        return $fileId;
+    }
+    
+    error_log("trackerGram: ERROR: No fileId in response: " . json_encode($responseData));
+    return false;
+}
+
+/**
+ * Descargar archivo de Telegram y subir a TikiWiki
+ */
+function downloadAndUploadMedia($fileId, $fileName = null, $mimeType = null)
+{
+    $fileUrl = getFileUrl($fileId);
+    if (!$fileUrl) {
+        error_log("trackerGram: Cannot get URL for FileID: $fileId");
+        return false;
+    }
+    
+    $ctx = stream_context_create(['http' => ['timeout' => 10]]);
+    $fileContent = @file_get_contents($fileUrl, false, $ctx);
+    
+    if ($fileContent === false) {
+        error_log("trackerGram: Cannot download from: $fileUrl");
+        return false;
+    }
+    
+    $tempFile = tempnam(sys_get_temp_dir(), 'tg_media_');
+    if (file_put_contents($tempFile, $fileContent) === false) {
+        return false;
+    }
+    
+    $result = uploadToTikiWiki($tempFile, $fileName, $mimeType);
+    unlink($tempFile);
+    
+    return $result;
+}
+
+/**
  * Extraer datos de mensaje según el tipo (texto, multimedia, sistema)
  */
 function extractMessageData($message)
@@ -50,7 +138,8 @@ function extractMessageData($message)
         'media_type' => null,
         'media_size' => null,
         'media_caption' => null,
-        'system_message' => null
+        'system_message' => null,
+        'uploaded_file_id' => null
     ];
 
     // Mensajes de texto
@@ -65,9 +154,17 @@ function extractMessageData($message)
         $data['media_url'] = getFileUrl($photo['file_id']) ?? $photo['file_id'];
         $data['media_type'] = 'image/jpeg';
         $data['media_size'] = $photo['file_size'] ?? null;
-        $data['text'] = '<img src="' . htmlspecialchars($data['media_url']) . '" alt="Foto" />';
+        
+        // Subir foto a TikiWiki
+        $data['uploaded_file_id'] = downloadAndUploadMedia(
+            $photo['file_id'],
+            'telegram_photo_' . $photo['file_id'] . '.jpg',
+            'image/jpeg'
+        );
+        
+        $data['text'] = 'Foto: ' . $data['media_type'];
         if (isset($message['caption'])) {
-            $data['text'] .= '<br/>' . htmlspecialchars($message['caption']);
+            $data['text'] .= ' - ' . htmlspecialchars($message['caption']);
         }
     }
 
@@ -76,12 +173,17 @@ function extractMessageData($message)
         $video = $message['video'];
         $data['type'] = 'video';
         $data['media_url'] = getFileUrl($video['file_id']) ?? $video['file_id'];
-        $data['media_type'] = $video['mime_type'] ?? 'mp4';
+        $data['media_type'] = $video['mime_type'] ?? 'video/mp4';
         $data['media_size'] = $video['file_size'] ?? null;
         $data['media_caption'] = $message['caption'] ?? null;
-        $data['text'] = '<video src="' . htmlspecialchars($data['media_url']) . '" controls>Video</video>';
+        
+        // Subir video a TikiWiki
+        $fileName = 'telegram_video_' . $video['file_id'] . '.' . pathinfo($video['file_id'], PATHINFO_EXTENSION);
+        $data['uploaded_file_id'] = downloadAndUploadMedia($video['file_id'], $fileName, $data['media_type']);
+        
+        $data['text'] = 'Video: ' . $data['media_type'];
         if (isset($message['caption'])) {
-            $data['text'] .= '<br/>' . htmlspecialchars($message['caption']);
+            $data['text'] .= ' - ' . htmlspecialchars($message['caption']);
         }
     }
 
@@ -90,11 +192,16 @@ function extractMessageData($message)
         $audio = $message['audio'];
         $data['type'] = 'audio';
         $data['media_url'] = getFileUrl($audio['file_id']) ?? $audio['file_id'];
-        $data['media_type'] = $audio['mime_type'] ?? 'mp3';
+        $data['media_type'] = $audio['mime_type'] ?? 'audio/mpeg';
         $data['media_size'] = $audio['file_size'] ?? null;
-        $data['text'] = '<audio src="' . htmlspecialchars($data['media_url']) . '" controls>Audio</audio>';
+        
+        // Subir audio a TikiWiki
+        $fileName = 'telegram_audio_' . $audio['file_id'] . '.mp3';
+        $data['uploaded_file_id'] = downloadAndUploadMedia($audio['file_id'], $fileName, $data['media_type']);
+        
+        $data['text'] = 'Audio: ' . $data['media_type'];
         if (isset($audio['title'])) {
-            $data['text'] .= '<br/>' . htmlspecialchars($audio['title']);
+            $data['text'] .= ' - ' . htmlspecialchars($audio['title']);
         }
     }
 
@@ -107,7 +214,11 @@ function extractMessageData($message)
         $data['media_size'] = $document['file_size'] ?? null;
         $data['media_caption'] = $message['caption'] ?? null;
         $fileName = $document['file_name'] ?? 'Documento';
-        $data['text'] = '<a href="' . htmlspecialchars($data['media_url']) . '">' . htmlspecialchars($fileName) . '</a>';
+        
+        // Subir documento a TikiWiki
+        $data['uploaded_file_id'] = downloadAndUploadMedia($document['file_id'], $fileName, $data['media_type']);
+        
+        $data['text'] = 'Documento: ' . $data['media_type'] . ' - ' . htmlspecialchars($fileName);
     }
 
     // Stickers
@@ -115,8 +226,13 @@ function extractMessageData($message)
         $sticker = $message['sticker'];
         $data['type'] = 'sticker';
         $data['media_url'] = getFileUrl($sticker['file_id']) ?? $sticker['file_id'];
-        $data['media_type'] = 'webp';
-        $data['text'] = '<img src="' . htmlspecialchars($data['media_url']) . '" alt="Sticker" />';
+        $data['media_type'] = 'image/webp';
+        
+        // Subir sticker a TikiWiki
+        $fileName = 'telegram_sticker_' . $sticker['file_id'] . '.webp';
+        $data['uploaded_file_id'] = downloadAndUploadMedia($sticker['file_id'], $fileName, 'image/webp');
+        
+        $data['text'] = 'Sticker: ' . $data['media_type'];
     }
 
     // Notas de voz
@@ -124,9 +240,14 @@ function extractMessageData($message)
         $voice = $message['voice'];
         $data['type'] = 'voice';
         $data['media_url'] = getFileUrl($voice['file_id']) ?? $voice['file_id'];
-        $data['media_type'] = $voice['mime_type'] ?? 'ogg';
+        $data['media_type'] = $voice['mime_type'] ?? 'audio/ogg';
         $data['media_size'] = $voice['file_size'] ?? null;
-        $data['text'] = '<audio src="' . htmlspecialchars($data['media_url']) . '" controls>Nota de voz</audio>';
+        
+        // Subir nota de voz a TikiWiki
+        $fileName = 'telegram_voice_' . $voice['file_id'] . '.ogg';
+        $data['uploaded_file_id'] = downloadAndUploadMedia($voice['file_id'], $fileName, $data['media_type']);
+        
+        $data['text'] = 'Nota de voz: ' . $data['media_type'];
     }
 
     // Video messages (videos redonditos)
@@ -134,9 +255,14 @@ function extractMessageData($message)
         $videoNote = $message['video_note'];
         $data['type'] = 'video_note';
         $data['media_url'] = getFileUrl($videoNote['file_id']) ?? $videoNote['file_id'];
-        $data['media_type'] = $videoNote['mime_type'] ?? 'mp4';
+        $data['media_type'] = $videoNote['mime_type'] ?? 'video/mp4';
         $data['media_size'] = $videoNote['file_size'] ?? null;
-        $data['text'] = '<video src="' . htmlspecialchars($data['media_url']) . '" controls>Video circular</video>';
+        
+        // Subir video_note a TikiWiki
+        $fileName = 'telegram_video_note_' . $videoNote['file_id'] . '.mp4';
+        $data['uploaded_file_id'] = downloadAndUploadMedia($videoNote['file_id'], $fileName, $data['media_type']);
+        
+        $data['text'] = 'Video circular: ' . $data['media_type'];
     }
 
     // Mensajes de sistema (cambio de nombre de topic, etc.)
@@ -195,6 +321,11 @@ function sendToTikiWiki($data)
         'fields[telegrammessageMessageDate]' => $data['date']
     ];
 
+    // Agregar archivo subido si existe
+    if (!empty($data['uploaded_file_id'])) {
+        $postFields['fields[telegrammessageMedia]'] = $data['uploaded_file_id'];
+    }
+
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_POST, true);
@@ -217,12 +348,12 @@ function sendToTikiWiki($data)
     curl_close($ch);
 
     if ($error) {
-        log_message("Error cURL al enviar a TikiWiki: $error");
+        error_log("Error cURL al enviar a TikiWiki: $error");
         return false;
     }
 
     if ($httpCode !== 200 && $httpCode !== 201) {
-        log_message("Error HTTP al enviar a TikiWiki: $httpCode - Response: $response");
+        error_log("Error HTTP al enviar a TikiWiki: $httpCode - Response: $response");
         return false;
     }
 
@@ -237,11 +368,11 @@ function sendToTikiWiki($data)
         if (strlen($cleanResponse) >= 300) {
             $cleanResponse .= '... [truncated]';
         }
-        log_message("Error de formato en respuesta de TikiWiki (Status $httpCode): $cleanResponse");
+        error_log("Error de formato en respuesta de TikiWiki (Status $httpCode): $cleanResponse");
         return false;
     }
 
-    log_message("Mensaje enviado a TikiWiki: message_id={$data['message_id']}");
+    error_log("Mensaje enviado a TikiWiki: message_id={$data['message_id']}");
     return true;
 }
 
@@ -250,7 +381,7 @@ function sendToTikiWiki($data)
  */
 function processUpdate($update)
 {
-    log_message("processUpdate iniciado");
+    error_log("processUpdate iniciado");
 
     if (!isset($update['message'])) {
         return;
@@ -262,7 +393,7 @@ function processUpdate($update)
     $requiredFields = ['message_id', 'chat', 'from', 'date'];
     foreach ($requiredFields as $field) {
         if (!isset($message[$field])) {
-            log_message("ERROR: Campo requerido '$field' no encontrado en el mensaje");
+            error_log("ERROR: Campo requerido '$field' no encontrado en el mensaje");
             return;
         }
     }
@@ -279,7 +410,7 @@ function processUpdate($update)
         $value = $message;
         foreach ($keys as $key) {
             if (!isset($value[$key])) {
-                log_message("ERROR: Subcampo requerido '$fieldPath' no encontrado en el mensaje");
+                error_log("ERROR: Subcampo requerido '$fieldPath' no encontrado en el mensaje");
                 return;
             }
             $value = $value[$key];
@@ -290,7 +421,7 @@ function processUpdate($update)
 
     // Validar chat_id si ALLOWED_CHAT_IDS está configurado
     if (!empty(ALLOWED_CHAT_IDS) && !in_array($chatId, ALLOWED_CHAT_IDS)) {
-        log_message("Chat $chatId no está en la lista de permitidos");
+        error_log("Chat $chatId no está en la lista de permitidos");
         return;
     }
 
@@ -315,6 +446,7 @@ function processUpdate($update)
         'media_type' => $messageData['media_type'],
         'media_size' => $messageData['media_size'],
         'media_caption' => $messageData['media_caption'],
+        'uploaded_file_id' => $messageData['uploaded_file_id'] ?? null,
         'date' => $message['date']
     ];
 
@@ -331,7 +463,7 @@ function processUpdate($update)
         }
 
         if ($i < $maxRetries - 1) {
-            log_message("Reintento " . ($i + 1) . " para message_id={$tikiData['message_id']}");
+            error_log("Reintento " . ($i + 1) . " para message_id={$tikiData['message_id']}");
             // Usar usleep en lugar de sleep para evitar bloquear el proceso por completo
             // 100000 microsegundos = 0.1 segundos
             usleep(100000); // Esperar 0.1 segundos antes de reintentar
@@ -339,10 +471,10 @@ function processUpdate($update)
     }
 
     if (!$success) {
-        log_message("ERROR: No se pudo enviar mensaje a TikiWiki después de $maxRetries intentos: message_id={$tikiData['message_id']}");
+        error_log("ERROR: No se pudo enviar mensaje a TikiWiki después de $maxRetries intentos: message_id={$tikiData['message_id']}");
     }
 
-    log_message("Mensaje procesado: Topic $topicId, User {$message['from']['first_name']}");
+    error_log("Mensaje procesado: Topic $topicId, User {$message['from']['first_name']}");
 }
 
 // Manejar webhook de Telegram
@@ -355,7 +487,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         processUpdate($update);
         echo json_encode(['status' => 'ok']);
     } else {
-        log_message("Error al decodificar JSON del webhook");
+        error_log("Error al decodificar JSON del webhook");
         http_response_code(400);
         echo json_encode(['error' => 'Invalid JSON']);
     }

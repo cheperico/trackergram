@@ -99,7 +99,8 @@ X-Telegram-Bot-Api-Secret-Token: <secret_token_configurado>
 | `telegrammessageFirstName` | `message.from.first_name` | String |
 | `telegrammessageLastName` | `message.from.last_name` | String |
 | `telegrammessageMessageType` | `extractMessageData().type` | String |
-| `telegrammessageText` | `extractMessageData().text` | String (HTML) |
+| `telegrammessageText` | `extractMessageData().text` | String |
+| `telegrammessageMedia` | `downloadAndUploadMedia().fileId` | File (vinculado a galería) |
 | `telegrammessageMediaUrl` | `extractMessageData().media_url` | String |
 | `telegrammessageFileUrl` | `extractMessageData().media_url` | String |
 | `telegrammessageMediaType` | `extractMessageData().media_type` | String |
@@ -159,13 +160,13 @@ DEBUG_MODE=false
 | Tipo | Campo Telegram | Procesamiento |
 |------|----------------|---------------|
 | Texto | `message.text` | Texto plano |
-| Foto | `message.photo` | HTML `<img>` con URL |
-| Video | `message.video` | HTML `<video>` con URL |
-| Audio | `message.audio` | HTML `<audio>` con URL |
-| Documento | `message.document` | HTML `<a>` con nombre |
-| Sticker | `message.sticker` | HTML `<img>` con URL |
-| Voz | `message.voice` | HTML `<audio>` con URL |
-| Video Nota | `message.video_note` | HTML `<video>` con URL |
+| Foto | `message.photo` | Sube a TikiWiki gallery, texto: "Foto: image/jpeg" |
+| Video | `message.video` | Sube a TikiWiki gallery, texto: "Video: video/mp4" |
+| Audio | `message.audio` | Sube a TikiWiki gallery, texto: "Audio: audio/mpeg" |
+| Documento | `message.document` | Sube a TikiWiki gallery, texto: "Documento: tipo - nombre" |
+| Sticker | `message.sticker` | Sube a TikiWiki gallery, texto: "Sticker: image/webp" |
+| Voz | `message.voice` | Sube a TikiWiki gallery, texto: "Nota de voz: audio/ogg" |
+| Video Nota | `message.video_note` | Sube a TikiWiki gallery, texto: "Video circular: video/mp4" |
 | Sistema | `message.forum_topic_*` | Texto descriptivo |
 
 ### Flujo de Procesamiento
@@ -182,7 +183,7 @@ DEBUG_MODE=false
 
 ## Seguridad
 
-### Implementaciones de Seguridad v1.1
+### Implementaciones de Seguridad v0.0.1
 
 #### Autenticación (admin.php)
 - **Contraseña obligatoria**: No permite login sin ADMIN_PASSWORD
@@ -336,17 +337,17 @@ El sistema mapea automáticamente los campos de Telegram a los campos del tracke
 
 ## Versiones y Cambios
 
-### v1.1 (Actual)
-- 10 fixes críticos de seguridad
-- 9 bugs de código corregidos
-- Documentación completa
-- Interfaz de administración robusta
+### v0.1.0 (Alpha) - Actual
+- Subida de archivos multimedia a TikiWiki file gallery
+- Los archivos se vinculan al campo `telegrammessageMedia` del tracker
+- Campo de texto ahora muestra solo el MIME type (no HTML)
+- Mejoras de seguridad en admin.php
 
-### v1.0
-- Funcionalidad básica
-- Webhook endpoint
-- Integración TikiWiki
-- Configuración inicial
+### v0.0.1 (Alpha)
+- Primera versión funcional
+- Webhook endpoint para Telegram
+- Integración básica con TikiWiki trackers
+- Interfaz de administración
 
 ## Licencia y Soporte
 
