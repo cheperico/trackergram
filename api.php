@@ -504,7 +504,7 @@ function sendToTikiWiki(array $data): bool
         'fields[telegrammessageChatId]' => $data['chat_id'],
         'fields[telegrammessageChatTitle]' => htmlspecialchars($data['chat_title'] ?? '', ENT_QUOTES, 'UTF-8'),
         'fields[telegrammessageTopicId]' => $data['topic_id'],
-        'fields[telegrammessageTopicName]' => htmlspecialchars($data['topic_title'] ?? '', ENT_QUOTES, 'UTF-8'),
+        'fields[telegrammessageTopicTitle]' => htmlspecialchars($data['topic_title'] ?? '', ENT_QUOTES, 'UTF-8'),
         'fields[telegrammessageUserId]' => $data['user_id'],
         'fields[telegrammessageUsername]' => htmlspecialchars($data['username'] ?? '', ENT_QUOTES, 'UTF-8'),
         'fields[telegrammessageFirstName]' => htmlspecialchars($data['first_name'] ?? '', ENT_QUOTES, 'UTF-8'),
