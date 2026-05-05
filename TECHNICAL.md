@@ -350,6 +350,7 @@ El sistema mapea automáticamente los campos de Telegram a los campos del tracke
 - Captura de nombre del chat (chat_title)
 - Tema del topic (topic_name)
 - Mejor manejo de mensajes no soportados (muestra el tipo)
+- Refactorización: type hints en funciones, constantes de configuración, logging unificado
 
 ### v0.1.0 (Alpha)
 - Subida de archivos multimedia a TikiWiki file gallery
