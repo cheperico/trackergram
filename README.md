@@ -274,8 +274,9 @@ Si ModSecurity bloquea las peticiones a TikiWiki:
 - Verificación de firma de mensajes de Telegram (opcional)
 - IP whitelisting para restringir acceso a endpoints administrativos
 - Monitoreo de anomalías en patrones de mensajes
-- Validación más estricta de contenido (longitud máxima, caracteres permitidos) - parcialmente implementado
-- **Refactorización del código**: Ver archivo `para_mejoras_tecnicas.md`. Ya implementadas: type hints, constantes de configuración, logging unificado.
+
+#### ✅ Completado
+- **Refactorización del código**: type hints, constantes de configuración, logging unificado, eliminada variable global
 
 ### Roadmap de Funcionalidades
 

@@ -66,7 +66,6 @@ Los valores hardcodeados fueron reemplazados por constantes:
 ### Prioridad Alta
 - Extraer clases para APIs externas (TelegramClient, TikiWikiClient)
 - Implementar patrón de inyección de dependencias
-- Eliminar variables globales ($mediaGalleryIdCache)
 
 ### Prioridad Media
 - Agregar tests unitarios
@@ -76,6 +75,12 @@ Los valores hardcodeados fueron reemplazados por constantes:
 ### Prioridad Baja
 - Agregar tipos estrictos (strict_types)
 - Agregar anotaciones de tipo para arrays (phpdoc)
+
+### ✅ Completado
+- Eliminar variables globales ($mediaGalleryIdCache) - Implementado con static dentro de función
+- Type hints en funciones
+- Constantes de configuración
+- Logging unificado
 
 ---
 
