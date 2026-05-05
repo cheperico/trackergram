@@ -148,7 +148,9 @@ DEBUG_MODE=false
 |------------------|----------------|------|
 | Telegram Message ID | telegrammessageTelegramMessageId | Text Field |
 | Chat ID | telegrammessageChatId | Text Field |
+| Chat Title | telegrammessageChatTitle | Text Field |
 | Topic ID | telegrammessageTopicId | Text Field |
+| Topic Title | telegrammessageTopicTitle | Text Field |
 | User ID | telegrammessageUserId | Text Field |
 | Username | telegrammessageUsername | Text Field |
 | First Name | telegrammessageFirstName | Text Field |

@@ -49,7 +49,7 @@ Telegram → trackerGram → TikiWiki Tracker
    - `telegrammessageChatId`
    - `telegrammessageChatTitle` (opcional - nombre del grupo)
    - `telegrammessageTopicId`
-   - `telegrammessageTopicName` (opcional - nombre del topic)
+   - `telegrammessageTopicTitle` (opcional - título del topic)
    - `telegrammessageUserId`
    - `telegrammessageUsername`
    - `telegrammessageFirstName`
