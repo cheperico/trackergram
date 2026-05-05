@@ -115,6 +115,32 @@ X-Telegram-Bot-Api-Secret-Token: <secret_token_configurado>
 ### Variables de Entorno (.env)
 
 ```bash
+# Modo debug (opcional)
+DEBUG_MODE=true
+```
+
+### Constantes del Sistema
+
+Las siguientes constantes están definidas en `config.php`:
+
+```php
+// Timeouts (en segundos)
+TIMEOUT_TELEGRAM_API = 5      // Para llamadas a API de Telegram
+TIMEOUT_TELEGRAM_DOWNLOAD = 10 // Para descarga de archivos de Telegram
+TIMEOUT_TIKIWIKI_API = 30     // Para llamadas a API de TikiWiki
+TIMEOUT_TIKIWIKI_UPLOAD = 30  // Para subida de archivos a TikiWiki
+
+// Reintentos
+RETRY_MAX_ATTEMPTS = 2        // Número máximo de reintentos
+RETRY_DELAY_MICROSECONDS = 100000 // Delay entre reintentos (0.1 segundos)
+
+// Cache
+CACHE_ENABLED = true          // Habilitar cache de galleryId
+```
+
+### Variables de Entorno (.env)
+
+```bash
 # Token del Bot de Telegram (obligatorio)
 TELEGRAM_BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
 
@@ -228,9 +254,11 @@ DEBUG_MODE=false
 
 ### Logging
 
-- **Archivo**: `debug.log` (solo si DEBUG_MODE=true)
+- **Función principal**: `log_message(string $message): void` - Usar en todo el código
+- **Archivo**: `debug.log` (solo si DEBUG_MODE=true en .env)
 - **Formato**: `[YYYY-MM-DD HH:MM:SS] Mensaje`
 - **Contenido**: Errores HTTP, fallos de API, validaciones
+- **También** va a `error_log` del sistema (disponible en todos los entornos)
 
 ### Códigos de Error
 
@@ -348,7 +376,7 @@ El sistema mapea automáticamente los campos de Telegram a los campos del tracke
 - Deduplicación de mensajes basada en message_id
 - Agregado soporte para ubicaciones, contactos, encuestas, animations
 - Captura de nombre del chat (chat_title)
-- Tema del topic (topic_name)
+- Título del topic (topic_title)
 - Mejor manejo de mensajes no soportados (muestra el tipo)
 - Refactorización: type hints en funciones, constantes de configuración, logging unificado
 
