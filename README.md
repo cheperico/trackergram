@@ -304,8 +304,8 @@ Si ModSecurity bloquea las peticiones a TikiWiki:
 ## Autores y Desarrollo
 
 - **cheperico**: Dirección del proyecto, pruebas y validación
-- **Cascade (minimax-m2.5-free)**: Asistencia de programación durante esta sesión
-- **Cascade (SWE-1.5 y SWE-1.6 - Cognition AI Assistant)**: Versiones anteriores del proyecto
+- **OpenCode (minimax-m2.5-free)**: Asistencia de programación
+- **Cascade (SWE-1.5 y SWE-1.6 - Cognition AI Assistant)**: Asistencia de programación
 
 ### Sobre el desarrollo
 

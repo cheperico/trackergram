@@ -307,9 +307,23 @@ function extractMessageData($message)
         $data['media_type'] = $voice['mime_type'] ?? 'audio/ogg';
         $data['media_size'] = $voice['file_size'] ?? null;
         
+        error_log("trackerGram: VOICE - file_id: {$voice['file_id']}, mime_type: {$voice['mime_type']}, size: {$data['media_size']}");
+        
+        // Determinar extensión basada en mime_type o usar .ogg por defecto
+        $ext = '.ogg';
+        if ($data['media_type'] === 'audio/mpeg' || $data['media_type'] === 'audio/mp3') {
+            $ext = '.mp3';
+        } elseif ($data['media_type'] === 'audio/webm') {
+            $ext = '.webm';
+        } elseif ($data['media_type'] === 'audio/wav') {
+            $ext = '.wav';
+        }
+        
         // Subir nota de voz a TikiWiki
-        $fileName = 'telegram_voice_' . $voice['file_id'] . '.ogg';
+        $fileName = 'telegram_voice_' . $voice['file_id'] . $ext;
         $data['uploaded_file_id'] = downloadAndUploadMedia($voice['file_id'], $fileName, $data['media_type']);
+        
+        error_log("trackerGram: VOICE upload result: " . ($data['uploaded_file_id'] ? "OK: {$data['uploaded_file_id']}" : "FAILED"));
         
         $data['text'] = 'Nota de voz: ' . $data['media_type'];
     }
