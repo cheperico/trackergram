@@ -89,9 +89,9 @@ function resetFailedLogin() {
 function generateWebhookUrl() {
     $env = loadEnvFromFile();
     
-    // Si hay una URL custom configurada, usarla
+    // Si hay una URL custom configurada, usarla directamente
     if (!empty($env['CUSTOM_WEBHOOK_URL'])) {
-        return rtrim($env['CUSTOM_WEBHOOK_URL'], '/') . '/api.php';
+        return rtrim(trim($env['CUSTOM_WEBHOOK_URL']), '/');
     }
     
     // Generar automáticamente desde el servidor actual
