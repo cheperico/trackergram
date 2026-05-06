@@ -241,7 +241,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $botToken = $env['TELEGRAM_BOT_TOKEN'] ?? '';
     $secretToken = $env['TELEGRAM_WEBHOOK_SECRET'] ?? '';
     
-    $webhookUrl = generateWebhookUrl();
+    // Usar URL custom si se proporcionó, sino usar la automática
+    $customUrl = trim($_POST['custom_webhook_url'] ?? '');
+    if (!empty($customUrl)) {
+        $webhookUrl = $customUrl;
+    } else {
+        $webhookUrl = generateWebhookUrl();
+    }
+    
+    // Guardar la URL custom en .env si se proporcionó
+    if (!empty($customUrl)) {
+        $env['CUSTOM_WEBHOOK_URL'] = $customUrl;
+        saveEnv($env);
+    }
     
     $apiUrl = "https://api.telegram.org/bot{$botToken}/setWebhook";
     $params = [
@@ -274,7 +286,8 @@ $config = [
     'telegram_webhook_secret' => $env['TELEGRAM_WEBHOOK_SECRET'] ?? '',
     'tikiwiki_api_url' => $env['TIKIWIKI_API_URL'] ?? '',
     'tikiwiki_token' => $env['TIKIWIKI_TOKEN'] ?? '',
-    'tikiwiki_tracker_id' => $env['TIKIWIKI_TRACKER_ID'] ?? '1'
+    'tikiwiki_tracker_id' => $env['TIKIWIKI_TRACKER_ID'] ?? '1',
+    'custom_webhook_url' => $env['CUSTOM_WEBHOOK_URL'] ?? ''
 ];
 
 // Mostrar login si no está autenticado
@@ -342,7 +355,7 @@ if (!checkAuth()) {
     </form>
     
     <h2>Webhook de Telegram</h2>
-    <p>URL del webhook actual: 
+    <p>URL automática: 
         <?php
         echo htmlspecialchars(generateWebhookUrl());
         ?>
@@ -350,6 +363,10 @@ if (!checkAuth()) {
     <form method="post">
         <input type="hidden" name="action" value="update_webhook">
         <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+        
+        <label>URL personalizada del webhook (dejar vacío para usar URL automática):</label><br>
+        <input type="text" name="custom_webhook_url" value="<?php echo htmlspecialchars($config['custom_webhook_url'] ?? ''); ?>" size="60" placeholder="https://example.com/api.php"><br><br>
+        
         <button type="submit">Actualizar Webhook</button>
     </form>
 </body>
