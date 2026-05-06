@@ -231,6 +231,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $env['TIKIWIKI_API_URL'] = validateInput($_POST['tikiwiki_api_url'] ?? '', 'url');
     $env['TIKIWIKI_TOKEN'] = validateInput($_POST['tikiwiki_token'] ?? '', 'token');
     $env['TIKIWIKI_TRACKER_ID'] = validateInput($_POST['tikiwiki_tracker_id'] ?? '1', 'number');
+    $env['CUSTOM_WEBHOOK_URL'] = validateInput($_POST['custom_webhook_url'] ?? '', 'url');
     
     if (saveEnv($env)) {
         $success = "Configuración guardada exitosamente";
@@ -348,6 +349,9 @@ if (!checkAuth()) {
         
         <label>Telegram Webhook Secret:</label><br>
         <input type="text" name="telegram_webhook_secret" value="<?php echo htmlspecialchars($config['telegram_webhook_secret']); ?>" size="50"><br><br>
+        
+        <label>Custom Webhook URL (opcional):</label><br>
+        <input type="text" name="custom_webhook_url" value="<?php echo htmlspecialchars($config['custom_webhook_url'] ?? ''); ?>" size="50" placeholder="https://example.com"><br><br>
         
         <label>TikiWiki API URL:</label><br>
         <input type="text" name="tikiwiki_api_url" value="<?php echo htmlspecialchars($config['tikiwiki_api_url']); ?>" size="50"><br><br>
