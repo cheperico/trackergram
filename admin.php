@@ -112,9 +112,9 @@ function validateInput($input, $type = 'string') {
             break;
             
         case 'token':
-            // Validar token (alfanumérico, guiones bajos, guiones)
-            if (!preg_match('/^[a-zA-Z0-9_-]+$/', $input)) {
-                die('Error: Token inválido. Solo permite letras, números, guiones bajos y guiones.');
+            // Validar token (alfanumérico, guiones bajos, guiones, dos puntos para Telegram)
+            if (!preg_match('/^[a-zA-Z0-9_:-]+$/', $input)) {
+                die('Error: Token inválido. Solo permite letras, números, guiones bajos, guiones y dos puntos.');
             }
             break;
             
