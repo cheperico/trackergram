@@ -87,10 +87,17 @@ function resetFailedLogin() {
 
 // Función para generar URL de webhook (evita duplicación de código)
 function generateWebhookUrl() {
+    $env = loadEnvFromFile();
+    
+    // Si hay una URL custom configurada, usarla
+    if (!empty($env['CUSTOM_WEBHOOK_URL'])) {
+        return rtrim($env['CUSTOM_WEBHOOK_URL'], '/') . '/api.php';
+    }
+    
+    // Generar automáticamente desde el servidor actual
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'];
     $scriptPath = dirname($_SERVER['SCRIPT_NAME']);
-    // Eliminar trailing slash para evitar doble barra
     $scriptPath = rtrim($scriptPath, '/');
     return $protocol . '://' . $host . $scriptPath . '/api.php';
 }
