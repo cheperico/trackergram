@@ -73,6 +73,7 @@ Telegram → trackerGram → TikiWiki Tracker
    ```env
 TELEGRAM_BOT_TOKEN=tu_token_aqui
 TELEGRAM_WEBHOOK_SECRET=tu_token_secreto_webhook_aqui
+CUSTOM_WEBHOOK_URL=  # Opcional: URL custom para el webhook (ej: https://otro-servidor.com/api.php)
 TIKIWIKI_API_URL=http://localhost/tikigram/api/
 TIKIWIKI_TOKEN=tu_token_tikiwiki_aqui
 TIKIWIKI_TRACKER_ID=1
@@ -124,6 +125,7 @@ trackerGram incluye una interfaz web minimalista para configurar credenciales y 
    - Editar credenciales del bot de Telegram
    - Editar credenciales de TikiWiki
    - Actualizar el webhook de Telegram automáticamente
+   - Especificar URL custom del webhook (para servidores externos)
 
 ## Estructura de Archivos
 
