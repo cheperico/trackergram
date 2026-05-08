@@ -441,7 +441,7 @@ function extractMessageData(array $message): array
         $zoom = 15; // Zoom por defecto
         $data['location'] = $location['longitude'] . ',' . $location['latitude'] . ',' . $zoom;
         
-        $data['text'] = '📍 Ubicación: https://maps.google.com/?q=' . $location['latitude'] . ',' . $location['longitude'];
+        $data['text'] = '📍 Ubicación';
         if (isset($location['horizontal_accuracy'])) {
             $data['text'] .= ' (precisión: ' . $location['horizontal_accuracy'] . 'm)';
         }
