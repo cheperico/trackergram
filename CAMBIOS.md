@@ -10,6 +10,7 @@
 - Fix: Token validation con `:` en tokens de Telegram
 - Fix: Campo CUSTOM_WEBHOOK_URL para especificar URL del webhook manualmente
 - Fix: Bug de doble `/api.php` en generateWebhookUrl()
+- Fix: Campo de ubicación (geolocation) no se enviaba a TikiWiki
 
 ## v0.1.0
 - Subida de archivos multimedia a TikiWiki file gallery
