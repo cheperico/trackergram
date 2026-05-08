@@ -436,6 +436,11 @@ function extractMessageData(array $message): array
         $location = $message['location'];
         $data['type'] = 'location';
         $data['media_type'] = 'location';
+        
+        // Formato TikiWiki: longitude,latitude,zoom
+        $zoom = 15; // Zoom por defecto
+        $data['location'] = $location['longitude'] . ',' . $location['latitude'] . ',' . $zoom;
+        
         $data['text'] = '📍 Ubicación: https://maps.google.com/?q=' . $location['latitude'] . ',' . $location['longitude'];
         if (isset($location['horizontal_accuracy'])) {
             $data['text'] .= ' (precisión: ' . $location['horizontal_accuracy'] . 'm)';
@@ -511,6 +516,7 @@ function sendToTikiWiki(array $data): bool
         'fields[telegrammessageLastName]' => htmlspecialchars($data['last_name'] ?? '', ENT_QUOTES, 'UTF-8'),
         'fields[telegrammessageMessageType]' => $data['message_type'],
         'fields[telegrammessageText]' => htmlspecialchars($data['text'] ?? '', ENT_QUOTES, 'UTF-8'),
+        'fields[telegrammessageLocation]' => $data['location'] ?? '',
         'fields[telegrammessageMediaUrl]' => $data['media_url'],
         'fields[telegrammessageFileUrl]' => $data['file_url'],
         'fields[telegrammessageMediaType]' => $data['media_type'],
