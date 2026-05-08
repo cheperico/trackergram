@@ -13,6 +13,8 @@
 - [ ] **Sistema de etiquetas**: Extraer hashtags (#etiqueta) de mensajes de Telegram y guardarlos en campo del tracker para conectar con el sistema de tags de TikiWiki
 - [ ] **Nombre real del topic**: Obtener nombre del topic desde API de Telegram (actualmente hardcodeado "General")
 - [ ] **Topic dinámico**: Obtener nombre real del topic (opcional, requiere llamadas extra a API de Telegram)
+- [ ] **Mensajes reply**: Guardar referencia al mensaje al que se responde (reply_to_message_id)
+- [ ] **Reacciones**: Guardar reacciones a mensajes (emoji + usuario)
 
 ### Seguridad
 

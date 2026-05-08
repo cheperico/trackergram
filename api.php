@@ -60,6 +60,38 @@ function getFileUrl(string $fileId): ?string
 }
 
 /**
+ * Obtener el nombre de un topic de Telegram desde la API
+ */
+function getTopicName(int $chatId, int $messageThreadId): string
+{
+    $url = TELEGRAM_API_URL . 'getForumTopic';
+    $postFields = http_build_query([
+        'chat_id' => $chatId,
+        'message_thread_id' => $messageThreadId
+    ]);
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TELEGRAM_API);
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($httpCode === 200) {
+        $data = json_decode($response, true);
+        if (isset($data['result']['name'])) {
+            return $data['result']['name'];
+        }
+    }
+    
+    return 'General';
+}
+
+/**
  * Verificar si un message_id ya existe en el tracker (para evitar duplicados)
  */
 function messageExistsInTracker(int $messageId): bool
@@ -635,7 +667,7 @@ function processUpdate(array $update): void
     }
 
     $topicId = $message['message_thread_id'] ?? 'general';
-    $topicName = 'General'; // Por ahora hardcodeado, luego se puede obtener de la API
+    $topicName = ($topicId === 'general') ? 'General' : getTopicName($chatId, $topicId);
 
     // Determinar tipo de mensaje y extraer datos
     $messageData = extractMessageData($message);
