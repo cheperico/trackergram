@@ -66,7 +66,7 @@ function messageExistsInTracker(int $messageId): bool
 {
     $trackerId = TIKIWIKI_TRACKER_ID;
     // Buscar items con ese message_id
-    $url = TIKIWIKI_API_URL . "trackers/{$trackerId}/items?filters[telegrammessageTelegramMessageId]=$messageId";
+    $url = TIKIWIKI_API_URL . "trackers/{$trackerId}/items?fields=telegrammessageTelegramMessageId";
     
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
@@ -664,6 +664,7 @@ function processUpdate(array $update): void
         'media_type' => $messageData['media_type'],
         'media_size' => $messageData['media_size'],
         'media_caption' => $messageData['media_caption'],
+        'location' => $messageData['location'] ?? '',
         'uploaded_file_id' => $messageData['uploaded_file_id'] ?? null,
         'date' => $message['date']
     ];
