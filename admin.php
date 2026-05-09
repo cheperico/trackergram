@@ -85,16 +85,9 @@ function resetFailedLogin() {
     $_SESSION['first_attempt_time'] = time();
 }
 
-// Función para generar URL de webhook (evita duplicación de código)
+// Función para generar URL de webhook automática del servidor actual
 function generateWebhookUrl() {
-    $env = loadEnvFromFile();
-    
-    // Si hay una URL custom configurada, usarla directamente
-    if (!empty($env['CUSTOM_WEBHOOK_URL'])) {
-        return rtrim(trim($env['CUSTOM_WEBHOOK_URL']), '/');
-    }
-    
-    // Generar automáticamente desde el servidor actual
+    // Siempre detectar automáticamente el servidor donde está corriendo
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'];
     $scriptPath = dirname($_SERVER['SCRIPT_NAME']);
