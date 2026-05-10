@@ -648,6 +648,9 @@ function sendToTikiWiki(array $data): bool
 function processUpdate(array $update): void
 {
     error_log("processUpdate iniciado");
+    
+    // Debug: mostrar mensaje completo
+    error_log("DEBUG message JSON: " . json_encode($message));
 
     if (!isset($update['message'])) {
         return;
