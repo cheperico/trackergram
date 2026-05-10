@@ -70,6 +70,8 @@ function getTopicName(int $chatId, int $messageThreadId): string
         'message_thread_id' => $messageThreadId
     ]);
     
+    error_log("DEBUG getTopicName: chatId=$chatId, threadId=$messageThreadId, url=$url");
+    
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_POST, true);
@@ -79,7 +81,10 @@ function getTopicName(int $chatId, int $messageThreadId): string
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
     curl_close($ch);
+    
+    error_log("DEBUG getTopicName: httpCode=$httpCode, response=$response, curlError=$curlError");
     
     if ($httpCode === 200) {
         $data = json_decode($response, true);
