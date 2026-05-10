@@ -1,5 +1,10 @@
 # Cambios - Changelog
 
+## v0.1.2
+- Detección automática de nombres de topics desde reply_to_message.forum_topic_created
+- Fix detección HTTPS con proxies (X-Forwarded-Proto)
+- Simplificación: webhook se actualiza automáticamente desde URL del servidor
+
 ## v0.1.1
 - Deduplicación de mensajes basada en message_id
 - Agregado soporte para ubicaciones, contactos, encuestas, animations

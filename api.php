@@ -491,7 +491,6 @@ function extractMessageData(array $message): array
 
     // Ubicación
     if (isset($message['location'])) {
-        log_message('DEBUG: Detectada ubicación en mensaje');
         $location = $message['location'];
         $data['type'] = 'location';
         $data['media_type'] = 'location';
@@ -499,8 +498,6 @@ function extractMessageData(array $message): array
         // Formato TikiWiki: longitude,latitude,zoom
         $zoom = 15; // Zoom por defecto
         $data['location'] = $location['longitude'] . ',' . $location['latitude'] . ',' . $zoom;
-        
-        log_message('DEBUG: Location data: ' . $data['location']);
         
         $data['text'] = '📍 Ubicación';
         if (isset($location['horizontal_accuracy'])) {
@@ -586,8 +583,6 @@ function sendToTikiWiki(array $data): bool
         'fields[telegrammessageMessageDate]' => $data['date']
     ];
     
-    log_message('DEBUG: Enviando a TikiWiki - Location field: ' . ($data['location'] ?? 'EMPTY'));
-    
     // Agregar archivo subido si existe
     if (!empty($data['uploaded_file_id'])) {
         $postFields['fields[telegrammessageMedia]'] = $data['uploaded_file_id'];
@@ -653,10 +648,7 @@ error_log("processUpdate iniciado");
         return;
     }
     
-    $message = $update['message'];
-    
-    // Debug: mostrar mensaje completo
-    error_log("DEBUG message JSON: " . json_encode($message));
+$message = $update['message'];
     
     // Validar campos requeridos del mensaje
     $requiredFields = ['message_id', 'chat', 'from', 'date'];
@@ -715,7 +707,6 @@ error_log("processUpdate iniciado");
     if ($topicName === 'General' && is_numeric($topicId)) {
         $topicName = 'Topic-' . $topicId;
     }
-    error_log("DEBUG: topicId=$topicId, topicName=$topicName");
 
     // Determinar tipo de mensaje y extraer datos
     $messageData = extractMessageData($message);
