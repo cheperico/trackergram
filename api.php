@@ -668,6 +668,7 @@ function processUpdate(array $update): void
 
     $topicId = $message['message_thread_id'] ?? 'general';
     $topicName = ($topicId === 'general') ? 'General' : getTopicName($chatId, $topicId);
+    error_log("DEBUG: topicId=$topicId, topicName=$topicName");
 
     // Determinar tipo de mensaje y extraer datos
     $messageData = extractMessageData($message);
