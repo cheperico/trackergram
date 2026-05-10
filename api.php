@@ -696,8 +696,22 @@ error_log("processUpdate iniciado");
     }
 
     $topicId = $message['message_thread_id'] ?? 'general';
-    $topicName = ($topicId === 'general') ? 'General' : getTopicName($chatId, $topicId);
-    // Si getTopicName falló (devuelve 'General' por defecto), usar el ID como nombre
+    
+    // Intentar obtener el nombre del topic desde reply_to_message (si es el mensaje de creación)
+    $topicName = null;
+    if (isset($message['reply_to_message']['forum_topic_created']['name'])) {
+        $topicName = $message['reply_to_message']['forum_topic_created']['name'];
+        // Guardar en cache
+        $cacheFile = __DIR__ . '/topic_names.json';
+        $topics = file_exists($cacheFile) ? json_decode(file_get_contents($cacheFile), true) : [];
+        $topics[$topicId] = $topicName;
+        file_put_contents($cacheFile, json_encode($topics));
+    } else {
+        // Buscar en cache
+        $topicName = getTopicName($chatId, $topicId);
+    }
+    
+    // Si no se pudo obtener, usar ID como fallback
     if ($topicName === 'General' && is_numeric($topicId)) {
         $topicName = 'Topic-' . $topicId;
     }
