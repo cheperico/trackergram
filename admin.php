@@ -87,8 +87,15 @@ function resetFailedLogin() {
 
 // Función para generar URL de webhook automática del servidor actual
 function generateWebhookUrl() {
-    // Siempre detectar automáticamente el servidor donde está corriendo
-    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    // Detectar HTTPS - considerar varios headers de proxy
+    $protocol = 'http';
+    if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+        $protocol = 'https';
+    } elseif (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+        $protocol = 'https';
+    } elseif (!empty($_SERVER['HTTP_X_FORWARDED_SSL']) && $_SERVER['HTTP_X_FORWARDED_SSL'] === 'on') {
+        $protocol = 'https';
+    }
     $host = $_SERVER['HTTP_HOST'];
     $scriptPath = dirname($_SERVER['SCRIPT_NAME']);
     $scriptPath = rtrim($scriptPath, '/');
