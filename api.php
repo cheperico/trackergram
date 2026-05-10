@@ -647,16 +647,16 @@ function sendToTikiWiki(array $data): bool
  */
 function processUpdate(array $update): void
 {
-    error_log("processUpdate iniciado");
-    
-    // Debug: mostrar mensaje completo
-    error_log("DEBUG message JSON: " . json_encode($message));
+error_log("processUpdate iniciado");
 
     if (!isset($update['message'])) {
         return;
     }
-
+    
     $message = $update['message'];
+    
+    // Debug: mostrar mensaje completo
+    error_log("DEBUG message JSON: " . json_encode($message));
     
     // Validar campos requeridos del mensaje
     $requiredFields = ['message_id', 'chat', 'from', 'date'];
