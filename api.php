@@ -60,17 +60,26 @@ function getFileUrl(string $fileId): ?string
 }
 
 /**
- * Obtener el nombre de un topic de Telegram desde la API
+ * Obtener el nombre de un topic de Telegram
+ * Primero busca en cache local, luego intenta API
  */
 function getTopicName(int $chatId, int $messageThreadId): string
 {
+    // Primero buscar en cache local
+    $cacheFile = __DIR__ . '/topic_names.json';
+    if (file_exists($cacheFile)) {
+        $topics = json_decode(file_get_contents($cacheFile), true);
+        if (isset($topics[$messageThreadId])) {
+            return $topics[$messageThreadId];
+        }
+    }
+    
+    // Intentar con la API
     $url = TELEGRAM_API_URL . 'getForumTopic';
     $postFields = http_build_query([
         'chat_id' => $chatId,
         'message_thread_id' => $messageThreadId
     ]);
-    
-    error_log("DEBUG getTopicName: chatId=$chatId, threadId=$messageThreadId, url=$url");
     
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
@@ -81,10 +90,7 @@ function getTopicName(int $chatId, int $messageThreadId): string
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curlError = curl_error($ch);
     curl_close($ch);
-    
-    error_log("DEBUG getTopicName: httpCode=$httpCode, response=$response, curlError=$curlError");
     
     if ($httpCode === 200) {
         $data = json_decode($response, true);
@@ -449,6 +455,21 @@ function extractMessageData(array $message): array
     }
 
     // Mensajes de sistema (cambio de nombre de topic, etc.)
+    if (isset($message['forum_topic_created'])) {
+        $topicCreated = $message['forum_topic_created'];
+        $data['type'] = 'system';
+        $topicName = $topicCreated['name'] ?? 'Nuevo Topic';
+        $data['system_message'] = 'Topic creado: ' . $topicName;
+        $data['text'] = 'Topic creado: ' . $topicName;
+        $data['topic_name'] = $topicName;
+        // Guardar en un archivo temporal para uso posterior
+        if (isset($message['message_thread_id'])) {
+            file_put_contents(__DIR__ . '/topic_names.json', json_encode([
+                $message['message_thread_id'] => $topicName
+            ]), JSON_PRETTY_PRINT);
+        }
+    }
+    
     if (isset($message['forum_topic_edited'])) {
         $topicEdit = $message['forum_topic_edited'];
         $data['type'] = 'system';
