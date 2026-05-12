@@ -128,12 +128,8 @@ function createTrackerWithFields(string $trackerName): ?int
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TIKIWIKI_API);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "Content-Type: application/x-www-form-urlencoded; charset=UTF-8",
         "Authorization: Bearer " . TIKIWIKI_TOKEN,
-        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept: */*",
-        "Accept-Language: en-US,en;q=0.9",
-        "Cache-Control: no-cache"
+        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     ]);
     
     $response = curl_exec($ch);
@@ -147,8 +143,9 @@ function createTrackerWithFields(string $trackerName): ?int
     
     // Manejar respuesta - puede ser JSON o HTML
     $trackerId = null;
-    if (json_last_error() === JSON_ERROR_NONE && isset($data['id'])) {
-        $trackerId = $data['id'];
+    if (json_last_error() === JSON_ERROR_NONE) {
+        // Buscar trackerId o id en la respuesta JSON
+        $trackerId = $data['trackerId'] ?? $data['id'] ?? null;
     } elseif ($httpCode === 200 && !empty($response)) {
         // Buscar ID en respuesta HTML
         if (preg_match('/["\']?id["\']?\s*[:=]\s*["\']?(\d+)["\']?/i', $response, $matches)) {
