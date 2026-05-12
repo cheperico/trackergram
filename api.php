@@ -885,21 +885,23 @@ $message = $update['message'];
 }
 
 // Manejar webhook de Telegram - solo ejecutar si es llamado directamente (no incluido)
-if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    $input = file_get_contents('php://input');
-    $update = json_decode($input, true);
+if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php') {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $input = file_get_contents('php://input');
+        $update = json_decode($input, true);
 
-    if ($update) {
-        // Procesar la actualización
-        processUpdate($update);
-        echo json_encode(['status' => 'ok']);
+        if ($update) {
+            // Procesar la actualización
+            processUpdate($update);
+            echo json_encode(['status' => 'ok']);
+        } else {
+            error_log("Error al decodificar JSON del webhook");
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid JSON']);
+        }
     } else {
-        error_log("Error al decodificar JSON del webhook");
-        http_response_code(400);
-        echo json_encode(['error' => 'Invalid JSON']);
+        // GET request para verificar estado
+        echo json_encode(['status' => 'trackerGram webhook endpoint']);
     }
-} else {
-    // GET request para verificar estado
-    echo json_encode(['status' => 'trackerGram webhook endpoint']);
 }
 ?>
