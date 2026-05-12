@@ -187,9 +187,15 @@ function createTrackerWithFields(string $trackerName): ?int
     ];
     
     foreach ($fields as $field) {
-        // Probar endpoint correcto para crear campos
+        // Endpoint correcto para crear campos
         $fieldUrl = TIKIWIKI_API_URL . 'trackers/' . $trackerId . '/fields';
-        $fieldPost = http_build_query($field);
+        // Enviar como name, permName, type, order (case sensitive)
+        $fieldPost = http_build_query([
+            'name' => $field['name'],
+            'permName' => $field['permname'],
+            'type' => $field['type'],
+            'order' => $field['order']
+        ]);
         
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $fieldUrl);
