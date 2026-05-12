@@ -108,8 +108,10 @@ function getTopicName(int $chatId, int $messageThreadId): string
 function createTrackerWithFields(string $trackerName): ?int
 {
     // Crear el tracker
-    $url = TIKIWIKI_API_URL . 'trackers';
+    $url = TIKIWIKI_API_URL;
     $postFields = http_build_query([
+        'controller' => 'tracker',
+        'action' => 'create_tracker',
         'name' => $trackerName,
         'description' => 'Tracker para mensajes de Telegram (creado por trackerGram)',
         'defaultStatus' => 'open'
