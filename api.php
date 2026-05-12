@@ -126,10 +126,14 @@ function createTrackerWithFields(string $trackerName): ?int
         "Authorization: Bearer " . TIKIWIKI_TOKEN,
         "Accept: application/json"
     ]);
+    curl_setopt($ch, CURLOPT_VERBOSE, true); // Debug
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
     curl_close($ch);
+    
+    error_log("DEBUG createTracker: URL=$url, httpCode=$httpCode, response=$response, curlError=$curlError");
     
     $data = json_decode($response, true);
     
