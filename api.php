@@ -188,13 +188,9 @@ function createTrackerWithFields(string $trackerName): ?int
     ];
     
     foreach ($fields as $field) {
-        $fieldUrl = TIKIWIKI_API_URL . "trackers/$trackerId/fields";
-        $fieldPost = http_build_query([
-            'name' => $field['name'],
-            'permname' => $field['permname'],
-            'type' => $field['type'],
-            'order' => $field['order']
-        ]);
+        // Probar endpoint correcto para crear campos
+        $fieldUrl = TIKIWIKI_API_URL . 'trackers/' . $trackerId . '/fields';
+        $fieldPost = http_build_query($field);
         
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $fieldUrl);
@@ -204,17 +200,20 @@ function createTrackerWithFields(string $trackerName): ?int
         curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TIKIWIKI_API);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             "Authorization: Bearer " . TIKIWIKI_TOKEN,
-            "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            "User-Agent: Mozilla/5.0"
         ]);
         
         $fieldResponse = curl_exec($ch);
         $fieldHttpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $fieldError = curl_error($ch);
         curl_close($ch);
+        
+        error_log("DEBUG field {$field['name']}: httpCode=$fieldHttpCode, response=$fieldResponse");
         
         if ($fieldHttpCode === 200) {
             error_log("Created field: {$field['name']}");
         } else {
-            error_log("ERROR creating field {$field['name']}: HTTP $fieldHttpCode");
+            error_log("ERROR creating field {$field['name']}: HTTP $fieldHttpCode, response=$fieldResponse");
         }
     }
     
