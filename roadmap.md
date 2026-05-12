@@ -12,15 +12,15 @@
 
 - [x] **Creación automática de tracker**: Crear tracker con campos via API de TikiWiki
   - Panel admin: crear nuevo tracker con nombre → genera campos automáticamente
-  - Tipos de campo TikiWiki: `t` (text), `a` (textarea), `n` (numeric), `f` (datetime), `D` (dropdown+other), `FG` (files)
+  - Tipos de campo TikiWiki: `t` (text), `a` (textarea), `n` (numeric), `f` (datetime), `D` (dropdown+other), `FG` (files), `G` (location)
   - Campos del tracker:
-    - `t` - Telegram Message ID, Chat ID, Chat Title, Topic ID, Topic Title, User ID, Username, First Name, Last Name, Media URL, File URL, Media Type, Media Caption, Location
-    - `a` - Text
-    - `n` - Media Size
-    - `f` - Message Date (fecha y hora)
-    - `D` - Message Type (desplegable con opción "Otro")
-    - `FG` - Media (archivos)
-  - [ ] **Refinar creación automática**: Los campos de fecha, dropdown y archivos necesitan ajustes
+    - `t` (position 0-180) - Telegram Message ID, Chat ID, Chat Title, Topic ID, Topic Title, User ID, Username, First Name, Last Name, Media URL, File URL, Media Type, Media Caption
+    - `f` (position 50) - Message Date (fecha y hora)
+    - `D` (position 100) - Message Type con opciones: text, photo, video, audio, document, sticker, voice, video_note, system
+    - `a` (position 110) - Text
+    - `FG` (position 120) - Media (archivos, requiere galleryId en opciones)
+    - `n` (position 160) - Media Size
+    - `G` (position 180) - Location (ubicación geográfica)
 - [ ] **Sistema de etiquetas**: Extraer hashtags (#etiqueta) de mensajes de Telegram y guardarlos en campo del tracker para conectar con el sistema de tags de TikiWiki
 - [ ] **Importar export de Telegram**: Importar conversaciones desde JSON exportado de Telegram (para carga masiva de datos históricos)
   - **Por zip**: Requiere aumentar límites de PHP (para exports pequeños)
