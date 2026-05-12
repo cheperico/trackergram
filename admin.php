@@ -479,8 +479,22 @@ if (!checkAuth()) {
             method: 'POST',
             body: formData
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('HTTP ' + response.status);
+            }
+            return response.text();
+        })
+        .then(text => {
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                resultDiv.innerHTML = '<p style="color: red;">Respuesta no válida: ' + text.substring(0, 200) + '</p>';
+                return null;
+            }
+        })
         .then(data => {
+            if (!data) return;
             if (data.error) {
                 resultDiv.innerHTML = '<p style="color: red;">Error: ' + data.error + '</p>';
             } else {
