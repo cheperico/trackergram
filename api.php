@@ -110,14 +110,11 @@ function getTopicName(int $chatId, int $messageThreadId): string
  */
 function createTrackerWithFields(string $trackerName): ?int
 {
-    // Crear el tracker
-    $url = TIKIWIKI_API_URL;
+    // Crear el tracker - igual que el curl que funciona
+    $url = TIKIWIKI_API_URL . 'trackers';
     $postFields = http_build_query([
-        'controller' => 'tracker',
-        'action' => 'create_tracker',
         'name' => $trackerName,
-        'description' => 'Tracker para mensajes de Telegram (creado por trackerGram)',
-        'defaultStatus' => 'open'
+        'description' => 'Tracker para mensajes de Telegram (creado por trackerGram)'
     ]);
     
     $ch = curl_init();
