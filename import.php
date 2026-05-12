@@ -4,6 +4,14 @@
  * Procesa archivos ZIP exportados desde Telegram y crea items en TikiWiki
  */
 
+// Manejo de errores para evitar HTML en respuesta
+function handleError($errno, $errstr, $errfile, $errline) {
+    http_response_code(500);
+    echo json_encode(['error' => "Error: $errstr"]);
+    exit;
+}
+set_error_handler('handleError');
+
 // Iniciar sesión para CSRF y autenticación
 if (session_status() === PHP_SESSION_NONE) {
     @session_start();
