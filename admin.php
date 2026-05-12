@@ -417,7 +417,7 @@ if (!checkAuth()) {
         <button type="submit">Guardar Configuración</button>
     </form>
     
-    <h2 id="tracker-importar">2. Importar conversaciones</h2>
+    <h2 id="tracker-importar">2. Importar conversaciones <span style="color: orange; font-size: 0.8em;">(funcionalidad en desarrollo)</span></h2>
     <p>Importar conversaciones desde archivos ZIP exportados de Telegram. Los archivos (fotos, stickers, videos) se subirán a la file gallery del tracker.</p>
     
     <form id="import-form" enctype="multipart/form-data">
