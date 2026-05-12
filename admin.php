@@ -394,10 +394,14 @@ if (!checkAuth()) {
         <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
         
         <label>Telegram Bot Token:</label><br>
-        <input type="text" name="telegram_bot_token" value="<?php echo htmlspecialchars($config['telegram_bot_token']); ?>" size="60"><br><br>
+        <input type="password" name="telegram_bot_token" value="<?php echo htmlspecialchars($config['telegram_bot_token']); ?>" size="60" placeholder="Click para ver">
+        <button type="button" onclick="this.previousElementSibling.type = this.previousElementSibling.type === 'password' ? 'text' : 'password'">👁</button>
+        <br><br>
         
         <label>Telegram Webhook Secret:</label><br>
-        <input type="text" name="telegram_webhook_secret" value="<?php echo htmlspecialchars($config['telegram_webhook_secret']); ?>" size="50"><br><br>
+        <input type="password" name="telegram_webhook_secret" value="<?php echo htmlspecialchars($config['telegram_webhook_secret']); ?>" size="50" placeholder="Click para ver">
+        <button type="button" onclick="this.previousElementSibling.type = this.previousElementSibling.type === 'password' ? 'text' : 'password'">👁</button>
+        <br><br>
         
         <label>Custom Webhook URL (opcional):</label><br>
         <input type="text" name="custom_webhook_url" value="<?php echo htmlspecialchars($config['custom_webhook_url'] ?? ''); ?>" size="50" placeholder="https://example.com"><br><br>
@@ -406,7 +410,9 @@ if (!checkAuth()) {
         <input type="text" name="tikiwiki_api_url" value="<?php echo htmlspecialchars($config['tikiwiki_api_url']); ?>" size="50"><br><br>
         
         <label>TikiWiki Token:</label><br>
-        <input type="text" name="tikiwiki_token" value="<?php echo htmlspecialchars($config['tikiwiki_token']); ?>" size="50"><br><br>
+        <input type="password" name="tikiwiki_token" value="<?php echo htmlspecialchars($config['tikiwiki_token']); ?>" size="50" placeholder="Click para ver">
+        <button type="button" onclick="this.previousElementSibling.type = this.previousElementSibling.type === 'password' ? 'text' : 'password'">👁</button>
+        <br><br>
         
         <button type="submit">Guardar Configuración</button>
     </form>
