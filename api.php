@@ -125,13 +125,16 @@ function createTrackerWithFields(string $trackerName): ?int
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TIKIWIKI_API);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "Content-Type: application/x-www-form-urlencoded",
+        "Content-Type: application/x-www-form-urlencoded; charset=UTF-8",
         "Authorization: Bearer " . TIKIWIKI_TOKEN,
-        "User-Agent: Mozilla/5.0 (compatible; trackerGram/1.0)"
+        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept: */*",
+        "Accept-Language: en-US,en;q=0.9",
+        "Cache-Control: no-cache"
     ]);
-    curl_setopt($ch, CURLOPT_USERAGENT, "Mozilla/5.0 (compatible; trackerGram/1.0)");
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
