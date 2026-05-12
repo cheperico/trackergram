@@ -448,6 +448,55 @@ if (!checkAuth()) {
         <button type="submit">Actualizar Webhook</button>
     </form>
     
+    <h2 id="tracker-importar">4. Tracker de importación</h2>
+    <p>Importar conversaciones desde archivos ZIP exportados de Telegram. Los archivos (fotos, stickers, videos) se subirán a la file gallery del tracker.</p>
+    
+    <form id="import-form" enctype="multipart/form-data">
+        <input type="hidden" name="action" value="import">
+        <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+        
+        <label>Tracker destino:</label><br>
+        <input type="text" name="tracker_id" value="<?php echo htmlspecialchars($config['tikiwiki_tracker_id']); ?>" size="10">
+        <small>(ID del tracker donde se importarán los mensajes)</small><br><br>
+        
+        <label>Archivo export (ZIP):</label><br>
+        <input type="file" name="export_file" accept=".zip" required><br><br>
+        
+        <button type="button" onclick="importExport()">Importar</button>
+    </form>
+    
+    <div id="import-result"></div>
+    
+    <script>
+    function importExport() {
+        var form = document.getElementById('import-form');
+        var formData = new FormData(form);
+        var resultDiv = document.getElementById('import-result');
+        
+        resultDiv.innerHTML = 'Importando... Esto puede tomar varios minutos.';
+        
+        fetch('import.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                resultDiv.innerHTML = '<p style="color: red;">Error: ' + data.error + '</p>';
+            } else {
+                resultDiv.innerHTML = '<p style="color: green;">Importación completada:<br>' +
+                    '- ' + data.imported + ' mensajes importados<br>' +
+                    '- ' + data.skipped + ' errores<br>' +
+                    '- ' + data.media_processed + ' archivos subidos<br>' +
+                    '- ' + data.topics_found + ' topics encontrados</p>';
+            }
+        })
+        .catch(error => {
+            resultDiv.innerHTML = '<p style="color: red;">Error: ' + error.message + '</p>';
+        });
+    }
+    </script>
+    
     <h2 id="crear-tracker">5. Crear Tracker en TikiWiki</h2>
     <p>Crea un nuevo tracker con todos los campos necesarios para trackerGram automáticamente en <?php echo htmlspecialchars(parse_url($config['tikiwiki_api_url'] ?? '', PHP_URL_HOST) ?: 'tu sitio'); ?>.</p>
     <form method="post">

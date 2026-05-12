@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JoinFromStart — FiveCrops Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Unbounded:wght@300;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f0e;
+    --surface: #141a17;
+    --surface2: #1c2620;
+    --accent: #4dff91;
+    --accent2: #ffcc00;
+    --muted: #3a4a42;
+    --text: #d4e8dc;
+    --text-dim: #6b8a76;
+    --danger: #ff4d6a;
+    --font-display: 'Unbounded', sans-serif;
+    --font-mono: 'Space Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    min-height: 100vh;
+    padding: 40px 24px;
+    background-image: radial-gradient(ellipse at 20% 0%, #0d2e1a 0%, transparent 60%),
+                      radial-gradient(ellipse at 80% 100%, #0a1f12 0%, transparent 50%);
+  }
+
+  header {
+    margin-bottom: 48px;
+    border-left: 3px solid var(--accent);
+    padding-left: 20px;
+  }
+
+  header h1 {
+    font-family: var(--font-display);
+    font-size: clamp(1.4rem, 4vw, 2.2rem);
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+
+  header p {
+    margin-top: 8px;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .badge {
+    display: inline-block;
+    font-size: 0.6rem;
+    background: var(--surface2);
+    border: 1px solid var(--muted);
+    color: var(--accent2);
+    padding: 2px 8px;
+    margin-top: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--muted);
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+
+  .card-title {
+    font-family: var(--font-display);
+    font-size: 0.65rem;
+    font-weight: 300;
+    color: var(--text-dim);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .card-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--muted);
+  }
+
+  /* Origin inputs */
+  .origin-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .input-group label {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .input-group input {
+    background: var(--bg);
+    border: 1px solid var(--muted);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .input-group input:focus {
+    border-color: var(--accent);
+  }
+
+  .origin-zero {
+    font-size: 0.7rem;
+    color: var(--accent2);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    letter-spacing: 0.05em;
+  }
+
+  .origin-zero:hover { color: var(--accent); }
+
+  /* Drop zone */
+  .dropzone {
+    border: 2px dashed var(--muted);
+    padding: 40px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+  }
+
+  .dropzone:hover, .dropzone.drag-over {
+    border-color: var(--accent);
+    background: rgba(77,255,145,0.04);
+  }
+
+  .dropzone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .dropzone-icon {
+    font-size: 2rem;
+    margin-bottom: 12px;
+    display: block;
+  }
+
+  .dropzone p {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+
+  .dropzone span {
+    color: var(--accent);
+  }
+
+  /* File list */
+  #file-list {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .file-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface2);
+    border: 1px solid var(--muted);
+    padding: 10px 14px;
+    font-size: 0.75rem;
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .file-item .file-name {
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+
+  .file-item .file-pts {
+    color: var(--text-dim);
+    margin: 0 12px;
+    white-space: nowrap;
+  }
+
+  .file-item .remove-btn {
+    color: var(--danger);
+    cursor: pointer;
+    font-size: 0.8rem;
+    padding: 0 4px;
+    line-height: 1;
+  }
+
+  .file-item .remove-btn:hover { opacity: 0.7; }
+
+  /* Preview canvas */
+  #preview-wrap {
+    margin-top: 16px;
+    position: relative;
+  }
+
+  canvas {
+    width: 100%;
+    height: 220px;
+    background: var(--bg);
+    border: 1px solid var(--muted);
+    display: block;
+  }
+
+  .preview-label {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* Stats */
+  #stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .stat-box {
+    background: var(--surface2);
+    border: 1px solid var(--muted);
+    padding: 14px;
+    text-align: center;
+  }
+
+  .stat-value {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--accent);
+    display: block;
+  }
+
+  .stat-label {
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-top: 4px;
+    display: block;
+  }
+
+  /* Button */
+  .btn-main {
+    width: 100%;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    font-family: var(--font-display);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 16px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    margin-top: 8px;
+  }
+
+  .btn-main:hover { background: #6fffaa; }
+  .btn-main:active { transform: scale(0.99); }
+  .btn-main:disabled {
+    background: var(--muted);
+    color: var(--text-dim);
+    cursor: not-allowed;
+  }
+
+  /* Log */
+  #log {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    line-height: 2;
+    min-height: 20px;
+  }
+
+  #log .ok { color: var(--accent); }
+  #log .err { color: var(--danger); }
+  #log .warn { color: var(--accent2); }
+
+  /* Legend */
+  #legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.65rem;
+    color: var(--text-dim);
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  footer {
+    margin-top: 48px;
+    font-size: 0.6rem;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-align: center;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>JoinFromStart</h1>
+  <p>FiveCrops · Pedaludico Tools</p>
+  <span class="badge">Ramillete GPX Merger</span>
+</header>
+
+<!-- ORIGIN -->
+<div class="card">
+  <div class="card-title">Punto de origen</div>
+  <div class="origin-grid">
+    <div class="input-group">
+      <label>Latitud</label>
+      <input type="number" id="origin-lat" value="0" step="0.000001" placeholder="0.0">
+    </div>
+    <div class="input-group">
+      <label>Longitud</label>
+      <input type="number" id="origin-lon" value="0" step="0.000001" placeholder="0.0">
+    </div>
+  </div>
+  <span class="origin-zero" onclick="resetOrigin()">← usar (0, 0)</span>
+</div>
+
+<!-- FILES -->
+<div class="card">
+  <div class="card-title">Archivos GPX</div>
+  <div class="dropzone" id="dropzone">
+    <input type="file" id="file-input" accept=".gpx" multiple>
+    <span class="dropzone-icon">🚴</span>
+    <p>Arrastrá tus archivos GPX acá<br>o <span>hacé click para seleccionar</span></p>
+  </div>
+  <div id="file-list"></div>
+</div>
+
+<!-- PREVIEW -->
+<div class="card" id="preview-card" style="display:none">
+  <div class="card-title">Vista previa del ramillete</div>
+  <div id="preview-wrap">
+    <canvas id="canvas" width="800" height="440"></canvas>
+    <span class="preview-label">preview</span>
+  </div>
+  <div id="legend"></div>
+  <div id="stats-row"></div>
+</div>
+
+<!-- OUTPUT -->
+<div class="card">
+  <div class="card-title">Generar GPX</div>
+  <div id="log">Cargá al menos un archivo GPX para comenzar.</div>
+  <button class="btn-main" id="btn-export" disabled onclick="exportGPX()">
+    Exportar JoinFromStart.gpx
+  </button>
+</div>
+
+<footer>FiveCrops WH · Pedaludico · JoinFromStart v1.0</footer>
+
+<script>
+// ─── STATE ────────────────────────────────────────────────────────────────────
+const tracks = []; // { name, points:[{lat,lon,ele,time}] }
+
+const COLORS = [
+  '#4dff91','#ffcc00','#ff6b6b','#6bb5ff','#ff9f43',
+  '#a29bfe','#fd79a8','#00cec9','#fdcb6e','#e17055'
+];
+
+// ─── ORIGIN ───────────────────────────────────────────────────────────────────
+function resetOrigin() {
+  document.getElementById('origin-lat').value = 0;
+  document.getElementById('origin-lon').value = 0;
+  if (tracks.length) renderPreview();
+}
+
+function getOrigin() {
+  return {
+    lat: parseFloat(document.getElementById('origin-lat').value) || 0,
+    lon: parseFloat(document.getElementById('origin-lon').value) || 0
+  };
+}
+
+// ─── DROP / FILE INPUT ────────────────────────────────────────────────────────
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('file-input');
+
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('drag-over');
+  handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+// re-trigger origin changes
+document.getElementById('origin-lat').addEventListener('input', () => { if(tracks.length) renderPreview(); });
+document.getElementById('origin-lon').addEventListener('input', () => { if(tracks.length) renderPreview(); });
+
+function handleFiles(files) {
+  Array.from(files).forEach(file => {
+    if (!file.name.toLowerCase().endsWith('.gpx')) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const pts = parseGPX(e.target.result);
+      if (!pts.length) { logMsg(`⚠ ${file.name}: sin puntos`, 'warn'); return; }
+      tracks.push({ name: file.name, points: pts });
+      renderFileList();
+      renderPreview();
+      updateLog();
+    };
+    reader.readAsText(file);
+  });
+}
+
+// ─── GPX PARSER ───────────────────────────────────────────────────────────────
+function parseGPX(text) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(text, 'text/xml');
+  const trkpts = doc.querySelectorAll('trkpt');
+  const wpts   = trkpts.length ? trkpts : doc.querySelectorAll('rtept');
+  const pts = [];
+  wpts.forEach(p => {
+    const lat = parseFloat(p.getAttribute('lat'));
+    const lon = parseFloat(p.getAttribute('lon'));
+    if (isNaN(lat) || isNaN(lon)) return;
+    const eleEl = p.querySelector('ele');
+    const timeEl = p.querySelector('time');
+    pts.push({
+      lat, lon,
+      ele: eleEl ? parseFloat(eleEl.textContent) : null,
+      time: timeEl ? timeEl.textContent : null
+    });
+  });
+  return pts;
+}
+
+// ─── FILE LIST ────────────────────────────────────────────────────────────────
+function renderFileList() {
+  const el = document.getElementById('file-list');
+  el.innerHTML = '';
+  tracks.forEach((t, i) => {
+    const div = document.createElement('div');
+    div.className = 'file-item';
+    div.innerHTML = `
+      <span style="width:10px;height:10px;border-radius:50%;background:${COLORS[i % COLORS.length]};flex-shrink:0;margin-right:10px;display:inline-block"></span>
+      <span class="file-name">${t.name}</span>
+      <span class="file-pts">${t.points.length} pts</span>
+      <span class="remove-btn" onclick="removeTrack(${i})">✕</span>
+    `;
+    el.appendChild(div);
+  });
+}
+
+function removeTrack(i) {
+  tracks.splice(i, 1);
+  renderFileList();
+  if (tracks.length) renderPreview();
+  else {
+    document.getElementById('preview-card').style.display = 'none';
+    document.getElementById('btn-export').disabled = true;
+  }
+  updateLog();
+}
+
+// ─── REBASE LOGIC ─────────────────────────────────────────────────────────────
+// Rebase a track so its first point = origin, preserving relative offsets in degrees.
+function rebaseTrack(track, origin) {
+  const p0 = track.points[0];
+  const dLat = origin.lat - p0.lat;
+  const dLon = origin.lon - p0.lon;
+  return track.points.map(p => ({
+    lat: p.lat + dLat,
+    lon: p.lon + dLon,
+    ele: p.ele,
+    time: p.time
+  }));
+}
+
+// ─── PREVIEW ──────────────────────────────────────────────────────────────────
+function renderPreview() {
+  document.getElementById('preview-card').style.display = 'block';
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const origin = getOrigin();
+  const rebased = tracks.map(t => rebaseTrack(t, origin));
+
+  // gather all points for scale
+  const allLats = rebased.flatMap(pts => pts.map(p => p.lat));
+  const allLons = rebased.flatMap(pts => pts.map(p => p.lon));
+  const minLat = Math.min(...allLats), maxLat = Math.max(...allLats);
+  const minLon = Math.min(...allLons), maxLon = Math.max(...allLons);
+
+  const pad = 40;
+  const rangeX = maxLon - minLon || 0.001;
+  const rangeY = maxLat - minLat || 0.001;
+
+  function toCanvas(lat, lon) {
+    return {
+      x: pad + ((lon - minLon) / rangeX) * (W - 2 * pad),
+      y: H - pad - ((lat - minLat) / rangeY) * (H - 2 * pad)
+    };
+  }
+
+  // dark grid
+  ctx.strokeStyle = '#1c2620';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const x = pad + (i / 4) * (W - 2 * pad);
+    const y = pad + (i / 4) * (H - 2 * pad);
+    ctx.beginPath(); ctx.moveTo(x, pad); ctx.lineTo(x, H - pad); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.stroke();
+  }
+
+  // tracks
+  rebased.forEach((pts, i) => {
+    const color = COLORS[i % COLORS.length];
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.globalAlpha = 0.85;
+    pts.forEach((p, j) => {
+      const c = toCanvas(p.lat, p.lon);
+      j === 0 ? ctx.moveTo(c.x, c.y) : ctx.lineTo(c.x, c.y);
+    });
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // end dot
+    const last = toCanvas(pts[pts.length - 1].lat, pts[pts.length - 1].lon);
+    ctx.beginPath();
+    ctx.arc(last.x, last.y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  });
+
+  // origin dot
+  const oc = toCanvas(origin.lat, origin.lon);
+  ctx.beginPath();
+  ctx.arc(oc.x, oc.y, 6, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(oc.x, oc.y, 3, 0, Math.PI * 2);
+  ctx.fillStyle = '#0d0f0e';
+  ctx.fill();
+
+  // legend
+  const legend = document.getElementById('legend');
+  legend.innerHTML = tracks.map((t, i) => `
+    <div class="legend-item">
+      <div class="legend-dot" style="background:${COLORS[i % COLORS.length]}"></div>
+      <span>${t.name.replace('.gpx','')}</span>
+    </div>
+  `).join('');
+
+  // stats
+  const totalPts = tracks.reduce((a, t) => a + t.points.length, 0);
+  const distances = tracks.map(t => trackDistance(t.points));
+  const totalKm = distances.reduce((a, b) => a + b, 0);
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-box"><span class="stat-value">${tracks.length}</span><span class="stat-label">Pedaleadas</span></div>
+    <div class="stat-box"><span class="stat-value">${totalPts.toLocaleString()}</span><span class="stat-label">Puntos totales</span></div>
+    <div class="stat-box"><span class="stat-value">${totalKm.toFixed(1)} km</span><span class="stat-label">Dist. combinada</span></div>
+  `;
+}
+
+function trackDistance(points) {
+  let d = 0;
+  for (let i = 1; i < points.length; i++) {
+    d += haversine(points[i-1].lat, points[i-1].lon, points[i].lat, points[i].lon);
+  }
+  return d;
+}
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// ─── LOG / STATE ──────────────────────────────────────────────────────────────
+function updateLog() {
+  const log = document.getElementById('log');
+  const btn = document.getElementById('btn-export');
+  if (!tracks.length) {
+    log.innerHTML = 'Cargá al menos un archivo GPX para comenzar.';
+    btn.disabled = true;
+  } else {
+    log.innerHTML = tracks.map((t, i) =>
+      `<span class="ok">✓ ${t.name}</span> — ${t.points.length} puntos`
+    ).join('<br>');
+    btn.disabled = false;
+  }
+}
+
+function logMsg(msg, type) {
+  const log = document.getElementById('log');
+  log.innerHTML += `<br><span class="${type}">${msg}</span>`;
+}
+
+// ─── EXPORT ───────────────────────────────────────────────────────────────────
+function exportGPX() {
+  const origin = getOrigin();
+  const now = new Date().toISOString();
+
+  let gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="JoinFromStart — FiveCrops Tools"
+  xmlns="http://www.topografix.com/GPX/1/1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+  <metadata>
+    <name>JoinFromStart</name>
+    <desc>Ramillete generado desde (${origin.lat}, ${origin.lon})</desc>
+    <time>${now}</time>
+  </metadata>
+`;
+
+  tracks.forEach((t, i) => {
+    const pts = rebaseTrack(t, origin);
+    gpx += `  <trk>\n    <name>${escapeXml(t.name.replace('.gpx',''))}</name>\n    <trkseg>\n`;
+    pts.forEach(p => {
+      gpx += `      <trkpt lat="${p.lat.toFixed(7)}" lon="${p.lon.toFixed(7)}">`;
+      if (p.ele !== null) gpx += `<ele>${p.ele.toFixed(1)}</ele>`;
+      if (p.time) gpx += `<time>${p.time}</time>`;
+      gpx += `</trkpt>\n`;
+    });
+    gpx += `    </trkseg>\n  </trk>\n`;
+  });
+
+  gpx += `</gpx>`;
+
+  const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'JoinFromStart.gpx';
+  a.click();
+
+  logMsg(`✓ JoinFromStart.gpx exportado con ${tracks.length} tracks`, 'ok');
+}
+
+function escapeXml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

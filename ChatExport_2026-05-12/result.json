@@ -1,0 +1,2789 @@
+{
+ "name": "cheLegram",
+ "type": "private_supergroup",
+ "id": 3976240989,
+ "messages": [
+  {
+   "id": -999908404,
+   "type": "service",
+   "date": "2026-04-22T19:40:33",
+   "date_unixtime": "1776897633",
+   "actor": "Federico Roitberg",
+   "actor_id": "user301480998",
+   "action": "create_group",
+   "title": "cheLegram",
+   "members": [
+    "Federico Roitberg",
+    "cheLegram"
+   ],
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": -999908403,
+   "type": "service",
+   "date": "2026-04-22T19:41:07",
+   "date_unixtime": "1776897667",
+   "actor": "Federico Roitberg",
+   "actor_id": "user301480998",
+   "action": "migrate_to_supergroup",
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 1,
+   "type": "service",
+   "date": "2026-04-22T19:41:07",
+   "date_unixtime": "1776897667",
+   "actor": "cheLegram",
+   "actor_id": "channel3976240989",
+   "action": "migrate_from_group",
+   "title": "cheLegram",
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 2,
+   "type": "message",
+   "date": "2026-04-22T21:21:50",
+   "date_unixtime": "1776903710",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "Muy buenas noches América!",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Muy buenas noches América!"
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "type": "message",
+   "date": "2026-04-22T21:25:38",
+   "date_unixtime": "1776903938",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "Acá cheperico!",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Acá cheperico!"
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "type": "message",
+   "date": "2026-04-22T21:42:42",
+   "date_unixtime": "1776904962",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "cheLagram",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "cheLagram"
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "type": "message",
+   "date": "2026-04-22T21:44:22",
+   "date_unixtime": "1776905062",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "Mensaje para grupo cheLagram",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Mensaje para grupo cheLagram"
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "type": "message",
+   "date": "2026-04-22T21:47:07",
+   "date_unixtime": "1776905227",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "Más y más mensajes",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Más y más mensajes"
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "type": "message",
+   "date": "2026-04-22T22:07:19",
+   "date_unixtime": "1776906439",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "Sms",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Sms"
+    }
+   ]
+  },
+  {
+   "id": 8,
+   "type": "message",
+   "date": "2026-04-23T00:55:27",
+   "date_unixtime": "1776916527",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "mensaje",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "mensaje"
+    }
+   ]
+  },
+  {
+   "id": 9,
+   "type": "message",
+   "date": "2026-04-23T01:00:32",
+   "date_unixtime": "1776916832",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "otro mensaje",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "otro mensaje"
+    }
+   ]
+  },
+  {
+   "id": 10,
+   "type": "message",
+   "date": "2026-04-23T01:01:57",
+   "date_unixtime": "1776916917",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "este tiene que andar",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "este tiene que andar"
+    }
+   ]
+  },
+  {
+   "id": 11,
+   "type": "message",
+   "date": "2026-04-23T01:02:44",
+   "date_unixtime": "1776916964",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "otro mensaje",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "otro mensaje"
+    }
+   ]
+  },
+  {
+   "id": 12,
+   "type": "message",
+   "date": "2026-04-23T01:05:00",
+   "date_unixtime": "1776917100",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "otro y otro",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "otro y otro"
+    }
+   ]
+  },
+  {
+   "id": 13,
+   "type": "message",
+   "date": "2026-04-23T01:05:28",
+   "date_unixtime": "1776917128",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "six seven",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "six seven"
+    }
+   ]
+  },
+  {
+   "id": 14,
+   "type": "message",
+   "date": "2026-04-23T01:16:33",
+   "date_unixtime": "1776917793",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "veamos",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "veamos"
+    }
+   ]
+  },
+  {
+   "id": 15,
+   "type": "message",
+   "date": "2026-04-23T01:18:58",
+   "date_unixtime": "1776917938",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "mensaje perdido",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "mensaje perdido"
+    }
+   ]
+  },
+  {
+   "id": 16,
+   "type": "message",
+   "date": "2026-04-23T01:19:49",
+   "date_unixtime": "1776917989",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "====",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "===="
+    }
+   ]
+  },
+  {
+   "id": 17,
+   "type": "message",
+   "date": "2026-04-23T01:21:11",
+   "date_unixtime": "1776918071",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "caca",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "caca"
+    }
+   ]
+  },
+  {
+   "id": 18,
+   "type": "message",
+   "date": "2026-04-23T01:23:03",
+   "date_unixtime": "1776918183",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "pedo",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "pedo"
+    }
+   ]
+  },
+  {
+   "id": 19,
+   "type": "message",
+   "date": "2026-04-23T01:50:55",
+   "date_unixtime": "1776919855",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "pito",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "pito"
+    }
+   ]
+  },
+  {
+   "id": 20,
+   "type": "message",
+   "date": "2026-04-25T00:23:10",
+   "date_unixtime": "1777087390",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "estamos en Telegram Online?",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "estamos en Telegram Online?"
+    }
+   ]
+  },
+  {
+   "id": 21,
+   "type": "message",
+   "date": "2026-04-25T00:27:54",
+   "date_unixtime": "1777087674",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "estamos o no?",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "estamos o no?"
+    }
+   ]
+  },
+  {
+   "id": 22,
+   "type": "message",
+   "date": "2026-04-25T00:27:57",
+   "date_unixtime": "1777087677",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "dale che!",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "dale che!"
+    }
+   ]
+  },
+  {
+   "id": 23,
+   "type": "message",
+   "date": "2026-04-25T00:32:46",
+   "date_unixtime": "1777087966",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "a ver cara de verga?",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "a ver cara de verga?"
+    }
+   ]
+  },
+  {
+   "id": 24,
+   "type": "message",
+   "date": "2026-04-25T00:33:25",
+   "date_unixtime": "1777088005",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "cara de verga?",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "cara de verga?"
+    }
+   ]
+  },
+  {
+   "id": 25,
+   "type": "message",
+   "date": "2026-04-25T02:19:52",
+   "date_unixtime": "1777094392",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "sale o no sale?",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "sale o no sale?"
+    }
+   ]
+  },
+  {
+   "id": 26,
+   "type": "message",
+   "date": "2026-04-25T03:33:12",
+   "date_unixtime": "1777098792",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "está o no está?",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "está o no está?"
+    }
+   ]
+  },
+  {
+   "id": 27,
+   "type": "message",
+   "date": "2026-04-25T04:28:22",
+   "date_unixtime": "1777102102",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "caca",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "caca"
+    }
+   ]
+  },
+  {
+   "id": 28,
+   "type": "message",
+   "date": "2026-04-25T04:30:25",
+   "date_unixtime": "1777102225",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "tele gram",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "tele gram"
+    }
+   ]
+  },
+  {
+   "id": 29,
+   "type": "message",
+   "date": "2026-04-25T04:32:09",
+   "date_unixtime": "1777102329",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "a",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "a"
+    }
+   ]
+  },
+  {
+   "id": 30,
+   "type": "message",
+   "date": "2026-04-25T04:32:10",
+   "date_unixtime": "1777102330",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "e",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "e"
+    }
+   ]
+  },
+  {
+   "id": 31,
+   "type": "message",
+   "date": "2026-04-25T04:32:11",
+   "date_unixtime": "1777102331",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "i",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "i"
+    }
+   ]
+  },
+  {
+   "id": 32,
+   "type": "message",
+   "date": "2026-04-25T04:32:11",
+   "date_unixtime": "1777102331",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "o",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "o"
+    }
+   ]
+  },
+  {
+   "id": 33,
+   "type": "message",
+   "date": "2026-04-25T04:32:12",
+   "date_unixtime": "1777102332",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "u",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "u"
+    }
+   ]
+  },
+  {
+   "id": 34,
+   "type": "message",
+   "date": "2026-04-25T04:49:01",
+   "date_unixtime": "1777103341",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "a ver ahora",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "a ver ahora"
+    }
+   ]
+  },
+  {
+   "id": 35,
+   "type": "message",
+   "date": "2026-04-25T04:54:55",
+   "date_unixtime": "1777103695",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "cacona",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "cacona"
+    }
+   ]
+  },
+  {
+   "id": 36,
+   "type": "message",
+   "date": "2026-04-25T05:27:00",
+   "date_unixtime": "1777105620",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "kkkkkk",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "kkkkkk"
+    }
+   ]
+  },
+  {
+   "id": 37,
+   "type": "message",
+   "date": "2026-04-25T05:27:24",
+   "date_unixtime": "1777105644",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "no llega!!!!",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "no llega!!!!"
+    }
+   ]
+  },
+  {
+   "id": 38,
+   "type": "message",
+   "date": "2026-04-25T12:02:59",
+   "date_unixtime": "1777129379",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "pero no llega?",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "pero no llega?"
+    }
+   ]
+  },
+  {
+   "id": 39,
+   "type": "message",
+   "date": "2026-04-26T01:37:28",
+   "date_unixtime": "1777178248",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "llega o no?",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "llega o no?"
+    }
+   ]
+  },
+  {
+   "id": 40,
+   "type": "message",
+   "date": "2026-04-26T02:10:37",
+   "date_unixtime": "1777180237",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "vps",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "vps"
+    }
+   ]
+  },
+  {
+   "id": 41,
+   "type": "message",
+   "date": "2026-04-26T03:08:37",
+   "date_unixtime": "1777183717",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "este mensaje llega?",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "este mensaje llega?"
+    }
+   ]
+  },
+  {
+   "id": 42,
+   "type": "message",
+   "date": "2026-04-26T03:28:40",
+   "date_unixtime": "1777184920",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "Es este un nuevo comienzo?",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Es este un nuevo comienzo?"
+    }
+   ]
+  },
+  {
+   "id": 43,
+   "type": "service",
+   "date": "2026-04-26T03:30:33",
+   "date_unixtime": "1777185033",
+   "actor": "Federico Roitberg",
+   "actor_id": "user301480998",
+   "action": "invite_members",
+   "members": [
+    "Juan Pablo Margenat"
+   ],
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 44,
+   "type": "message",
+   "date": "2026-04-26T03:31:18",
+   "date_unixtime": "1777185078",
+   "edited": "2026-04-26T03:48:45",
+   "edited_unixtime": "1777186125",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": [
+    "Hola Juan... fijate en ",
+    {
+     "type": "link",
+     "text": "https://wiki.chela.org.ar/Espacio-de-pruebas"
+    },
+    " cómo se van cargando los mensajes de este chat."
+   ],
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Hola Juan... fijate en "
+    },
+    {
+     "type": "link",
+     "text": "https://wiki.chela.org.ar/Espacio-de-pruebas"
+    },
+    {
+     "type": "plain",
+     "text": " cómo se van cargando los mensajes de este chat."
+    }
+   ],
+   "reactions": [
+     {
+      "type": "emoji",
+      "count": 1,
+      "emoji": "👍",
+      "recent": [
+       {
+        "from": "Juan Pablo Margenat",
+        "from_id": "user436811565",
+        "date": "2026-04-26T03:48:45"
+       }
+      ]
+     }
+    ]
+  },
+  {
+   "id": 45,
+   "type": "service",
+   "date": "2026-04-26T03:32:44",
+   "date_unixtime": "1777185164",
+   "actor": "Federico Roitberg",
+   "actor_id": "user301480998",
+   "action": "topic_created",
+   "title": "Coronel",
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 46,
+   "type": "message",
+   "date": "2026-04-26T03:32:44",
+   "date_unixtime": "1777185164",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "text": "Este es el grupo Coronel",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Este es el grupo Coronel"
+    }
+   ]
+  },
+  {
+   "id": 47,
+   "type": "message",
+   "date": "2026-04-26T03:34:07",
+   "date_unixtime": "1777185247",
+   "edited": "2026-04-26T03:55:38",
+   "edited_unixtime": "1777186538",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "text": "Todavía me falta trabajar mucho en cómo va interpretando los mensajes (y luego en cómo se muestran), pero la base está.",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Todavía me falta trabajar mucho en cómo va interpretando los mensajes (y luego en cómo se muestran), pero la base está."
+    }
+   ],
+   "reactions": [
+     {
+      "type": "emoji",
+      "count": 1,
+      "emoji": "👌",
+      "recent": [
+       {
+        "from": "Juan Pablo Margenat",
+        "from_id": "user436811565",
+        "date": "2026-04-26T03:55:38"
+       }
+      ]
+     }
+    ]
+  },
+  {
+   "id": 48,
+   "type": "message",
+   "date": "2026-04-26T03:49:29",
+   "date_unixtime": "1777186169",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "text": "Pruebo mensaje  y miro esa wiki",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Pruebo mensaje  y miro esa wiki"
+    }
+   ]
+  },
+  {
+   "id": 49,
+   "type": "message",
+   "date": "2026-04-26T03:52:02",
+   "date_unixtime": "1777186322",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "Lo importante es que los mensajes quedan integrados para las búsquedas y otros tipos de manipulaciones.",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Lo importante es que los mensajes quedan integrados para las búsquedas y otros tipos de manipulaciones."
+    }
+   ]
+  },
+  {
+   "id": 50,
+   "type": "message",
+   "date": "2026-04-26T03:53:01",
+   "date_unixtime": "1777186381",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "text": "No veo el mensaje que deje…debo loguearme en la wiki?",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "No veo el mensaje que deje…debo loguearme en la wiki?"
+    }
+   ]
+  },
+  {
+   "id": 51,
+   "type": "message",
+   "date": "2026-04-26T03:53:24",
+   "date_unixtime": "1777186404",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "text": "Estas en una compu ahora? Trasnochadisimo!!!",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Estas en una compu ahora? Trasnochadisimo!!!"
+    }
+   ]
+  },
+  {
+   "id": 52,
+   "type": "message",
+   "date": "2026-04-26T12:03:15",
+   "date_unixtime": "1777215795",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "text": "che... no veo en la wiki lo del telegram... si lo del mapa.. igual hice una prueba y el punto no apareci'o...",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "che... no veo en la wiki lo del telegram... si lo del mapa.. igual hice una prueba y el punto no apareci'o..."
+    }
+   ]
+  },
+  {
+   "id": 53,
+   "type": "message",
+   "date": "2026-04-26T14:15:36",
+   "date_unixtime": "1777223736",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "qué raro, yo lo veo todo... tal vez no estás loggeado.",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "qué raro, yo lo veo todo... tal vez no estás loggeado."
+    }
+   ]
+  },
+  {
+   "id": 54,
+   "type": "message",
+   "date": "2026-04-26T14:16:16",
+   "date_unixtime": "1777223776",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "photo": "photos/photo_1@26-04-2026_14-16-16.jpg",
+   "photo_file_size": 85231,
+   "width": 808,
+   "height": 634,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 55,
+   "type": "message",
+   "date": "2026-04-26T14:17:06",
+   "date_unixtime": "1777223826",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "me parece que la re colgué mandando esa imagen",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "me parece que la re colgué mandando esa imagen"
+    }
+   ]
+  },
+  {
+   "id": 56,
+   "type": "message",
+   "date": "2026-04-26T14:17:51",
+   "date_unixtime": "1777223871",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "ahí se descolgó, pero la imagen aparece como un link a la nada, a crear una página... eso está mal",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "ahí se descolgó, pero la imagen aparece como un link a la nada, a crear una página... eso está mal"
+    }
+   ]
+  },
+  {
+   "id": 57,
+   "type": "message",
+   "date": "2026-04-27T16:52:59",
+   "date_unixtime": "1777319579",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "text": "claro, no me habia logueado, ea muy tarde y estaba emn el celu sin logueo en wiki!! ahi siii lo veo genial\\",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "claro, no me habia logueado, ea muy tarde y estaba emn el celu sin logueo en wiki!! ahi siii lo veo genial\\"
+    }
+   ]
+  },
+  {
+   "id": 58,
+   "type": "message",
+   "date": "2026-04-27T16:53:21",
+   "date_unixtime": "1777319601",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "photo": "photos/photo_2@27-04-2026_16-53-21.jpg",
+   "photo_file_size": 89380,
+   "width": 1280,
+   "height": 766,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 59,
+   "type": "message",
+   "date": "2026-04-27T17:01:11",
+   "date_unixtime": "1777320071",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "file": "stickers/sticker.webp",
+   "file_name": "sticker.webp",
+   "file_size": 17482,
+   "thumbnail": "stickers/sticker.webp_thumb.jpg",
+   "thumbnail_file_size": 4752,
+   "media_type": "sticker",
+   "sticker_emoji": "😄",
+   "mime_type": "image/webp",
+   "width": 301,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 60,
+   "type": "message",
+   "date": "2026-04-28T18:01:40",
+   "date_unixtime": "1777410100",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "aversisiguefuncionando",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "aversisiguefuncionando"
+    }
+   ]
+  },
+  {
+   "id": 61,
+   "type": "message",
+   "date": "2026-04-28T18:02:19",
+   "date_unixtime": "1777410139",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "file": "stickers/sticker (1).webp",
+   "file_name": "sticker.webp",
+   "file_size": 25236,
+   "thumbnail": "stickers/sticker (1).webp_thumb.jpg",
+   "thumbnail_file_size": 4202,
+   "media_type": "sticker",
+   "sticker_emoji": "🔥",
+   "mime_type": "image/webp",
+   "width": 369,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 62,
+   "type": "message",
+   "date": "2026-04-28T18:27:27",
+   "date_unixtime": "1777411647",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "text": "a ver>>>>",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "a ver>>>>"
+    }
+   ]
+  },
+  {
+   "id": 63,
+   "type": "message",
+   "date": "2026-04-28T18:27:36",
+   "date_unixtime": "1777411656",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "text": "ga",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "ga"
+    }
+   ]
+  },
+  {
+   "id": 64,
+   "type": "message",
+   "date": "2026-04-28T18:29:04",
+   "date_unixtime": "1777411744",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "photo": "photos/photo_3@28-04-2026_18-29-04.jpg",
+   "photo_file_size": 35807,
+   "width": 1118,
+   "height": 454,
+   "text": "verga! no le gustan los >>>>>",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "verga! no le gustan los >>>>>"
+    }
+   ]
+  },
+  {
+   "id": 65,
+   "type": "message",
+   "date": "2026-04-29T02:24:50",
+   "date_unixtime": "1777440290",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "text": "a ver si funcionan los cambios",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "a ver si funcionan los cambios"
+    }
+   ]
+  },
+  {
+   "id": 66,
+   "type": "message",
+   "date": "2026-04-29T02:32:35",
+   "date_unixtime": "1777440755",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "otra funcionalidad a arreglar",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "otra funcionalidad a arreglar"
+    }
+   ]
+  },
+  {
+   "id": 67,
+   "type": "message",
+   "date": "2026-05-05T01:53:16",
+   "date_unixtime": "1777956796",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "text": "sigue funcionando esto?",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "sigue funcionando esto?"
+    }
+   ]
+  },
+  {
+   "id": 68,
+   "type": "message",
+   "date": "2026-05-05T01:53:43",
+   "date_unixtime": "1777956823",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "photo": "photos/photo_4@05-05-2026_01-53-43.jpg",
+   "photo_file_size": 7569,
+   "width": 196,
+   "height": 177,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 69,
+   "type": "message",
+   "date": "2026-05-05T01:59:55",
+   "date_unixtime": "1777957195",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "file": "stickers/sticker (1).webp",
+   "file_name": "sticker.webp",
+   "file_size": 25236,
+   "thumbnail": "stickers/sticker (1).webp_thumb.jpg",
+   "thumbnail_file_size": 4202,
+   "media_type": "sticker",
+   "sticker_emoji": "🔥",
+   "mime_type": "image/webp",
+   "width": 369,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 70,
+   "type": "message",
+   "date": "2026-05-05T02:01:32",
+   "date_unixtime": "1777957292",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "file": "stickers/sticker (2).webp",
+   "file_name": "sticker.webp",
+   "file_size": 37224,
+   "thumbnail": "stickers/sticker (2).webp_thumb.jpg",
+   "thumbnail_file_size": 5446,
+   "media_type": "sticker",
+   "sticker_emoji": "😀",
+   "mime_type": "image/webp",
+   "width": 441,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 71,
+   "type": "message",
+   "date": "2026-05-05T02:04:37",
+   "date_unixtime": "1777957477",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "file": "stickers/sticker (3).webp",
+   "file_name": "sticker.webp",
+   "file_size": 24934,
+   "thumbnail": "stickers/sticker (3).webp_thumb.jpg",
+   "thumbnail_file_size": 4318,
+   "media_type": "sticker",
+   "sticker_emoji": "🤗",
+   "mime_type": "image/webp",
+   "width": 446,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 72,
+   "type": "message",
+   "date": "2026-05-05T02:09:10",
+   "date_unixtime": "1777957750",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "file": "stickers/sticker (4).webp",
+   "file_name": "sticker.webp",
+   "file_size": 25788,
+   "thumbnail": "stickers/sticker (4).webp_thumb.jpg",
+   "thumbnail_file_size": 13812,
+   "media_type": "sticker",
+   "sticker_emoji": "🖼",
+   "mime_type": "image/webp",
+   "width": 512,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 73,
+   "type": "message",
+   "date": "2026-05-05T02:11:49",
+   "date_unixtime": "1777957909",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "file": "stickers/sticker (5).webp",
+   "file_name": "sticker.webp",
+   "file_size": 20306,
+   "thumbnail": "stickers/sticker (5).webp_thumb.jpg",
+   "thumbnail_file_size": 3676,
+   "media_type": "sticker",
+   "sticker_emoji": "👀",
+   "mime_type": "image/webp",
+   "width": 384,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 74,
+   "type": "message",
+   "date": "2026-05-05T02:15:38",
+   "date_unixtime": "1777958138",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "photo": "photos/photo_5@05-05-2026_02-15-38.jpg",
+   "photo_file_size": 1625,
+   "width": 50,
+   "height": 50,
+   "text": "acá",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "acá"
+    }
+   ]
+  },
+  {
+   "id": 75,
+   "type": "message",
+   "date": "2026-05-05T02:17:28",
+   "date_unixtime": "1777958248",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "file": "stickers/sticker (6).webp",
+   "file_name": "sticker.webp",
+   "file_size": 22252,
+   "thumbnail": "stickers/sticker (6).webp_thumb.jpg",
+   "thumbnail_file_size": 12126,
+   "media_type": "sticker",
+   "sticker_emoji": "🙂",
+   "mime_type": "image/webp",
+   "width": 512,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 76,
+   "type": "message",
+   "date": "2026-05-05T02:27:50",
+   "date_unixtime": "1777958870",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "file": "stickers/sticker (3).webp",
+   "file_name": "sticker.webp",
+   "file_size": 24934,
+   "thumbnail": "stickers/sticker (3).webp_thumb.jpg",
+   "thumbnail_file_size": 4318,
+   "media_type": "sticker",
+   "sticker_emoji": "🤗",
+   "mime_type": "image/webp",
+   "width": 446,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 77,
+   "type": "message",
+   "date": "2026-05-05T02:36:09",
+   "date_unixtime": "1777959369",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "file": "stickers/sticker (7).webp",
+   "file_name": "sticker.webp",
+   "file_size": 22002,
+   "thumbnail": "stickers/sticker (7).webp_thumb.jpg",
+   "thumbnail_file_size": 4324,
+   "media_type": "sticker",
+   "sticker_emoji": "😗",
+   "mime_type": "image/webp",
+   "width": 512,
+   "height": 474,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 78,
+   "type": "message",
+   "date": "2026-05-05T02:41:22",
+   "date_unixtime": "1777959682",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "file": "stickers/sticker (8).webp",
+   "file_name": "sticker.webp",
+   "file_size": 29220,
+   "thumbnail": "stickers/sticker (8).webp_thumb.jpg",
+   "thumbnail_file_size": 3662,
+   "media_type": "sticker",
+   "sticker_emoji": "🙃",
+   "mime_type": "image/webp",
+   "width": 200,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 79,
+   "type": "message",
+   "date": "2026-05-05T02:45:57",
+   "date_unixtime": "1777959957",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "file": "stickers/sticker (6).webp",
+   "file_name": "sticker.webp",
+   "file_size": 22252,
+   "thumbnail": "stickers/sticker (6).webp_thumb.jpg",
+   "thumbnail_file_size": 12126,
+   "media_type": "sticker",
+   "sticker_emoji": "🙂",
+   "mime_type": "image/webp",
+   "width": 512,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 80,
+   "type": "message",
+   "date": "2026-05-05T02:54:43",
+   "date_unixtime": "1777960483",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "file": "stickers/sticker (9).webp",
+   "file_name": "sticker.webp",
+   "file_size": 13820,
+   "thumbnail": "stickers/sticker (9).webp_thumb.jpg",
+   "thumbnail_file_size": 7614,
+   "media_type": "sticker",
+   "sticker_emoji": "🤲",
+   "mime_type": "image/webp",
+   "width": 512,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 81,
+   "type": "message",
+   "date": "2026-05-05T02:57:37",
+   "date_unixtime": "1777960657",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "file": "stickers/sticker (10).webp",
+   "file_name": "sticker.webp",
+   "file_size": 40878,
+   "thumbnail": "stickers/sticker (10).webp_thumb.jpg",
+   "thumbnail_file_size": 4768,
+   "media_type": "sticker",
+   "sticker_emoji": "👋",
+   "mime_type": "image/webp",
+   "width": 512,
+   "height": 422,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 82,
+   "type": "message",
+   "date": "2026-05-05T03:00:08",
+   "date_unixtime": "1777960808",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "file": "stickers/sticker (11).webp",
+   "file_name": "sticker.webp",
+   "file_size": 22656,
+   "thumbnail": "stickers/sticker (11).webp_thumb.jpg",
+   "thumbnail_file_size": 13812,
+   "media_type": "sticker",
+   "sticker_emoji": "🌸",
+   "mime_type": "image/webp",
+   "width": 512,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 83,
+   "type": "message",
+   "date": "2026-05-05T03:03:35",
+   "date_unixtime": "1777961015",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "file": "stickers/sticker (12).webp",
+   "file_name": "sticker.webp",
+   "file_size": 21468,
+   "thumbnail": "stickers/sticker (12).webp_thumb.jpg",
+   "thumbnail_file_size": 12734,
+   "media_type": "sticker",
+   "sticker_emoji": "🎸",
+   "mime_type": "image/webp",
+   "width": 512,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 84,
+   "type": "message",
+   "date": "2026-05-05T03:07:12",
+   "date_unixtime": "1777961232",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "file": "stickers/sticker (13).webp",
+   "file_name": "sticker.webp",
+   "file_size": 27094,
+   "thumbnail": "stickers/sticker (13).webp_thumb.jpg",
+   "thumbnail_file_size": 15574,
+   "media_type": "sticker",
+   "sticker_emoji": "🐱",
+   "mime_type": "image/webp",
+   "width": 512,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 85,
+   "type": "message",
+   "date": "2026-05-05T03:07:52",
+   "date_unixtime": "1777961272",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "file": "stickers/sticker (14).webp",
+   "file_name": "sticker.webp",
+   "file_size": 12822,
+   "thumbnail": "stickers/sticker (14).webp_thumb.jpg",
+   "thumbnail_file_size": 7434,
+   "media_type": "sticker",
+   "sticker_emoji": "🧸",
+   "mime_type": "image/webp",
+   "width": 512,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 86,
+   "type": "message",
+   "date": "2026-05-05T03:24:40",
+   "date_unixtime": "1777962280",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "file": "stickers/sticker (15).webp",
+   "file_name": "sticker.webp",
+   "file_size": 21662,
+   "thumbnail": "stickers/sticker (15).webp_thumb.jpg",
+   "thumbnail_file_size": 10832,
+   "media_type": "sticker",
+   "sticker_emoji": "🤲",
+   "mime_type": "image/webp",
+   "width": 512,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 87,
+   "type": "message",
+   "date": "2026-05-05T03:33:13",
+   "date_unixtime": "1777962793",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "file": "stickers/sticker (15).webp",
+   "file_name": "sticker.webp",
+   "file_size": 21662,
+   "thumbnail": "stickers/sticker (15).webp_thumb.jpg",
+   "thumbnail_file_size": 10832,
+   "media_type": "sticker",
+   "sticker_emoji": "🤲",
+   "mime_type": "image/webp",
+   "width": 512,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 88,
+   "type": "message",
+   "date": "2026-05-05T03:37:23",
+   "date_unixtime": "1777963043",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "file": "stickers/sticker (16).webp",
+   "file_name": "sticker.webp",
+   "file_size": 22228,
+   "thumbnail": "stickers/sticker (16).webp_thumb.jpg",
+   "thumbnail_file_size": 11762,
+   "media_type": "sticker",
+   "sticker_emoji": "🎢",
+   "mime_type": "image/webp",
+   "width": 512,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 89,
+   "type": "message",
+   "date": "2026-05-05T03:39:04",
+   "date_unixtime": "1777963144",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "file": "stickers/sticker (17).webp",
+   "file_name": "sticker.webp",
+   "file_size": 16974,
+   "thumbnail": "stickers/sticker (17).webp_thumb.jpg",
+   "thumbnail_file_size": 10048,
+   "media_type": "sticker",
+   "sticker_emoji": "📖",
+   "mime_type": "image/webp",
+   "width": 512,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 90,
+   "type": "message",
+   "date": "2026-05-05T03:40:55",
+   "date_unixtime": "1777963255",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "file": "stickers/sticker (18).webp",
+   "file_name": "sticker.webp",
+   "file_size": 14914,
+   "thumbnail": "stickers/sticker (18).webp_thumb.jpg",
+   "thumbnail_file_size": 8414,
+   "media_type": "sticker",
+   "sticker_emoji": "👄",
+   "mime_type": "image/webp",
+   "width": 512,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 91,
+   "type": "message",
+   "date": "2026-05-05T03:42:51",
+   "date_unixtime": "1777963371",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "file": "stickers/sticker (19).webp",
+   "file_name": "sticker.webp",
+   "file_size": 17604,
+   "thumbnail": "stickers/sticker (19).webp_thumb.jpg",
+   "thumbnail_file_size": 10154,
+   "media_type": "sticker",
+   "sticker_emoji": "📺",
+   "mime_type": "image/webp",
+   "width": 512,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 92,
+   "type": "message",
+   "date": "2026-05-05T03:46:02",
+   "date_unixtime": "1777963562",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "file": "stickers/sticker (20).webp",
+   "file_name": "sticker.webp",
+   "file_size": 10840,
+   "thumbnail": "stickers/sticker (20).webp_thumb.jpg",
+   "thumbnail_file_size": 6094,
+   "media_type": "sticker",
+   "sticker_emoji": "👂",
+   "mime_type": "image/webp",
+   "width": 512,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 93,
+   "type": "message",
+   "date": "2026-05-05T03:54:14",
+   "date_unixtime": "1777964054",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "photo": "photos/photo_5@05-05-2026_02-15-38.jpg",
+   "photo_file_size": 1625,
+   "width": 50,
+   "height": 50,
+   "text": "el gato!",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "el gato!"
+    }
+   ]
+  },
+  {
+   "id": 94,
+   "type": "message",
+   "date": "2026-05-05T04:07:21",
+   "date_unixtime": "1777964841",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "file": "voice_messages/audio_1@05-05-2026_04-07-21.ogg",
+   "file_size": 248072,
+   "media_type": "voice_message",
+   "mime_type": "audio/ogg",
+   "duration_seconds": 12,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 95,
+   "type": "message",
+   "date": "2026-05-05T04:08:34",
+   "date_unixtime": "1777964914",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "file": "round_video_messages/file_1@05-05-2026_04-08-34.mp4",
+   "file_size": 214365,
+   "thumbnail": "round_video_messages/file_1@05-05-2026_04-08-34.mp4_thumb.jpg",
+   "thumbnail_file_size": 11343,
+   "media_type": "video_message",
+   "mime_type": "video/mp4",
+   "duration_seconds": 3,
+   "width": 384,
+   "height": 384,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 96,
+   "type": "message",
+   "date": "2026-05-05T04:08:50",
+   "date_unixtime": "1777964930",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "file": "video_files/video_1@05-05-2026_04-08-50.mp4",
+   "file_size": 1094224,
+   "thumbnail": "video_files/video_1@05-05-2026_04-08-50.mp4_thumb.jpg",
+   "thumbnail_file_size": 10015,
+   "media_type": "video_file",
+   "mime_type": "video/mp4",
+   "duration_seconds": 3,
+   "width": 720,
+   "height": 1280,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 97,
+   "type": "message",
+   "date": "2026-05-05T04:08:55",
+   "date_unixtime": "1777964935",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "location_information": {
+    "latitude": -34.642510,
+    "longitude": -58.406320
+   },
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 98,
+   "type": "message",
+   "date": "2026-05-05T04:10:33",
+   "date_unixtime": "1777965033",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "photo": "photos/photo_7@05-05-2026_04-10-33.jpg",
+   "photo_file_size": 99344,
+   "width": 678,
+   "height": 900,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 99,
+   "type": "message",
+   "date": "2026-05-05T04:10:33",
+   "date_unixtime": "1777965033",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "photo": "photos/photo_8@05-05-2026_04-10-33.jpg",
+   "photo_file_size": 202308,
+   "width": 964,
+   "height": 1280,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 100,
+   "type": "message",
+   "date": "2026-05-05T04:10:33",
+   "date_unixtime": "1777965033",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "photo": "photos/photo_9@05-05-2026_04-10-33.jpg",
+   "photo_file_size": 150142,
+   "width": 896,
+   "height": 1189,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 101,
+   "type": "message",
+   "date": "2026-05-05T04:12:47",
+   "date_unixtime": "1777965167",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "file": "files/DANI EXPERICLETA 20268364723_011_00003_00000106.pdf",
+   "file_name": "DANI EXPERICLETA 20268364723_011_00003_00000106.pdf",
+   "file_size": 104843,
+   "mime_type": "application/pdf",
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 102,
+   "type": "message",
+   "date": "2026-05-05T04:19:15",
+   "date_unixtime": "1777965555",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "file": "voice_messages/audio_2@05-05-2026_04-19-15.ogg",
+   "file_size": 61848,
+   "media_type": "voice_message",
+   "mime_type": "audio/ogg",
+   "duration_seconds": 2,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 103,
+   "type": "message",
+   "date": "2026-05-05T04:29:21",
+   "date_unixtime": "1777966161",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "último",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "último"
+    }
+   ]
+  },
+  {
+   "id": 104,
+   "type": "message",
+   "date": "2026-05-05T04:31:10",
+   "date_unixtime": "1777966270",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "ahora sí último",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "ahora sí último"
+    }
+   ]
+  },
+  {
+   "id": 105,
+   "type": "message",
+   "date": "2026-05-05T04:31:24",
+   "date_unixtime": "1777966284",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "reply_to_message_id": 45,
+   "text": "JJ",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "JJ"
+    }
+   ]
+  },
+  {
+   "id": 106,
+   "type": "message",
+   "date": "2026-05-05T04:31:34",
+   "date_unixtime": "1777966294",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "reply_to_message_id": 45,
+   "location_information": {
+    "latitude": 34.069696,
+    "longitude": -118.227709
+   },
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 107,
+   "type": "message",
+   "date": "2026-05-05T04:32:08",
+   "date_unixtime": "1777966328",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "mentí",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "mentí"
+    }
+   ]
+  },
+  {
+   "id": 108,
+   "type": "message",
+   "date": "2026-05-05T04:32:36",
+   "date_unixtime": "1777966356",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "file": "video_files/IMG_0404.MOV",
+   "file_name": "IMG_0404.MOV",
+   "file_size": 2652038,
+   "thumbnail": "video_files/IMG_0404.MOV_thumb.jpg",
+   "thumbnail_file_size": 15397,
+   "media_type": "video_file",
+   "mime_type": "video/mp4",
+   "duration_seconds": 7,
+   "width": 1280,
+   "height": 960,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 109,
+   "type": "message",
+   "date": "2026-05-05T04:33:01",
+   "date_unixtime": "1777966381",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "jaja...",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "jaja..."
+    }
+   ]
+  },
+  {
+   "id": 110,
+   "type": "message",
+   "date": "2026-05-05T04:34:02",
+   "date_unixtime": "1777966442",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "bueno, así como está el coso este casi que lo puedo proponer para testear en chela qué pasa",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "bueno, así como está el coso este casi que lo puedo proponer para testear en chela qué pasa"
+    }
+   ]
+  },
+  {
+   "id": 111,
+   "type": "message",
+   "date": "2026-05-05T04:34:29",
+   "date_unixtime": "1777966469",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "ya en tiki levanta los audios, videos, imágenes, documentos, etc.",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "ya en tiki levanta los audios, videos, imágenes, documentos, etc."
+    }
+   ]
+  },
+  {
+   "id": 112,
+   "type": "message",
+   "date": "2026-05-05T04:34:38",
+   "date_unixtime": "1777966478",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "todo bastante integrado",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "todo bastante integrado"
+    }
+   ]
+  },
+  {
+   "id": 113,
+   "type": "message",
+   "date": "2026-05-05T04:37:23",
+   "date_unixtime": "1777966643",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "text": "Genial!",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Genial!"
+    }
+   ]
+  },
+  {
+   "id": 114,
+   "type": "message",
+   "date": "2026-05-05T04:37:36",
+   "date_unixtime": "1777966656",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "text": "No vi estos dias",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "No vi estos dias"
+    }
+   ]
+  },
+  {
+   "id": 115,
+   "type": "message",
+   "date": "2026-05-05T04:38:01",
+   "date_unixtime": "1777966681",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "text": "Stickers? Como los levsnta?",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Stickers? Como los levsnta?"
+    }
+   ]
+  },
+  {
+   "id": 116,
+   "type": "message",
+   "date": "2026-05-05T04:38:27",
+   "date_unixtime": "1777966707",
+   "edited": "2026-05-05T04:38:41",
+   "edited_unixtime": "1777966721",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "text": "en tiempo real no?",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "en tiempo real no?"
+    }
+   ]
+  },
+  {
+   "id": 117,
+   "type": "message",
+   "date": "2026-05-05T04:39:07",
+   "date_unixtime": "1777966747",
+   "edited": "2026-05-05T04:39:18",
+   "edited_unixtime": "1777966758",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "text": "Si. Que bolu, si yo probe…",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Si. Que bolu, si yo probe…"
+    }
+   ]
+  },
+  {
+   "id": 118,
+   "type": "message",
+   "date": "2026-05-05T04:42:18",
+   "date_unixtime": "1777966938",
+   "edited": "2026-05-05T04:42:39",
+   "edited_unixtime": "1777966959",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "text": "Que bot estas utilizando? sync@ChatbroBot?",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Que bot estas utilizando? sync@ChatbroBot?"
+    }
+   ]
+  },
+  {
+   "id": 119,
+   "type": "message",
+   "date": "2026-05-05T04:47:53",
+   "date_unixtime": "1777967273",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "sale de botfather",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "sale de botfather"
+    }
+   ]
+  },
+  {
+   "id": 120,
+   "type": "message",
+   "date": "2026-05-05T04:48:21",
+   "date_unixtime": "1777967301",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "sync@ChatbroBot no sé qué es eso... hice un bot en botfather y lo metí acá",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "sync@ChatbroBot no sé qué es eso... hice un bot en botfather y lo metí acá"
+    }
+   ]
+  },
+  {
+   "id": 121,
+   "type": "message",
+   "date": "2026-05-05T04:48:53",
+   "date_unixtime": "1777967333",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 116,
+   "text": "sube en tiempo real pero obvio que hay que actualizar la página para ver los cambios",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "sube en tiempo real pero obvio que hay que actualizar la página para ver los cambios"
+    }
+   ]
+  },
+  {
+   "id": 122,
+   "type": "message",
+   "date": "2026-05-05T04:49:15",
+   "date_unixtime": "1777967355",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 97,
+   "text": "no estaba en cheLA, mandé antes que se actualice",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "no estaba en cheLA, mandé antes que se actualice"
+    }
+   ]
+  },
+  {
+   "id": 123,
+   "type": "message",
+   "date": "2026-05-05T11:12:48",
+   "date_unixtime": "1777990368",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "file": "stickers/sticker (21).webp",
+   "file_name": "sticker.webp",
+   "file_size": 14922,
+   "thumbnail": "stickers/sticker (21).webp_thumb.jpg",
+   "thumbnail_file_size": 8344,
+   "media_type": "sticker",
+   "sticker_emoji": "🤲",
+   "mime_type": "image/webp",
+   "width": 512,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 124,
+   "type": "message",
+   "date": "2026-05-05T12:27:40",
+   "date_unixtime": "1777994860",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "reply_to_message_id": 45,
+   "file": "stickers/sticker (22).webp",
+   "file_name": "sticker.webp",
+   "file_size": 34894,
+   "thumbnail": "stickers/sticker (22).webp_thumb.jpg",
+   "thumbnail_file_size": 17564,
+   "media_type": "sticker",
+   "sticker_emoji": "💇",
+   "mime_type": "image/webp",
+   "width": 512,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 125,
+   "type": "message",
+   "date": "2026-05-05T13:24:59",
+   "date_unixtime": "1777998299",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "file": "stickers/sticker (23).webp",
+   "file_name": "sticker.webp",
+   "file_size": 21782,
+   "thumbnail": "stickers/sticker (23).webp_thumb.jpg",
+   "thumbnail_file_size": 12082,
+   "media_type": "sticker",
+   "sticker_emoji": "🖼",
+   "mime_type": "image/webp",
+   "width": 512,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 126,
+   "type": "message",
+   "date": "2026-05-05T13:29:24",
+   "date_unixtime": "1777998564",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "text": "cada vez que mando un mensaje es porque estoy probando algo",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "cada vez que mando un mensaje es porque estoy probando algo"
+    }
+   ]
+  },
+  {
+   "id": 127,
+   "type": "message",
+   "date": "2026-05-05T13:29:29",
+   "date_unixtime": "1777998569",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "file": "stickers/sticker (24).webp",
+   "file_name": "sticker.webp",
+   "file_size": 16744,
+   "thumbnail": "stickers/sticker (24).webp_thumb.jpg",
+   "thumbnail_file_size": 9670,
+   "media_type": "sticker",
+   "sticker_emoji": "🤲",
+   "mime_type": "image/webp",
+   "width": 512,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 128,
+   "type": "message",
+   "date": "2026-05-05T13:34:36",
+   "date_unixtime": "1777998876",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "file": "stickers/sticker (15).webp",
+   "file_name": "sticker.webp",
+   "file_size": 21662,
+   "thumbnail": "stickers/sticker (15).webp_thumb.jpg",
+   "thumbnail_file_size": 10832,
+   "media_type": "sticker",
+   "sticker_emoji": "🤲",
+   "mime_type": "image/webp",
+   "width": 512,
+   "height": 512,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 129,
+   "type": "message",
+   "date": "2026-05-05T13:34:39",
+   "date_unixtime": "1777998879",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "un horror",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "un horror"
+    }
+   ]
+  },
+  {
+   "id": 130,
+   "type": "message",
+   "date": "2026-05-05T13:35:32",
+   "date_unixtime": "1777998932",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "text": "coronel",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "coronel"
+    }
+   ]
+  },
+  {
+   "id": 131,
+   "type": "message",
+   "date": "2026-05-05T15:10:45",
+   "date_unixtime": "1778004645",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "text": "BOY GEORGE",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "BOY GEORGE"
+    }
+   ]
+  },
+  {
+   "id": 132,
+   "type": "message",
+   "date": "2026-05-06T00:25:02",
+   "date_unixtime": "1778037902",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "probando nuevamente",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "probando nuevamente"
+    }
+   ]
+  },
+  {
+   "id": 133,
+   "type": "message",
+   "date": "2026-05-06T00:48:42",
+   "date_unixtime": "1778039322",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "jjjj",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "jjjj"
+    }
+   ]
+  },
+  {
+   "id": 134,
+   "type": "message",
+   "date": "2026-05-06T00:55:11",
+   "date_unixtime": "1778039711",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "pepa pig",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "pepa pig"
+    }
+   ]
+  },
+  {
+   "id": 135,
+   "type": "message",
+   "date": "2026-05-06T01:00:19",
+   "date_unixtime": "1778040019",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "cacona",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "cacona"
+    }
+   ]
+  },
+  {
+   "id": 136,
+   "type": "message",
+   "date": "2026-05-06T01:01:19",
+   "date_unixtime": "1778040079",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "y ahora qué pasa?",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "y ahora qué pasa?"
+    }
+   ]
+  },
+  {
+   "id": 137,
+   "type": "message",
+   "date": "2026-05-06T01:02:32",
+   "date_unixtime": "1778040152",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "asfasfasf",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "asfasfasf"
+    }
+   ]
+  },
+  {
+   "id": 138,
+   "type": "message",
+   "date": "2026-05-06T01:12:34",
+   "date_unixtime": "1778040754",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "si este funciona no jodo más",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "si este funciona no jodo más"
+    }
+   ]
+  },
+  {
+   "id": 139,
+   "type": "message",
+   "date": "2026-05-06T02:10:16",
+   "date_unixtime": "1778044216",
+   "edited": "2026-05-06T02:10:35",
+   "edited_unixtime": "1778044235",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "text": "Los de Morron",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Los de Morron"
+    }
+   ]
+  },
+  {
+   "id": 140,
+   "type": "message",
+   "date": "2026-05-06T02:10:16",
+   "date_unixtime": "1778044216",
+   "edited": "2026-05-06T02:48:32",
+   "edited_unixtime": "1778046512",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "photo": "photos/photo_10@06-05-2026_02-10-16.jpg",
+   "photo_file_size": 147446,
+   "width": 960,
+   "height": 1280,
+   "text": "",
+   "text_entities": [],
+   "reactions": [
+     {
+      "type": "emoji",
+      "count": 1,
+      "emoji": "🔥",
+      "recent": [
+       {
+        "from": "Federico Roitberg",
+        "from_id": "user301480998",
+        "date": "2026-05-06T02:48:32"
+       }
+      ]
+     }
+    ]
+  },
+  {
+   "id": 141,
+   "type": "message",
+   "date": "2026-05-08T02:01:50",
+   "date_unixtime": "1778216510",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "location_information": {
+    "latitude": -34.587292,
+    "longitude": -58.446821
+   },
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 142,
+   "type": "message",
+   "date": "2026-05-08T02:16:33",
+   "date_unixtime": "1778217393",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "location_information": {
+    "latitude": -34.585166,
+    "longitude": -58.450421
+   },
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 143,
+   "type": "message",
+   "date": "2026-05-08T02:20:20",
+   "date_unixtime": "1778217620",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "location_information": {
+    "latitude": -34.587277,
+    "longitude": -58.446741
+   },
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 144,
+   "type": "message",
+   "date": "2026-05-08T02:51:26",
+   "date_unixtime": "1778219486",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "location_information": {
+    "latitude": -34.587303,
+    "longitude": -58.446843
+   },
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 145,
+   "type": "message",
+   "date": "2026-05-08T03:39:19",
+   "date_unixtime": "1778222359",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "reply_to_message_id": 45,
+   "location_information": {
+    "latitude": 34.069623,
+    "longitude": -118.227545
+   },
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 146,
+   "type": "message",
+   "date": "2026-05-08T03:40:10",
+   "date_unixtime": "1778222410",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "file": "files/JoinFromStart.html",
+   "file_name": "JoinFromStart.html",
+   "file_size": 20150,
+   "mime_type": "application/octet-stream",
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 147,
+   "type": "message",
+   "date": "2026-05-08T12:11:11",
+   "date_unixtime": "1778253071",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 145,
+   "photo": "photos/photo_11@08-05-2026_12-11-11.jpg",
+   "photo_file_size": 5196,
+   "width": 245,
+   "height": 263,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 148,
+   "type": "message",
+   "date": "2026-05-08T15:25:46",
+   "date_unixtime": "1778264746",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "reply_to_message_id": 45,
+   "file": "round_video_messages/video.mp4",
+   "file_name": "video.mp4",
+   "file_size": 1830930,
+   "thumbnail": "round_video_messages/video.mp4_thumb.jpg",
+   "thumbnail_file_size": 22241,
+   "media_type": "video_message",
+   "mime_type": "video/mp4",
+   "duration_seconds": 13,
+   "width": 400,
+   "height": 400,
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 149,
+   "type": "message",
+   "date": "2026-05-09T15:28:51",
+   "date_unixtime": "1778351331",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "photo": "photos/photo_12@09-05-2026_15-28-51.jpg",
+   "photo_file_size": 40172,
+   "width": 432,
+   "height": 487,
+   "text": "Se ve que sí",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Se ve que sí"
+    }
+   ]
+  },
+  {
+   "id": 150,
+   "type": "message",
+   "date": "2026-05-09T16:33:52",
+   "date_unixtime": "1778355232",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "reply_to_message_id": 45,
+   "text": "no video",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "no video"
+    }
+   ]
+  },
+  {
+   "id": 151,
+   "type": "message",
+   "date": "2026-05-09T16:34:59",
+   "date_unixtime": "1778355299",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "reply_to_message_id": 45,
+   "photo": "photos/photo_13@09-05-2026_16-34-59.jpg",
+   "photo_file_size": 138187,
+   "width": 960,
+   "height": 1280,
+   "text": "En breve consulta contenedor",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "En breve consulta contenedor"
+    }
+   ]
+  },
+  {
+   "id": 152,
+   "type": "message",
+   "date": "2026-05-09T16:49:24",
+   "date_unixtime": "1778356164",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "text": "consolas muy útil",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "consolas muy útil"
+    }
+   ]
+  },
+  {
+   "id": 153,
+   "type": "message",
+   "date": "2026-05-09T20:46:03",
+   "date_unixtime": "1778370363",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "text": "probar hacer llegar un mensaje",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "probar hacer llegar un mensaje"
+    }
+   ]
+  },
+  {
+   "id": 154,
+   "type": "message",
+   "date": "2026-05-09T20:50:38",
+   "date_unixtime": "1778370638",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "text": "otra prueba",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "otra prueba"
+    }
+   ]
+  },
+  {
+   "id": 155,
+   "type": "message",
+   "date": "2026-05-09T20:55:21",
+   "date_unixtime": "1778370921",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "reply_to_message_id": 45,
+   "text": "abrite esta!",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "abrite esta!"
+    }
+   ]
+  },
+  {
+   "id": 156,
+   "type": "message",
+   "date": "2026-05-09T20:55:21",
+   "date_unixtime": "1778370921",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "reply_to_message_id": 45,
+   "file": "files/dogtown_360.html",
+   "file_name": "dogtown_360.html",
+   "file_size": 1450088,
+   "mime_type": "application/octet-stream",
+   "text": "",
+   "text_entities": []
+  },
+  {
+   "id": 157,
+   "type": "message",
+   "date": "2026-05-09T20:55:55",
+   "date_unixtime": "1778370955",
+   "from": "Juan Pablo Margenat",
+   "from_id": "user436811565",
+   "reply_to_message_id": 45,
+   "text": "estoy atrasado con lo del contenedor... me parece que mañana enviare las fotos...",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "estoy atrasado con lo del contenedor... me parece que mañana enviare las fotos..."
+    }
+   ]
+  },
+  {
+   "id": 158,
+   "type": "message",
+   "date": "2026-05-10T02:51:34",
+   "date_unixtime": "1778392294",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "text": "a ver si se arregló un error que tenía",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "a ver si se arregló un error que tenía"
+    }
+   ]
+  },
+  {
+   "id": 159,
+   "type": "message",
+   "date": "2026-05-10T03:00:07",
+   "date_unixtime": "1778392807",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "text": "el errror persiste",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "el errror persiste"
+    }
+   ]
+  },
+  {
+   "id": 160,
+   "type": "message",
+   "date": "2026-05-10T03:01:48",
+   "date_unixtime": "1778392908",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "text": "sigue fallando",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "sigue fallando"
+    }
+   ]
+  },
+  {
+   "id": 161,
+   "type": "message",
+   "date": "2026-05-10T03:05:10",
+   "date_unixtime": "1778393110",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "text": "y sigue mal",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "y sigue mal"
+    }
+   ]
+  },
+  {
+   "id": 162,
+   "type": "message",
+   "date": "2026-05-10T03:05:31",
+   "date_unixtime": "1778393131",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "text": "a ver acpa",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "a ver acpa"
+    }
+   ]
+  },
+  {
+   "id": 163,
+   "type": "message",
+   "date": "2026-05-10T03:24:23",
+   "date_unixtime": "1778394263",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "text": "veamos...",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "veamos..."
+    }
+   ]
+  },
+  {
+   "id": 164,
+   "type": "message",
+   "date": "2026-05-10T03:25:25",
+   "date_unixtime": "1778394325",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "text": "mensaje",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "mensaje"
+    }
+   ]
+  },
+  {
+   "id": 165,
+   "type": "message",
+   "date": "2026-05-10T03:29:51",
+   "date_unixtime": "1778394591",
+   "from": "Federico Roitberg",
+   "from_id": "user301480998",
+   "reply_to_message_id": 45,
+   "text": "testeo",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "testeo"
+    }
+   ]
+  }
+ ]
+}
