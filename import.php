@@ -7,6 +7,8 @@
 // Iniciar sesión para CSRF y autenticación
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
+} elseif (session_status() === PHP_SESSION_ACTIVE) {
+    // Sesión ya iniciada por otro script,no hace falta hacer nada
 }
 
 if (!isset($_SESSION['authenticated']) || $_SESSION['authenticated'] !== true) {

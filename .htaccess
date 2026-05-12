@@ -1,5 +1,9 @@
 # Configuración Apache para trackerGram
 
+# Límites de PHP para importación de archivos grandes
+php_value upload_max_filesize 50M
+php_value post_max_size 50M
+
 # Deshabilitar listado de directorios
 Options -Indexes
 
