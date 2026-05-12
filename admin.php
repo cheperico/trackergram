@@ -402,6 +402,12 @@ if (!checkAuth()) {
         <label>Custom Webhook URL (opcional):</label><br>
         <input type="text" name="custom_webhook_url" value="<?php echo htmlspecialchars($config['custom_webhook_url'] ?? ''); ?>" size="50" placeholder="https://example.com"><br><br>
         
+        <label>TikiWiki API URL:</label><br>
+        <input type="text" name="tikiwiki_api_url" value="<?php echo htmlspecialchars($config['tikiwiki_api_url']); ?>" size="50"><br><br>
+        
+        <label>TikiWiki Token:</label><br>
+        <input type="text" name="tikiwiki_token" value="<?php echo htmlspecialchars($config['tikiwiki_token']); ?>" size="50"><br><br>
+        
         <button type="submit">Guardar Configuración</button>
     </form>
     
