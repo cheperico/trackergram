@@ -12,3 +12,6 @@ debug.log
 # Archivos de backup
 *.bak
 *.backup
+
+# Exports
+Exports/

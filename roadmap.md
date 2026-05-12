@@ -10,11 +10,15 @@
 
 ### Funcionalidades
 
+- [ ] **Creación automática de tracker**: Usar API de TikiWiki para crear el tracker con todos los campos necesarios automáticamente (evita configuración manual)
+  - Panel admin: crear nuevo tracker con nombre → genera campos automáticamente
+  - O usar tracker existente → agregar campos que falten
 - [ ] **Sistema de etiquetas**: Extraer hashtags (#etiqueta) de mensajes de Telegram y guardarlos en campo del tracker para conectar con el sistema de tags de TikiWiki
-- [ ] **Nombre real del topic**: Obtener nombre del topic desde API de Telegram (actualmente hardcodeado "General")
-- [ ] **Topic dinámico**: Obtener nombre real del topic (opcional, requiere llamadas extra a API de Telegram)
-- [ ] **Mensajes reply**: Guardar referencia al mensaje al que se responde (reply_to_message_id)
-- [ ] **Reacciones**: Guardar reacciones a mensajes (emoji + usuario)
+- [ ] **Importar export de Telegram**: Importar conversaciones desde JSON exportado de Telegram (para carga masiva de datos históricos)
+  - **Por zip**: Requiere aumentar límites de PHP (para exports pequeños)
+    - Mostrar límites claramente en panel (lenguaje usuario + datos técnicos)
+    - Después de procesar, borrar archivo importado
+  - **Por FTP + carpeta local**: Recomendado - subir export por FTP a una carpeta y procesar desde ahí (sin límites de upload, procesamiento en chunks)
 
 ### Seguridad
 

@@ -103,6 +103,103 @@ function getTopicName(int $chatId, int $messageThreadId): string
 }
 
 /**
+ * Crear un tracker con todos los campos necesarios para trackerGram
+ */
+function createTrackerWithFields(string $trackerName): ?int
+{
+    // Crear el tracker
+    $url = TIKIWIKI_API_URL . 'trackers';
+    $postFields = http_build_query([
+        'name' => $trackerName,
+        'description' => 'Tracker para mensajes de Telegram (creado por trackerGram)',
+        'defaultStatus' => 'open'
+    ]);
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TIKIWIKI_API);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "Content-Type: application/x-www-form-urlencoded",
+        "Authorization: Bearer " . TIKIWIKI_TOKEN,
+        "Accept: application/json"
+    ]);
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    $data = json_decode($response, true);
+    
+    if ($httpCode !== 200 || !isset($data['id'])) {
+        error_log("ERROR creating tracker: HTTP $httpCode, response: $response");
+        return null;
+    }
+    
+    $trackerId = $data['id'];
+    error_log("Created tracker with ID: $trackerId");
+    
+    // Campos necesarios para trackerGram
+    $fields = [
+        ['name' => 'Telegram Message ID', 'permname' => 'telegrammessageTelegramMessageId', 'type' => 'text_field', 'order' => 1],
+        ['name' => 'Chat ID', 'permname' => 'telegrammessageChatId', 'type' => 'text_field', 'order' => 2],
+        ['name' => 'Chat Title', 'permname' => 'telegrammessageChatTitle', 'type' => 'text_field', 'order' => 3],
+        ['name' => 'Topic ID', 'permname' => 'telegrammessageTopicId', 'type' => 'text_field', 'order' => 4],
+        ['name' => 'Topic Title', 'permname' => 'telegrammessageTopicTitle', 'type' => 'text_field', 'order' => 5],
+        ['name' => 'User ID', 'permname' => 'telegrammessageUserId', 'type' => 'text_field', 'order' => 6],
+        ['name' => 'Username', 'permname' => 'telegrammessageUsername', 'type' => 'text_field', 'order' => 7],
+        ['name' => 'First Name', 'permname' => 'telegrammessageFirstName', 'type' => 'text_field', 'order' => 8],
+        ['name' => 'Last Name', 'permname' => 'telegrammessageLastName', 'type' => 'text_field', 'order' => 9],
+        ['name' => 'Message Type', 'permname' => 'telegrammessageMessageType', 'type' => 'text_field', 'order' => 10],
+        ['name' => 'Text', 'permname' => 'telegrammessageText', 'type' => 'text_area', 'order' => 11],
+        ['name' => 'Media', 'permname' => 'telegrammessageMedia', 'type' => 'file', 'order' => 12],
+        ['name' => 'Media URL', 'permname' => 'telegrammessageMediaUrl', 'type' => 'text_field', 'order' => 13],
+        ['name' => 'File URL', 'permname' => 'telegrammessageFileUrl', 'type' => 'text_field', 'order' => 14],
+        ['name' => 'Media Type', 'permname' => 'telegrammessageMediaType', 'type' => 'text_field', 'order' => 15],
+        ['name' => 'Media Size', 'permname' => 'telegrammessageMediaSize', 'type' => 'numeric', 'order' => 16],
+        ['name' => 'Media Caption', 'permname' => 'telegrammessageMediaCaption', 'type' => 'text_field', 'order' => 17],
+        ['name' => 'Location', 'permname' => 'telegrammessageLocation', 'type' => 'text_field', 'order' => 18],
+        ['name' => 'Message Date', 'permname' => 'telegrammessageMessageDate', 'type' => 'text_field', 'order' => 19],
+    ];
+    
+    foreach ($fields as $field) {
+        $fieldUrl = TIKIWIKI_API_URL . "trackers/$trackerId/fields";
+        $fieldPost = http_build_query([
+            'name' => $field['name'],
+            'permname' => $field['permname'],
+            'type' => $field['type'],
+            'order' => $field['order']
+        ]);
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $fieldUrl);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $fieldPost);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TIKIWIKI_API);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Content-Type: application/x-www-form-urlencoded",
+            "Authorization: Bearer " . TIKIWIKI_TOKEN,
+            "Accept: application/json"
+        ]);
+        
+        $fieldResponse = curl_exec($ch);
+        $fieldHttpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        if ($fieldHttpCode === 200) {
+            error_log("Created field: {$field['name']}");
+        } else {
+            error_log("ERROR creating field {$field['name']}: HTTP $fieldHttpCode");
+        }
+    }
+    
+    return $trackerId;
+}
+
+/**
  * Verificar si un message_id ya existe en el tracker (para evitar duplicados)
  */
 function messageExistsInTracker(int $messageId): bool

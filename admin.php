@@ -280,6 +280,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
+// Procesar creación de tracker
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'create_tracker') {
+    validateCSRFToken($_POST['csrf_token'] ?? '');
+    
+    $trackerName = trim($_POST['tracker_name'] ?? 'Telegram Messages');
+    
+    // Incluir api.php para tener la función
+    require_once __DIR__ . '/api.php';
+    
+    $newTrackerId = createTrackerWithFields($trackerName);
+    
+    if ($newTrackerId) {
+        $success = "Tracker '$trackerName' creado exitosamente con ID: $newTrackerId. Actualiza el ID en la configuración.";
+    } {
+        $error = "Error al crear el tracker. Verifica las credenciales de TikiWiki.";
+    }
+}
+
 // Cargar configuración actual
 $env = loadEnvFromFile();
 $config = [
@@ -369,6 +387,18 @@ if (!checkAuth()) {
         <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
         
         <button type="submit">Actualizar Webhook</button>
+    </form>
+    
+    <h2>Crear Tracker en TikiWiki</h2>
+    <p>Crea un nuevo tracker con todos los campos necesarios para trackerGram automáticamente.</p>
+    <form method="post">
+        <input type="hidden" name="action" value="create_tracker">
+        <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+        
+        <label>Nombre del tracker:</label><br>
+        <input type="text" name="tracker_name" value="Telegram Messages" size="40"><br><br>
+        
+        <button type="submit">Crear Tracker</button>
     </form>
 </body>
 </html>
