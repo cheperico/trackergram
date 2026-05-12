@@ -15,3 +15,7 @@ debug.log
 
 # Exports
 Exports/
+ChatExport_*/
+
+# Import temp
+import_temp/
