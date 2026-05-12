@@ -140,12 +140,24 @@ function createTrackerWithFields(string $trackerName): ?int
     
     $data = json_decode($response, true);
     
-    if ($httpCode !== 200 || !isset($data['id'])) {
-        error_log("ERROR creating tracker: HTTP $httpCode, response: $response");
+    // Manejar respuesta - puede ser JSON o HTML
+    $trackerId = null;
+    if (json_last_error() === JSON_ERROR_NONE && isset($data['id'])) {
+        $trackerId = $data['id'];
+    } elseif ($httpCode === 200) {
+        // Buscar ID en respuesta HTML
+        if (preg_match('/["\']?id["\']?\s*[:=]\s*["\']?(\d+)["\']?/i', $response, $matches)) {
+            $trackerId = $matches[1];
+        } elseif (preg_match('/\/tiki\/tracker\.php\?trackerId=(\d+)/', $response, $matches)) {
+            $trackerId = $matches[1];
+        }
+    }
+    
+    if (!$trackerId) {
+        error_log("ERROR creating tracker: HTTP $httpCode, response=$response, jsonError=" . json_last_error_msg());
         return null;
     }
     
-    $trackerId = $data['id'];
     error_log("Created tracker with ID: $trackerId");
     
     // Campos necesarios para trackerGram
