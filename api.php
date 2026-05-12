@@ -26,8 +26,11 @@ function getCachedMediaGalleryId(): ?int
     return $mediaGalleryIdCache;
 }
 
-// Validar secret token del webhook si está configurado
-if (TELEGRAM_WEBHOOK_SECRET) {
+// Validar secret token del webhook solo si es una petición de Telegram (tiene datos JSON en input)
+$rawInput = file_get_contents('php://input');
+$isWebhookRequest = !empty($rawInput) && json_decode($rawInput, true) !== null;
+
+if ($isWebhookRequest && TELEGRAM_WEBHOOK_SECRET) {
     $secretToken = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '';
     if ($secretToken !== TELEGRAM_WEBHOOK_SECRET) {
         http_response_code(403);
