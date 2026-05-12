@@ -203,9 +203,8 @@ function createTrackerWithFields(string $trackerName): ?int
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TIKIWIKI_API);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Content-Type: application/x-www-form-urlencoded",
             "Authorization: Bearer " . TIKIWIKI_TOKEN,
-            "Accept: application/json"
+            "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         ]);
         
         $fieldResponse = curl_exec($ch);
