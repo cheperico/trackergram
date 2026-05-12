@@ -382,9 +382,9 @@ if (!checkAuth()) {
     <h2>Índice</h2>
     <ul>
         <li><a href="#config-telegram">1. Configuración de Telegram</a></li>
-        <li><a href="#tracker-directo">2. Tracker en directo</a></li>
-        <li><a href="#webhook">3. Webhook de Telegram</a></li>
-        <li><a href="#tracker-importar">4. Tracker de importación</a></li>
+        <li><a href="#tracker-importar">2. Importar conversaciones</a></li>
+        <li><a href="#tracker-directo">3. Tracker en directo</a></li>
+        <li><a href="#webhook">4. Webhook de Telegram</a></li>
         <li><a href="#crear-tracker">5. Crear Tracker en TikiWiki</a></li>
     </ul>
     
@@ -417,38 +417,7 @@ if (!checkAuth()) {
         <button type="submit">Guardar Configuración</button>
     </form>
     
-    <h2 id="tracker-directo">2. Tracker en directo</h2>
-    <form method="post">
-        <input type="hidden" name="action" value="save_config">
-        <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-        
-        <input type="hidden" name="telegram_bot_token" value="<?php echo htmlspecialchars($config['telegram_bot_token']); ?>">
-        <input type="hidden" name="telegram_webhook_secret" value="<?php echo htmlspecialchars($config['telegram_webhook_secret']); ?>">
-        <input type="hidden" name="custom_webhook_url" value="<?php echo htmlspecialchars($config['custom_webhook_url'] ?? ''); ?>">
-        <input type="hidden" name="tikiwiki_api_url" value="<?php echo htmlspecialchars($config['tikiwiki_api_url']); ?>">
-        <input type="hidden" name="tikiwiki_token" value="<?php echo htmlspecialchars($config['tikiwiki_token']); ?>">
-        
-        <label>TikiWiki Tracker ID:</label><br>
-        <input type="text" name="tikiwiki_tracker_id" value="<?php echo htmlspecialchars($config['tikiwiki_tracker_id']); ?>" size="10">
-        <small>(ID del tracker que recibe los mensajes del webhook)</small><br><br>
-        
-        <button type="submit">Guardar Tracker</button>
-    </form>
-    
-    <h2 id="webhook">3. Webhook de Telegram</h2>
-    <p>URL automática: 
-        <?php
-        echo htmlspecialchars(generateWebhookUrl());
-        ?>
-    </p>
-    <form method="post">
-        <input type="hidden" name="action" value="update_webhook">
-        <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-        
-        <button type="submit">Actualizar Webhook</button>
-    </form>
-    
-    <h2 id="tracker-importar">4. Tracker de importación</h2>
+    <h2 id="tracker-importar">2. Importar conversaciones</h2>
     <p>Importar conversaciones desde archivos ZIP exportados de Telegram. Los archivos (fotos, stickers, videos) se subirán a la file gallery del tracker.</p>
     
     <form id="import-form" enctype="multipart/form-data">
@@ -511,17 +480,101 @@ if (!checkAuth()) {
     }
     </script>
     
-    <h2 id="crear-tracker">5. Crear Tracker en TikiWiki</h2>
-    <p>Crea un nuevo tracker con todos los campos necesarios para trackerGram automáticamente en <?php echo htmlspecialchars(parse_url($config['tikiwiki_api_url'] ?? '', PHP_URL_HOST) ?: 'tu sitio'); ?>.</p>
+    <h2 id="tracker-directo">3. Tracker en directo</h2>
     <form method="post">
-        <input type="hidden" name="action" value="create_tracker">
+        <input type="hidden" name="action" value="save_config">
         <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
         
-        <label>Nombre del tracker:</label><br>
-        <input type="text" name="tracker_name" value="Telegram Messages" size="40"><br><br>
+        <input type="hidden" name="telegram_bot_token" value="<?php echo htmlspecialchars($config['telegram_bot_token']); ?>">
+        <input type="hidden" name="telegram_webhook_secret" value="<?php echo htmlspecialchars($config['telegram_webhook_secret']); ?>">
+        <input type="hidden" name="custom_webhook_url" value="<?php echo htmlspecialchars($config['custom_webhook_url'] ?? ''); ?>">
+        <input type="hidden" name="tikiwiki_api_url" value="<?php echo htmlspecialchars($config['tikiwiki_api_url']); ?>">
+        <input type="hidden" name="tikiwiki_token" value="<?php echo htmlspecialchars($config['tikiwiki_token']); ?>">
         
-        <button type="submit">Crear Tracker</button>
+        <label>TikiWiki Tracker ID:</label><br>
+        <input type="text" name="tikiwiki_tracker_id" value="<?php echo htmlspecialchars($config['tikiwiki_tracker_id']); ?>" size="10">
+        <small>(ID del tracker que recibe los mensajes del webhook)</small><br><br>
+        
+        <button type="submit">Guardar Tracker</button>
     </form>
+    
+    <h2 id="webhook">4. Webhook de Telegram</h2>
+    <p>URL automática: 
+        <?php
+        echo htmlspecialchars(generateWebhookUrl());
+        ?>
+    </p>
+    <form method="post">
+        <input type="hidden" name="action" value="update_webhook">
+        <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+        
+        <button type="submit">Actualizar Webhook</button>
+    </form>
+    
+    <!-- Sección de importación movida arriba -->
+    
+    <h2 id="crear-tracker">5. Crear Tracker en TikiWiki <span style="color: orange; font-size: 0.8em;">(funcionalidad en desarrollo)</span></h2>
+    
+    <form id="import-form" enctype="multipart/form-data">
+        <input type="hidden" name="action" value="import">
+        <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+        
+        <label>Tracker destino:</label><br>
+        <input type="text" name="tracker_id" value="<?php echo htmlspecialchars($config['tikiwiki_tracker_id']); ?>" size="10">
+        <small>(ID del tracker donde se importarán los mensajes)</small><br><br>
+        
+        <label>Archivo export (ZIP):</label><br>
+        <input type="file" name="export_file" accept=".zip" required><br><br>
+        
+        <button type="button" onclick="importExport()">Importar</button>
+    </form>
+    
+    <div id="import-result"></div>
+    
+    <script>
+    function importExport() {
+        var form = document.getElementById('import-form');
+        var formData = new FormData(form);
+        var resultDiv = document.getElementById('import-result');
+        
+        resultDiv.innerHTML = 'Importando... Esto puede tomar varios minutos.';
+        
+        fetch('import.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('HTTP ' + response.status);
+            }
+            return response.text();
+        })
+        .then(text => {
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                resultDiv.innerHTML = '<p style="color: red;">Respuesta no válida: ' + text.substring(0, 200) + '</p>';
+                return null;
+            }
+        })
+        .then(data => {
+            if (!data) return;
+            if (data.error) {
+                resultDiv.innerHTML = '<p style="color: red;">Error: ' + data.error + '</p>';
+            } else {
+                resultDiv.innerHTML = '<p style="color: green;">Importación completada:<br>' +
+                    '- ' + data.imported + ' mensajes importados<br>' +
+                    '- ' + data.skipped + ' errores<br>' +
+                    '- ' + data.media_processed + ' archivos subidos<br>' +
+                    '- ' + data.topics_found + ' topics encontrados</p>';
+            }
+        })
+        .catch(error => {
+            resultDiv.innerHTML = '<p style="color: red;">Error: ' + error.message + '</p>';
+        });
+    }
+    </script>
+    
     <p><small>El tracker creado puede usarse como tracker en directo o para importar mensajes.</small></p>
 </body>
 </html>
