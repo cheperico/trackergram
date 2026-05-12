@@ -356,8 +356,8 @@ if (!checkAuth()) {
     <ul>
         <li><a href="#config-telegram">1. Configuración de Telegram</a></li>
         <li><a href="#tracker-directo">2. Tracker en directo</a></li>
-        <li><a href="#tracker-importar">3. Tracker de importación</a></li>
-        <li><a href="#webhook">4. Webhook de Telegram</a></li>
+        <li><a href="#webhook">3. Webhook de Telegram</a></li>
+        <li><a href="#tracker-importar">4. Tracker de importación</a></li>
         <li><a href="#crear-tracker">5. Crear Tracker en TikiWiki</a></li>
     </ul>
     
@@ -396,10 +396,7 @@ if (!checkAuth()) {
         <button type="submit">Guardar Tracker</button>
     </form>
     
-    <h2 id="tracker-importar">3. Tracker de importación <span style="color: gray; font-size: 0.8em;">(pronto disponible)</span></h2>
-    <p>Esta sección permitirá importar conversaciones desde exports de Telegram.</p>
-    
-    <h2 id="webhook">4. Webhook de Telegram</h2>
+    <h2 id="webhook">3. Webhook de Telegram</h2>
     <p>URL automática: 
         <?php
         echo htmlspecialchars(generateWebhookUrl());
