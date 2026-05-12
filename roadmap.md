@@ -30,6 +30,18 @@
 
 ### Seguridad
 
+- [x] ~~Deduplicación: ahora filtra por message_id específico~~ ✅
+- [x] ~~checkAuth() antes de procesar acciones mutantes~~ ✅
+- [x] ~~setup_webhook.php protegido (solo CLI/localhost)~~ ✅
+- [x] ~~TELEGRAM_WEBHOOK_SECRET obligatorio con hash_equals()~~ ✅
+- [x] ~~Logs de debug condicionados por DEBUG_MODE~~ ✅
+- [ ] **Rotar token del bot**: Si ya se usó con media real, el token quedó expuesto en URLs de archivos guardados en TikiWiki
+- [ ] **Limitar tamaño de descarga de media**: Descargas completas en memoria pueden agotar recursos
+- [ ] **Hash de contraseña admin**: Usar password_hash()/password_verify() en vez de comparación en claro
+- [ ] **Forzar HTTPS**: No permitir TIKIWIKI_API_URL en http://
+
+### Seguridad
+
 - [ ] **Rate limiting webhook**: Para prevenir abuso del endpoint (importante para producción)
 - [ ] **Logging de accesos no autorizados**: Registrar intentos de acceso fallidos
 - [ ] **IP whitelisting para admin**: Restringir acceso a interfaz administrativa por IP

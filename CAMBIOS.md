@@ -3,6 +3,11 @@
 ## v0.1.2
 - Creación automática de tracker con campos via API de TikiWiki
 - Interfaz reorganizada con índice y secciones (tracker en directo, importación)
+- **Seguridad**: Deduplicación corregida - ahora filtra por message_id específico
+- **Seguridad**: checkAuth() ejecutado antes de procesar cualquier acción
+- **Seguridad**: setup_webhook.php protegido - solo CLI/localhost
+- **Seguridad**: TELEGRAM_WEBHOOK_SECRET obligatorio con hash_equals()
+- **Seguridad**: Logs de debug condicionados por DEBUG_MODE
 - Fix: ModSecurity bloqueaba peticiones sin User-Agent
 - Fix: Tipos de campo correctos para API de TikiWiki (t, a, n, f, D, FG)
 - Fix: Validación de secret token solo en peticiones de webhook
