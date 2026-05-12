@@ -884,8 +884,8 @@ $message = $update['message'];
     error_log("Mensaje procesado: Topic $topicId, User {$message['from']['first_name']}");
 }
 
-// Manejar webhook de Telegram
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// Manejar webhook de Telegram - solo ejecutar si es llamado directamente (no incluido)
+if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $input = file_get_contents('php://input');
     $update = json_decode($input, true);
 
