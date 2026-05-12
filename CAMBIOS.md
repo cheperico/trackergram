@@ -1,6 +1,12 @@
 # Cambios - Changelog
 
 ## v0.1.2
+- Creación automática de tracker con campos via API de TikiWiki
+- Interfaz reorganizada con índice y secciones (tracker en directo, importación)
+- Fix: ModSecurity bloqueaba peticiones sin User-Agent
+- Fix: Tipos de campo correctos para API de TikiWiki (t, a, n, f, D, FG)
+- Fix: Validación de secret token solo en peticiones de webhook
+- Fix: Evitar ejecución de webhook al incluir api.php como librería
 - Detección automática de nombres de topics desde reply_to_message.forum_topic_created
 - Fix detección HTTPS con proxies (X-Forwarded-Proto)
 - Simplificación: webhook se actualiza automáticamente desde URL del servidor
