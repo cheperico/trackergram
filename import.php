@@ -4,31 +4,19 @@
  * Procesa archivos ZIP exportados desde Telegram y crea items en TikiWiki
  */
 
-require_once 'config.php';
-
-// Verificar autenticación
-session_start();
-$env = [];
-$envFile = __DIR__ . '/.env';
-if (file_exists($envFile)) {
-    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    foreach ($lines as $line) {
-        if (strpos(trim($line), '#') === 0) continue;
-        if (strpos($line, '=') !== false) {
-            list($name, $value) = explode('=', $line, 2);
-            $env[trim($name)] = trim($value);
-        }
-    }
+// Iniciar sesión para CSRF y autenticación
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
-
-$username = $env['ADMIN_USERNAME'] ?? '';
-$password = $env['ADMIN_PASSWORD'] ?? '';
 
 if (!isset($_SESSION['authenticated']) || $_SESSION['authenticated'] !== true) {
     http_response_code(403);
     echo json_encode(['error' => 'No autenticado']);
     exit;
 }
+
+// Cargar config después de verificar auth
+require_once 'config.php';
 
 // Validar tracker ID
 $trackerId = $_POST['tracker_id'] ?? '';
@@ -48,8 +36,20 @@ if ($file['error'] !== UPLOAD_ERR_OK) {
     exit;
 }
 
-if (pathinfo($file['name'], PATHINFO_EXTENSION) !== 'zip') {
+$extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+if ($extension !== 'zip') {
     echo json_encode(['error' => 'El archivo debe ser un ZIP']);
+    exit;
+}
+
+// Validar CSRF token
+$csrfToken = $_POST['csrf_token'] ?? '';
+if (empty($csrfToken)) {
+    echo json_encode(['error' => 'Token CSRF requerido']);
+    exit;
+}
+if (!isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $csrfToken)) {
+    echo json_encode(['error' => 'Token CSRF inválido']);
     exit;
 }
 
