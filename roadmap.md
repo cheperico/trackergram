@@ -3,16 +3,24 @@
 ## Estado del Proyecto
 
 - **Estado**: Activo - En desarrollo
-- **Última versión**: v0.1.1
+- **Última versión**: v0.1.2
 - **Funcionalidad principal**: Recibe webhooks de Telegram y envía mensajes directamente a TikiWiki trackers
 
 ## Pendientes
 
 ### Funcionalidades
 
-- [ ] **Creación automática de tracker**: Usar API de TikiWiki para crear el tracker con todos los campos necesarios automáticamente (evita configuración manual)
+- [x] **Creación automática de tracker**: Crear tracker con campos via API de TikiWiki
   - Panel admin: crear nuevo tracker con nombre → genera campos automáticamente
-  - O usar tracker existente → agregar campos que falten
+  - Tipos de campo TikiWiki: `t` (text), `a` (textarea), `n` (numeric), `f` (datetime), `D` (dropdown+other), `FG` (files)
+  - Campos del tracker:
+    - `t` - Telegram Message ID, Chat ID, Chat Title, Topic ID, Topic Title, User ID, Username, First Name, Last Name, Media URL, File URL, Media Type, Media Caption, Location
+    - `a` - Text
+    - `n` - Media Size
+    - `f` - Message Date (fecha y hora)
+    - `D` - Message Type (desplegable con opción "Otro")
+    - `FG` - Media (archivos)
+  - [ ] **Refinar creación automática**: Los campos de fecha, dropdown y archivos necesitan ajustes
 - [ ] **Sistema de etiquetas**: Extraer hashtags (#etiqueta) de mensajes de Telegram y guardarlos en campo del tracker para conectar con el sistema de tags de TikiWiki
 - [ ] **Importar export de Telegram**: Importar conversaciones desde JSON exportado de Telegram (para carga masiva de datos históricos)
   - **Por zip**: Requiere aumentar límites de PHP (para exports pequeños)
@@ -78,6 +86,11 @@
 - Fix: Campo CUSTOM_WEBHOOK_URL para especificar URL del webhook manualmente
 - Fix: Bug de doble `/api.php` en generateWebhookUrl()
 - Fix: Campo de ubicación (geolocation) no se enviaba a TikiWiki
+
+### v0.1.2 (Completado)
+- Creación automática de tracker via API de TikiWiki
+- Fix: ModSecurity bloqueaba peticiones sin User-Agent
+- Fix: Corrección de endpoint y tipos de campo para API de TikiWiki
 
 ### v0.1.0 (Completado)
 - Subida de archivos multimedia a TikiWiki file gallery
