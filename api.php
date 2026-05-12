@@ -164,26 +164,26 @@ function createTrackerWithFields(string $trackerName): ?int
     
     error_log("Created tracker with ID: $trackerId");
     
-    // Campos necesarios para trackerGram - tipos válidos de TikiWiki
+    // Campos necesarios para trackerGram - códigos de tipo de TikiWiki
     $fields = [
-        ['name' => 'Telegram Message ID', 'permname' => 'telegrammessageTelegramMessageId', 'type' => 'text', 'order' => 1],
-        ['name' => 'Chat ID', 'permname' => 'telegrammessageChatId', 'type' => 'text', 'order' => 2],
-        ['name' => 'Chat Title', 'permname' => 'telegrammessageChatTitle', 'type' => 'text', 'order' => 3],
-        ['name' => 'Topic ID', 'permname' => 'telegrammessageTopicId', 'type' => 'text', 'order' => 4],
-        ['name' => 'Topic Title', 'permname' => 'telegrammessageTopicTitle', 'type' => 'text', 'order' => 5],
-        ['name' => 'User ID', 'permname' => 'telegrammessageUserId', 'type' => 'text', 'order' => 6],
-        ['name' => 'Username', 'permname' => 'telegrammessageUsername', 'type' => 'text', 'order' => 7],
-        ['name' => 'First Name', 'permname' => 'telegrammessageFirstName', 'type' => 'text', 'order' => 8],
-        ['name' => 'Last Name', 'permname' => 'telegrammessageLastName', 'type' => 'text', 'order' => 9],
-        ['name' => 'Message Type', 'permname' => 'telegrammessageMessageType', 'type' => 'text', 'order' => 10],
-        ['name' => 'Text', 'permname' => 'telegrammessageText', 'type' => 'textarea', 'order' => 11],
-        ['name' => 'Media URL', 'permname' => 'telegrammessageMediaUrl', 'type' => 'text', 'order' => 12],
-        ['name' => 'File URL', 'permname' => 'telegrammessageFileUrl', 'type' => 'text', 'order' => 13],
-        ['name' => 'Media Type', 'permname' => 'telegrammessageMediaType', 'type' => 'text', 'order' => 14],
-        ['name' => 'Media Size', 'permname' => 'telegrammessageMediaSize', 'type' => 'numeric', 'order' => 15],
-        ['name' => 'Media Caption', 'permname' => 'telegrammessageMediaCaption', 'type' => 'text', 'order' => 16],
-        ['name' => 'Location', 'permname' => 'telegrammessageLocation', 'type' => 'text', 'order' => 17],
-        ['name' => 'Message Date', 'permname' => 'telegrammessageMessageDate', 'type' => 'text', 'order' => 18],
+        ['name' => 'Telegram Message ID', 'permname' => 'telegrammessageTelegramMessageId', 'type' => 't', 'order' => 1],
+        ['name' => 'Chat ID', 'permname' => 'telegrammessageChatId', 'type' => 't', 'order' => 2],
+        ['name' => 'Chat Title', 'permname' => 'telegrammessageChatTitle', 'type' => 't', 'order' => 3],
+        ['name' => 'Topic ID', 'permname' => 'telegrammessageTopicId', 'type' => 't', 'order' => 4],
+        ['name' => 'Topic Title', 'permname' => 'telegrammessageTopicTitle', 'type' => 't', 'order' => 5],
+        ['name' => 'User ID', 'permname' => 'telegrammessageUserId', 'type' => 't', 'order' => 6],
+        ['name' => 'Username', 'permname' => 'telegrammessageUsername', 'type' => 't', 'order' => 7],
+        ['name' => 'First Name', 'permname' => 'telegrammessageFirstName', 'type' => 't', 'order' => 8],
+        ['name' => 'Last Name', 'permname' => 'telegrammessageLastName', 'type' => 't', 'order' => 9],
+        ['name' => 'Message Type', 'permname' => 'telegrammessageMessageType', 'type' => 't', 'order' => 10],
+        ['name' => 'Text', 'permname' => 'telegrammessageText', 'type' => 'a', 'order' => 11],
+        ['name' => 'Media URL', 'permname' => 'telegrammessageMediaUrl', 'type' => 't', 'order' => 12],
+        ['name' => 'File URL', 'permname' => 'telegrammessageFileUrl', 'type' => 't', 'order' => 13],
+        ['name' => 'Media Type', 'permname' => 'telegrammessageMediaType', 'type' => 't', 'order' => 14],
+        ['name' => 'Media Size', 'permname' => 'telegrammessageMediaSize', 'type' => 'n', 'order' => 15],
+        ['name' => 'Media Caption', 'permname' => 'telegrammessageMediaCaption', 'type' => 't', 'order' => 16],
+        ['name' => 'Location', 'permname' => 'telegrammessageLocation', 'type' => 't', 'order' => 17],
+        ['name' => 'Message Date', 'permname' => 'telegrammessageMessageDate', 'type' => 't', 'order' => 18],
     ];
     
     foreach ($fields as $field) {
