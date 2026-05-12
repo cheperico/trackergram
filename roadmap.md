@@ -39,6 +39,10 @@
 - [ ] **Limitar tamaño de descarga de media**: Descargas completas en memoria pueden agotar recursos
 - [ ] **Hash de contraseña admin**: Usar password_hash()/password_verify() en vez de comparación en claro
 - [ ] **Forzar HTTPS**: No permitir TIKIWIKI_API_URL en http://
+- [ ] **No guardar URLs con token**: Descargar media via proxy o usar token limitado en lugar de guardar URLs con token de Telegram
+- [ ] **Límite de tamaño de archivos**: Evitar DoS por archivos grandes (descarga completa en memoria)
+- [ ] **ALLOWED_CHAT_IDS por defecto**: No aceptar todos los chats, permitir solo los autorizados
+- [ ] **display_errors=0 en admin**: Apagar errores visibles en producción
 
 ### Seguridad
 
