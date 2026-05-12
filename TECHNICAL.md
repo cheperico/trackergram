@@ -13,7 +13,8 @@ Telegram Bot → Webhook (api.php) → Procesamiento → TikiWiki API → Tracke
 1. **api.php**: Endpoint principal del webhook
 2. **config.php**: Configuración y carga de variables de entorno
 3. **admin.php**: Interfaz de administración web
-4. **setup_webhook.php**: Script para configuración automática
+4. **import.php**: Script de importación de exports de Telegram
+5. **setup_webhook.php**: Script para configuración automática
 
 ## Especificaciones Técnicas
 
@@ -33,13 +34,18 @@ Telegram Bot → Webhook (api.php) → Procesamiento → TikiWiki API → Tracke
 trackergram/
 ├── api.php              # Webhook endpoint (punto de entrada principal)
 ├── admin.php            # Interfaz de administración
+├── import.php           # Importación de exports de Telegram
 ├── config.php           # Configuración y variables de entorno
 ├── setup_webhook.php    # Script de configuración inicial
 ├── .env.example         # Plantilla de variables de entorno
 ├── .env                 # Variables de entorno (creado por usuario)
 ├── .htaccess            # Configuración Apache y seguridad
 ├── .gitignore           # Archivos ignorados por Git
-└── README.md            # Documentación del proyecto
+├── README.md            # Documentación para usuarios
+├── TECHNICAL.md         # Documentación técnica
+├── INSTALL.md           # Guía de instalación
+├── CAMBIOS.md           # Changelog
+└── roadmap.md           # Roadmap del proyecto
 ```
 
 ## API y Webhooks
@@ -372,7 +378,14 @@ El sistema mapea automáticamente los campos de Telegram a los campos del tracke
 
 ## Versiones y Cambios
 
-### v0.1.1 (Alpha) - Actual
+### v0.1.2 (Beta) - Actual
+- Importación de exports de Telegram (ZIP)
+- Creación automática de trackers con campos via API
+- Interfaz de administración reorganizada con índice
+- Seguridad: deduplicación, CSRF, checkAuth(), hash_equals()
+- Fix: ModSecurity, tipos de campo TikiWiki
+
+### v0.1.1 (Alpha)
 - Deduplicación de mensajes basada en message_id
 - Agregado soporte para ubicaciones, contactos, encuestas, animations
 - Captura de nombre del chat (chat_title)

@@ -4,12 +4,14 @@ Integración directa de Telegram con TikiWiki trackers.
 
 ## Descripción
 
-trackerGram es una aplicación independiente que recibe webhooks de Telegram y envía mensajes directamente a TikiWiki trackers para aprovechar sus capacidades de indexado y búsqueda. Reutiliza el código aprendido en cheLegram (extractMessageData, manejo de topics, etc.) pero sin dependencia de cheLegram.
+trackerGram es una aplicación que recibe webhooks de Telegram y envía mensajes directamente a TikiWiki trackers. También permite importar conversaciones desde exports de Telegram.
 
 ## Arquitectura
 
 ```
 Telegram → trackerGram → TikiWiki Tracker
+         ↓
+Importar exports ZIP → TikiWiki Tracker
 ```
 
 ## Características
@@ -18,17 +20,19 @@ Telegram → trackerGram → TikiWiki Tracker
 - **Envío directo a TikiWiki**: Mensajes enviados directamente a trackers
 - **Manejo de topics**: Soporte completo para forum topics de Telegram
 - **Soporte multimedia**: Fotos, videos, audio, documentos, stickers, notas de voz
+- **Importación de exports**: Importa conversaciones desde archivos ZIP exportados de Telegram
+- **Creación automática de trackers**: Crea trackers con todos los campos necesarios via API
+- **Interfaz de administración**: Panel web para configurar y administrar
 - **Reintentos automáticos**: 2 intentos en caso de falla de envío
-- **Timeouts optimizados**: 5 segundos para cURL y file_get_contents para evitar saturación
-- **Logging**: Registro de errores y operaciones
+- **Timeouts optimizados**: Configurables para evitar saturación
 - **Sin base de datos local**: No requiere almacenamiento local, solo envía a TikiWiki
 
 ## Requisitos
 
-- PHP 7.4+
+- PHP 7.4+ (recomendado 8.0+)
 - Apache con mod_rewrite
 - Bot de Telegram (creado con @BotFather)
-- TikiWiki instalado y configurado con trackers
+- TikiWiki 21.x+ con API habilitada
 - Token de API de TikiWiki
 
 ## Instalación
@@ -83,7 +87,14 @@ DEBUG_MODE=false
 
 ### 4. Configurar Webhook de Telegram
 
-**Opción A: Usar el script automático (recomendado)**
+**Opción A: Usar la interfaz de administración (recomendado)**
+
+1. Accede a: `https://tu-dominio.com/trackergram/admin.php`
+2. Inicia sesión con las credenciales configuradas
+3. Ve a la sección "3. Webhook de Telegram"
+4. Haz clic en "Actualizar Webhook"
+
+**Opción B: Script automático**
 
 1. Accede al script desde tu navegador:
    ```
@@ -91,7 +102,7 @@ DEBUG_MODE=false
    ```
 2. El script detectará automáticamente la URL del servidor y configurará el webhook
 
-**Opción B: Configuración manual**
+**Opción C: Configuración manual**
 
 1. Determina la URL pública de tu webhook:
    ```
@@ -107,9 +118,9 @@ DEBUG_MODE=false
    https://api.telegram.org/bot<TOKEN>/getWebhookInfo
    ```
 
-### 5. Interfaz de Administración (Opcional)
+### 5. Interfaz de Administración
 
-trackerGram incluye una interfaz web minimalista para configurar credenciales y actualizar el webhook:
+trackerGram incluye una interfaz web para configurar y administrar:
 
 1. Configura las credenciales de administración en `.env`:
    ```env
@@ -121,11 +132,28 @@ trackerGram incluye una interfaz web minimalista para configurar credenciales y 
    https://tu-dominio.com/trackergram/admin.php
    ```
 3. Inicia sesión con las credenciales configuradas
-4. Desde la interfaz puedes:
-   - Editar credenciales del bot de Telegram
-   - Editar credenciales de TikiWiki
-   - Actualizar el webhook de Telegram automáticamente
-   - Especificar URL custom del webhook (para servidores externos)
+4. La interfaz tiene las siguientes secciones:
+   - **1. Configuración de Telegram**: Token del bot, webhook secret, URL custom
+   - **2. Tracker en directo**: ID del tracker que recibe mensajes del webhook
+   - **3. Webhook de Telegram**: Actualizar webhook automáticamente
+   - **4. Tracker de importación**: Importar exports ZIP de Telegram
+   - **5. Crear Tracker en TikiWiki**: Crear tracker con todos los campos automáticamente
+
+### 6. Crear Tracker Automáticamente (Opcional)
+
+En lugar de crear el tracker manualmente, puedes usar la sección "5. Crear Tracker en TikiWiki" del panel de administración. El script creará un tracker con todos los campos necesarios:
+- Telegram Message ID, Chat ID, Chat Title, Topic ID, Topic Title
+- User ID, Username, First Name, Last Name
+- Message Type, Text, Media, Media URL, File URL
+- Media Type, Media Size, Media Caption, Location, Message Date
+
+### 7. Importar Conversaciones (Opcional)
+
+Para importar conversaciones históricas desde Telegram:
+1. Exporta el chat desde Telegram (Settings > Export chat data)
+2. En la sección "4. Tracker de importación" del admin
+3. Selecciona el tracker destino y sube el archivo ZIP
+4. Los mensajes se importarán con sus archivos multimedia
 
 ## Estructura de Archivos
 
@@ -133,13 +161,18 @@ trackerGram incluye una interfaz web minimalista para configurar credenciales y 
 trackergram/
 ├── config.php          # Configuración del proyecto
 ├── api.php             # Webhook endpoint de Telegram
-├── admin.php           # Interfaz de administración (opcional)
+├── admin.php           # Interfaz de administración
+├── import.php          # Script de importación de exports
 ├── setup_webhook.php   # Script para configurar webhook automáticamente
 ├── .env                # Variables de entorno (credenciales)
 ├── .env.example        # Plantilla de variables de entorno
 ├── .htaccess           # Configuración Apache
-├── README.md           # Este archivo
-└── debug.log           # Logs (se crea automáticamente)
+├── README.md           # Documentación para usuarios
+├── TECHNICAL.md        # Documentación técnica
+├── INSTALL.md          # Guía de instalación
+├── CAMBIOS.md          # Changelog
+├── roadmap.md          # Roadmap del proyecto
+└── debug.log           # Logs (se crea automáticamente si DEBUG_MODE=true)
 ```
 
 ## Uso
