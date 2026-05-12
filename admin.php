@@ -291,9 +291,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     
     $newTrackerId = createTrackerWithFields($trackerName);
     
-    if ($newTrackerId) {
+    if (is_array($newTrackerId) && isset($newTrackerId['error'])) {
+        $error = $newTrackerId['error'];
+    } elseif ($newTrackerId) {
         $success = "Tracker '$trackerName' creado exitosamente con ID: $newTrackerId. Actualiza el ID en la configuración.";
-    } {
+    } else {
         $error = "Error al crear el tracker. Verifica las credenciales de TikiWiki.";
     }
 }

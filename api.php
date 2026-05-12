@@ -144,7 +144,7 @@ function createTrackerWithFields(string $trackerName): ?int
     $trackerId = null;
     if (json_last_error() === JSON_ERROR_NONE && isset($data['id'])) {
         $trackerId = $data['id'];
-    } elseif ($httpCode === 200) {
+    } elseif ($httpCode === 200 && !empty($response)) {
         // Buscar ID en respuesta HTML
         if (preg_match('/["\']?id["\']?\s*[:=]\s*["\']?(\d+)["\']?/i', $response, $matches)) {
             $trackerId = $matches[1];
@@ -154,8 +154,13 @@ function createTrackerWithFields(string $trackerName): ?int
     }
     
     if (!$trackerId) {
-        error_log("ERROR creating tracker: HTTP $httpCode, response=$response, jsonError=" . json_last_error_msg());
-        return null;
+        // Devolver info de debug
+        return [
+            'error' => 'TikiWiki response: HTTP ' . $httpCode . ', length: ' . strlen($response),
+            'httpCode' => $httpCode,
+            'response' => $response,
+            'jsonError' => json_last_error_msg()
+        ];
     }
     
     error_log("Created tracker with ID: $trackerId");
