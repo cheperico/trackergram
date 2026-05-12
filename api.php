@@ -277,18 +277,18 @@ function getMediaGalleryId(): ?int
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         "Authorization: Bearer " . TIKIWIKI_TOKEN,
-        "User-Agent: trackerGram/1.0",
-        "Accept: application/json"
+        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     ]);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TELEGRAM_API);
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    error_log("DEBUG getTrackerFields: httpCode=$httpCode, response=" . substr($response, 0, 500));
     curl_close($ch);
     
     if ($httpCode !== 200) {
-        error_log("trackerGram: ERROR getting tracker fields: HTTP $httpCode");
+        error_log("trackerGram: ERROR getting tracker fields: HTTP $httpCode, response: $response");
         return null;
     }
     
@@ -352,8 +352,7 @@ function uploadToTikiWiki(string $filePath, string $fileName, ?string $mimeType 
     curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         "Authorization: Bearer " . TIKIWIKI_TOKEN,
-        "User-Agent: trackerGram/1.0",
-        "Accept: application/json"
+        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     ]);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TIKIWIKI_UPLOAD);
@@ -710,13 +709,11 @@ function sendToTikiWiki(array $data): bool
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postFields));
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "Content-Type: application/x-www-form-urlencoded",
         "Authorization: Bearer " . TIKIWIKI_TOKEN,
-        "User-Agent: trackerGram/1.0",
-        "Accept: application/json"
+        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     ]);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // Seguir redirecciones (error 302)
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TIKIWIKI_API);
 
     $response = curl_exec($ch);
