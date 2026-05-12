@@ -219,6 +219,33 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     exit;
 }
 
+// Verificar autenticación antes de procesar cualquier acción
+if (!checkAuth()) {
+    // Mostrar login y terminar
+    ?>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>trackerGram - Login</title>
+    </head>
+    <body>
+        <h1>trackerGram - Login</h1>
+        <?php if (isset($loginError)): ?>
+            <p style="color: red;"><?php echo htmlspecialchars($loginError); ?></p>
+        <?php endif; ?>
+        <form method="post">
+            <label>Usuario:</label><br>
+            <input type="text" name="login_username" required><br><br>
+            <label>Contraseña:</label><br>
+            <input type="password" name="login_password" required><br><br>
+            <button type="submit">Iniciar sesión</button>
+        </form>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
 // Procesar formulario de configuración
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save_config') {
     // Validar CSRF token

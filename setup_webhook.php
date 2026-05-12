@@ -2,7 +2,16 @@
 /**
  * Script para configurar automáticamente el webhook de Telegram.
  * Detecta la URL del servidor automáticamente y configura el webhook.
+ * 
+ * SEGURIDAD: Ejecutar solo desde línea de comandos o localhost.
+ * Eliminar después de usar en producción.
  */
+
+// Verificar que se ejecuta desde CLI o localhost
+if (php_sapi_name() !== 'cli' && $_SERVER['REMOTE_ADDR'] !== '127.0.0.1' && $_SERVER['REMOTE_ADDR'] !== '::1') {
+    http_response_code(403);
+    die("Acceso denegado. Ejecutar desde línea de comandos.\n");
+}
 
 // Cargar configuración
 require_once 'config.php';

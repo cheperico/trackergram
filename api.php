@@ -26,13 +26,22 @@ function getCachedMediaGalleryId(): ?int
     return $mediaGalleryIdCache;
 }
 
-// Validar secret token del webhook solo si es una petición de Telegram (tiene datos JSON en input)
+// Validar secret token del webhook - obligatorio para seguridad
+if (empty(TELEGRAM_WEBHOOK_SECRET)) {
+    error_log("trackerGram: ERROR - TELEGRAM_WEBHOOK_SECRET no configurado. Configurá un secret en .env");
+}
+
+// Verificar request de webhook
 $rawInput = file_get_contents('php://input');
 $isWebhookRequest = !empty($rawInput) && json_decode($rawInput, true) !== null;
 
-if ($isWebhookRequest && TELEGRAM_WEBHOOK_SECRET) {
+if ($isWebhookRequest) {
+    if (empty(TELEGRAM_WEBHOOK_SECRET)) {
+        http_response_code(500);
+        die(json_encode(['error' => 'Configuración incompleta']));
+    }
     $secretToken = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '';
-    if ($secretToken !== TELEGRAM_WEBHOOK_SECRET) {
+    if (!hash_equals(TELEGRAM_WEBHOOK_SECRET, $secretToken)) {
         http_response_code(403);
         die(json_encode(['error' => 'Acceso denegado']));
     }
@@ -134,7 +143,9 @@ function createTrackerWithFields(string $trackerName): ?int
     $curlError = curl_error($ch);
     curl_close($ch);
     
-    error_log("DEBUG createTracker: httpCode=$httpCode, response=$response");
+    if (DEBUG_MODE) {
+        error_log("DEBUG createTracker: httpCode=$httpCode, response=" . substr($response, 0, 200));
+    }
     
     $data = json_decode($response, true);
     
@@ -213,7 +224,9 @@ function createTrackerWithFields(string $trackerName): ?int
         $fieldError = curl_error($ch);
         curl_close($ch);
         
-        error_log("DEBUG field {$field['name']}: httpCode=$fieldHttpCode, response=$fieldResponse");
+        if (DEBUG_MODE) {
+            error_log("DEBUG field {$field['name']}: httpCode=$fieldHttpCode, response=" . substr($fieldResponse, 0, 200));
+        }
         
         if ($fieldHttpCode === 200) {
             error_log("Created field: {$field['name']}");
@@ -231,15 +244,14 @@ function createTrackerWithFields(string $trackerName): ?int
 function messageExistsInTracker(int $messageId): bool
 {
     $trackerId = TIKIWIKI_TRACKER_ID;
-    // Buscar items con ese message_id
-    $url = TIKIWIKI_API_URL . "trackers/{$trackerId}/items?fields=telegrammessageTelegramMessageId";
+    // Buscar items filtrando por message_id específico
+    $url = TIKIWIKI_API_URL . "trackers/{$trackerId}/items?fields=telegrammessageTelegramMessageId&filter[telegrammessageTelegramMessageId]=$messageId";
     
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         "Authorization: Bearer " . TIKIWIKI_TOKEN,
-        "User-Agent: trackerGram/1.0",
-        "Accept: application/json"
+        "User-Agent: Mozilla/5.0"
     ]);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TELEGRAM_API);
@@ -250,15 +262,18 @@ function messageExistsInTracker(int $messageId): bool
     
     if ($httpCode !== 200) {
         error_log("trackerGram: ERROR checking duplicate: HTTP $httpCode");
-        return false; // En caso de error, permitir envío
+        return false;
     }
     
     $data = json_decode($response, true);
-    $count = $data['count'] ?? 0;
+    $items = $data['data'] ?? [];
     
-    if ($count > 0) {
-        error_log("trackerGram: DUPLICATE detected for message_id: $messageId");
-        return true;
+    foreach ($items as $item) {
+        $fieldValue = $item['telegrammessageTelegramMessageId'] ?? '';
+        if ((string)$messageId === (string)$fieldValue) {
+            error_log("trackerGram: DUPLICATE detected for message_id: $messageId");
+            return true;
+        }
     }
     
     return false;
@@ -290,7 +305,9 @@ function getMediaGalleryId(): ?int
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    error_log("DEBUG getTrackerFields: httpCode=$httpCode, response=" . substr($response, 0, 500));
+    if (DEBUG_MODE) {
+        error_log("DEBUG getTrackerFields: httpCode=$httpCode, response=" . substr($response, 0, 500));
+    }
     curl_close($ch);
     
     if ($httpCode !== 200) {
