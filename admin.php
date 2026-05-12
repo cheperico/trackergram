@@ -294,7 +294,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     if (is_array($newTrackerId) && isset($newTrackerId['error'])) {
         $error = $newTrackerId['error'];
     } elseif ($newTrackerId) {
-        $success = "Tracker '$trackerName' creado exitosamente con ID: $newTrackerId. Actualiza el ID en la configuración.";
+        $success = "Tracker '$trackerName' creado exitosamente con ID: $newTrackerId. Podés usarlo como tracker en directo o para importar mensajes.";
     } else {
         $error = "Error al crear el tracker. Verifica las credenciales de TikiWiki.";
     }
@@ -352,7 +352,16 @@ if (!checkAuth()) {
         <p style="color: red;"><?php echo htmlspecialchars($error); ?></p>
     <?php endif; ?>
     
-    <h2>Configuración Actual</h2>
+    <h2>Índice</h2>
+    <ul>
+        <li><a href="#config-telegram">1. Configuración de Telegram</a></li>
+        <li><a href="#tracker-directo">2. Tracker en directo</a></li>
+        <li><a href="#tracker-importar">3. Tracker de importación</a></li>
+        <li><a href="#webhook">4. Webhook de Telegram</a></li>
+        <li><a href="#crear-tracker">5. Crear Tracker en TikiWiki</a></li>
+    </ul>
+    
+    <h2 id="config-telegram">1. Configuración de Telegram</h2>
     <form method="post">
         <input type="hidden" name="action" value="save_config">
         <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
@@ -366,19 +375,31 @@ if (!checkAuth()) {
         <label>Custom Webhook URL (opcional):</label><br>
         <input type="text" name="custom_webhook_url" value="<?php echo htmlspecialchars($config['custom_webhook_url'] ?? ''); ?>" size="50" placeholder="https://example.com"><br><br>
         
-        <label>TikiWiki API URL:</label><br>
-        <input type="text" name="tikiwiki_api_url" value="<?php echo htmlspecialchars($config['tikiwiki_api_url']); ?>" size="50"><br><br>
-        
-        <label>TikiWiki Token:</label><br>
-        <input type="text" name="tikiwiki_token" value="<?php echo htmlspecialchars($config['tikiwiki_token']); ?>" size="50"><br><br>
-        
-        <label>TikiWiki Tracker ID:</label><br>
-        <input type="text" name="tikiwiki_tracker_id" value="<?php echo htmlspecialchars($config['tikiwiki_tracker_id']); ?>" size="10"><br><br>
-        
         <button type="submit">Guardar Configuración</button>
     </form>
     
-    <h2>Webhook de Telegram</h2>
+    <h2 id="tracker-directo">2. Tracker en directo</h2>
+    <form method="post">
+        <input type="hidden" name="action" value="save_config">
+        <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+        
+        <input type="hidden" name="telegram_bot_token" value="<?php echo htmlspecialchars($config['telegram_bot_token']); ?>">
+        <input type="hidden" name="telegram_webhook_secret" value="<?php echo htmlspecialchars($config['telegram_webhook_secret']); ?>">
+        <input type="hidden" name="custom_webhook_url" value="<?php echo htmlspecialchars($config['custom_webhook_url'] ?? ''); ?>">
+        <input type="hidden" name="tikiwiki_api_url" value="<?php echo htmlspecialchars($config['tikiwiki_api_url']); ?>">
+        <input type="hidden" name="tikiwiki_token" value="<?php echo htmlspecialchars($config['tikiwiki_token']); ?>">
+        
+        <label>TikiWiki Tracker ID:</label><br>
+        <input type="text" name="tikiwiki_tracker_id" value="<?php echo htmlspecialchars($config['tikiwiki_tracker_id']); ?>" size="10">
+        <small>(ID del tracker que recibe los mensajes del webhook)</small><br><br>
+        
+        <button type="submit">Guardar Tracker</button>
+    </form>
+    
+    <h2 id="tracker-importar">3. Tracker de importación <span style="color: gray; font-size: 0.8em;">(pronto disponible)</span></h2>
+    <p>Esta sección permitirá importar conversaciones desde exports de Telegram.</p>
+    
+    <h2 id="webhook">4. Webhook de Telegram</h2>
     <p>URL automática: 
         <?php
         echo htmlspecialchars(generateWebhookUrl());
@@ -391,8 +412,8 @@ if (!checkAuth()) {
         <button type="submit">Actualizar Webhook</button>
     </form>
     
-    <h2>Crear Tracker en TikiWiki</h2>
-    <p>Crea un nuevo tracker con todos los campos necesarios para trackerGram automáticamente.</p>
+    <h2 id="crear-tracker">5. Crear Tracker en TikiWiki</h2>
+    <p>Crea un nuevo tracker con todos los campos necesarios para trackerGram automáticamente en <?php echo htmlspecialchars(parse_url($config['tikiwiki_api_url'] ?? '', PHP_URL_HOST) ?: 'tu sitio'); ?>.</p>
     <form method="post">
         <input type="hidden" name="action" value="create_tracker">
         <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
@@ -402,5 +423,6 @@ if (!checkAuth()) {
         
         <button type="submit">Crear Tracker</button>
     </form>
+    <p><small>El tracker creado puede usarse como tracker en directo o para importar mensajes.</small></p>
 </body>
 </html>
