@@ -164,8 +164,9 @@ if (!$galleryId) {
 $imported = 0;
 $skipped = 0;
 $mediaProcessed = 0;
+error_log("import.php: INICIANDO procesamiento de " . count($messages) . " mensajes");
 
-foreach ($messages as $msg) {
+foreach ($messages as $i => $msg) {
     // Solo procesar mensajes regulares
     if (($msg['type'] ?? '') !== 'message') {
         continue;
@@ -250,12 +251,17 @@ foreach ($messages as $msg) {
     } else {
         $skipped++;
     }
+    if ($i % 10 === 0) {
+        error_log("import.php: procesando mensaje $i de " . count($messages));
+    }
 }
 
 // Limpiar directorio temporal
 array_map('unlink', glob("$tempDir/*/*"));
 array_map('unlink', glob("$tempDir/*"));
 rmdir($tempDir);
+
+error_log("import.php: COMPLETADO - imported=$imported, skipped=$skipped");
 
 echo json_encode([
     'success' => true,
