@@ -75,7 +75,8 @@ if (!isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $cs
 }
 
 // Extraer el ZIP en carpeta temporal
-$tempDir = sys_get_temp_dir() . '/trackergram_import_' . time();
+$tempDir = sys_gettempdir() . '/trackergram_import_' . time();
+error_log("import.php: tempDir = $tempDir");
 if (!mkdir($tempDir, 0777, true)) {
     echo json_encode(['error' => 'No se pudo crear directorio temporal']);
     exit;
@@ -87,9 +88,11 @@ if ($zip->open($file['tmp_name']) !== true) {
     echo json_encode(['error' => 'No se pudo abrir el archivo ZIP']);
     exit;
 }
+error_log("import.php: ZIP abierto");
 
 $zip->extractTo($tempDir);
 $zip->close();
+error_log("import.php: ZIP extraido");
 
 // Buscar result.json
 $jsonFile = null;
@@ -107,10 +110,13 @@ if (!$jsonFile) {
     echo json_encode(['error' => 'No se encontró result.json en el export']);
     exit;
 }
+error_log("import.php: result.json encontrado en $jsonFile");
 
 // Leer y parsear el JSON
 $jsonContent = file_get_contents($jsonFile);
+error_log("import.php: JSON leido, size = " . strlen($jsonContent));
 $data = json_decode($jsonContent, true);
+error_log("import.php: JSON decodificado, messages count = " . ($data['messages'] ?? 0));
 if (!$data || !isset($data['messages'])) {
     array_map('unlink', glob("$tempDir/*"));
     rmdir($tempDir);
