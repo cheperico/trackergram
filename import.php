@@ -38,6 +38,9 @@ error_log("import.php: CONFIG CARGADA");
 
 // Validar tracker ID
 $trackerId = $_POST['tracker_id'] ?? '';
+error_log("import.php: tracker_id = " . $trackerId);
+error_log("import.php: FILES = " . print_r($_FILES, true));
+
 if (!$trackerId || !ctype_digit($trackerId)) {
     echo json_encode(['error' => 'Tracker ID inválido']);
     exit;
