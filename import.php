@@ -411,7 +411,12 @@ function importItemToTikiWiki(int $trackerId, array $data): bool {
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
     curl_close($ch);
+    
+    if ($httpCode !== 200) {
+        error_log("import.php: Tiki API error - HTTP $httpCode, response: $response, error: $error");
+    }
     
     return $httpCode === 200;
 }
