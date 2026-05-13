@@ -19,7 +19,7 @@ class TikiWikiClient
             return self::$mediaGalleryIdCache;
         }
 
-        $trackerId = $trackerId ?? TRACKER_ID;
+        $trackerId = $trackerId ?? TIKIWIKI_TRACKER_ID;
         $url = TIKIWIKI_API_URL . "trackers/$trackerId";
 
         $ch = curl_init();

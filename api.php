@@ -57,27 +57,11 @@ if ($isWebhookRequest) {
 }
 
 /**
- * Obtener URL de archivo de Telegram
+ * Obtener URL de archivo de Telegram (delegate a TelegramClient)
  */
 function getFileUrl(string $fileId): ?string
 {
-    $url = TELEGRAM_API_URL . 'getFile?file_id=' . $fileId;
-
-    // Usar context para evitar que file_get_contents se quede colgado indefinidamente
-    // (FIX: Previene timeouts cuando la API de Telegram tarda en responder)
-    $ctx = stream_context_create(['http' => ['timeout' => TIMEOUT_TELEGRAM_API]]);
-    $response = @file_get_contents($url, false, $ctx);
-
-    if ($response === false) {
-        return false; // Consistente: return false en caso de error
-    }
-
-    $data = json_decode($response, true);
-    if (!$data || !isset($data['result']['file_path'])) {
-        return false; // Consistente: return false en caso de error
-    }
-
-    return 'https://api.telegram.org/file/bot' . TELEGRAM_BOT_TOKEN . '/' . $data['result']['file_path'];
+    return TelegramClient::getFileUrl($fileId);
 }
 
 /**
@@ -125,260 +109,41 @@ function getTopicName(int $chatId, int $messageThreadId): string
 
 /**
  * Crear un tracker con todos los campos necesarios para trackerGram
+ * Delegate a TikiWikiClient
  */
 function createTrackerWithFields(string $trackerName): ?int
 {
-    // Crear el tracker - igual que el curl que funciona
-    $url = TIKIWIKI_API_URL . 'trackers';
-    $postFields = http_build_query([
-        'name' => $trackerName,
-        'description' => 'Tracker para mensajes de Telegram (creado por trackerGram)'
-    ]);
-    
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TIKIWIKI_API);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "Authorization: Bearer " . TIKIWIKI_TOKEN,
-        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    ]);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curlError = curl_error($ch);
-    curl_close($ch);
-    
-    if (DEBUG_MODE) {
-        error_log("DEBUG createTracker: httpCode=$httpCode, response=" . substr($response, 0, 200));
-    }
-    
-    $data = json_decode($response, true);
-    
-    // Manejar respuesta - puede ser JSON o HTML
-    $trackerId = null;
-    if (json_last_error() === JSON_ERROR_NONE) {
-        // Buscar trackerId o id en la respuesta JSON
-        $trackerId = $data['trackerId'] ?? $data['id'] ?? null;
-    } elseif ($httpCode === 200 && !empty($response)) {
-        // Buscar ID en respuesta HTML
-        if (preg_match('/["\']?id["\']?\s*[:=]\s*["\']?(\d+)["\']?/i', $response, $matches)) {
-            $trackerId = $matches[1];
-        } elseif (preg_match('/\/tiki\/tracker\.php\?trackerId=(\d+)/', $response, $matches)) {
-            $trackerId = $matches[1];
-        }
-    }
-    
-    if (!$trackerId) {
-        // Devolver info de debug
-        return [
-            'error' => 'TikiWiki response: HTTP ' . $httpCode . ', length: ' . strlen($response),
-            'httpCode' => $httpCode,
-            'response' => $response,
-            'jsonError' => json_last_error_msg()
-        ];
-    }
-    
-    error_log("Created tracker with ID: $trackerId");
-    
-    // Campos necesarios para trackerGram - códigos de tipo de TikiWiki
-    $fields = [
-        ['name' => 'Telegram Message ID', 'permname' => 'telegrammessageTelegramMessageId', 'type' => 't', 'order' => 1],
-        ['name' => 'Chat ID', 'permname' => 'telegrammessageChatId', 'type' => 't', 'order' => 2],
-        ['name' => 'Chat Title', 'permname' => 'telegrammessageChatTitle', 'type' => 't', 'order' => 3],
-        ['name' => 'Topic ID', 'permname' => 'telegrammessageTopicId', 'type' => 't', 'order' => 4],
-        ['name' => 'Topic Title', 'permname' => 'telegrammessageTopicTitle', 'type' => 't', 'order' => 5],
-        ['name' => 'User ID', 'permname' => 'telegrammessageUserId', 'type' => 't', 'order' => 6],
-        ['name' => 'Username', 'permname' => 'telegrammessageUsername', 'type' => 't', 'order' => 7],
-        ['name' => 'First Name', 'permname' => 'telegrammessageFirstName', 'type' => 't', 'order' => 8],
-        ['name' => 'Last Name', 'permname' => 'telegrammessageLastName', 'type' => 't', 'order' => 9],
-        ['name' => 'Message Type', 'permname' => 'telegrammessageMessageType', 'type' => 't', 'order' => 10],
-        ['name' => 'Text', 'permname' => 'telegrammessageText', 'type' => 'a', 'order' => 11],
-        ['name' => 'Media URL', 'permname' => 'telegrammessageMediaUrl', 'type' => 't', 'order' => 12],
-        ['name' => 'File URL', 'permname' => 'telegrammessageFileUrl', 'type' => 't', 'order' => 13],
-        ['name' => 'Media Type', 'permname' => 'telegrammessageMediaType', 'type' => 't', 'order' => 14],
-        ['name' => 'Media Size', 'permname' => 'telegrammessageMediaSize', 'type' => 'n', 'order' => 15],
-        ['name' => 'Media Caption', 'permname' => 'telegrammessageMediaCaption', 'type' => 't', 'order' => 16],
-        ['name' => 'Location', 'permname' => 'telegrammessageLocation', 'type' => 't', 'order' => 17],
-        ['name' => 'Message Date', 'permname' => 'telegrammessageMessageDate', 'type' => 't', 'order' => 18],
-    ];
-    
-    foreach ($fields as $field) {
-        // Endpoint correcto para crear campos
-        $fieldUrl = TIKIWIKI_API_URL . 'trackers/' . $trackerId . '/fields';
-        // Enviar como name, permName, type, order (case sensitive)
-        $fieldPost = http_build_query([
-            'name' => $field['name'],
-            'permName' => $field['permname'],
-            'type' => $field['type'],
-            'order' => $field['order']
-        ]);
-        
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $fieldUrl);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $fieldPost);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TIKIWIKI_API);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Authorization: Bearer " . TIKIWIKI_TOKEN,
-            "User-Agent: Mozilla/5.0"
-        ]);
-        
-        $fieldResponse = curl_exec($ch);
-        $fieldHttpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $fieldError = curl_error($ch);
-        curl_close($ch);
-        
-        if (DEBUG_MODE) {
-            error_log("DEBUG field {$field['name']}: httpCode=$fieldHttpCode, response=" . substr($fieldResponse, 0, 200));
-        }
-        
-        if ($fieldHttpCode === 200) {
-            error_log("Created field: {$field['name']}");
-        } else {
-            error_log("ERROR creating field {$field['name']}: HTTP $fieldHttpCode, response=$fieldResponse");
-        }
-    }
-    
-    return $trackerId;
+    return TikiWikiClient::createTracker($trackerName);
 }
 
 /**
  * Verificar si un message_id ya existe en el tracker (para evitar duplicados)
+ * Delegate a TikiWikiClient
  */
 function messageExistsInTracker(int $messageId): bool
 {
-    $trackerId = TIKIWIKI_TRACKER_ID;
-    // Buscar items filtrando por message_id específico
-    $url = TIKIWIKI_API_URL . "trackers/{$trackerId}/items?fields=telegrammessageTelegramMessageId&filter[telegrammessageTelegramMessageId]=$messageId";
-    
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "Authorization: Bearer " . TIKIWIKI_TOKEN,
-        "User-Agent: Mozilla/5.0"
-    ]);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TELEGRAM_API);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    if ($httpCode !== 200) {
-        error_log("trackerGram: ERROR checking duplicate: HTTP $httpCode");
-        return false;
-    }
-    
-    $data = json_decode($response, true);
-    $items = $data['data'] ?? [];
-    
-    foreach ($items as $item) {
-        $fieldValue = $item['telegrammessageTelegramMessageId'] ?? '';
-        if ((string)$messageId === (string)$fieldValue) {
-            error_log("trackerGram: DUPLICATE detected for message_id: $messageId");
-            return true;
-        }
-    }
-    
-    return false;
+    return TikiWikiClient::messageExists(TIKIWIKI_TRACKER_ID, $messageId);
+}
 }
 
 /**
  * Obtener el galleryId del campo de archivo en el tracker
- * Usa caché estático para evitar múltiples llamadas a la API
+ * Delegate a TikiWikiClient
  */
 function getMediaGalleryId(): ?int
 {
-    static $cachedGalleryId = null;
-    
-    if ($cachedGalleryId !== null) {
-        return $cachedGalleryId;
-    }
-    
-    $trackerId = TIKIWIKI_TRACKER_ID;
-    $url = TIKIWIKI_API_URL . "trackers/{$trackerId}/fields";
-    
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "Authorization: Bearer " . TIKIWIKI_TOKEN,
-        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    ]);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TELEGRAM_API);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    if (DEBUG_MODE) {
-        error_log("DEBUG getTrackerFields: httpCode=$httpCode, response=" . substr($response, 0, 500));
-    }
-    curl_close($ch);
-    
-    if ($httpCode !== 200) {
-        error_log("trackerGram: ERROR getting tracker fields: HTTP $httpCode, response: $response");
-        return null;
-    }
-    
-    $data = json_decode($response, true);
-    if (!$data || !isset($data['fields'])) {
-        error_log("trackerGram: ERROR parsing tracker fields response");
-        return null;
-    }
-    
-    // Buscar el campo telegrammessageMedia
-    foreach ($data['fields'] as $field) {
-        if (($field['permName'] ?? '') === 'telegrammessageMedia') {
-            $options = $field['options'] ?? [];
-            
-            // El galleryId puede estar en diferentes formatos
-            $galleryId = $options['galleryId'] ?? $options['gallery_id'] ?? $options['id'] ?? null;
-            
-            if ($galleryId) {
-                error_log("trackerGram: Found media field galleryId: $galleryId");
-                $cachedGalleryId = (int)$galleryId;
-                return $cachedGalleryId;
-            }
-        }
-    }
-    
-    error_log("trackerGram: WARNING - telegrammessageMedia field not found or has no galleryId configured");
-    $cachedGalleryId = 29; // Fallback
-    return $cachedGalleryId;
+    return TikiWikiClient::getMediaGalleryId();
 }
 
 /**
  * Subir archivo a TikiWiki file gallery
+ * Delegate a TikiWikiClient
  */
 function uploadToTikiWiki(string $filePath, string $fileName, ?string $mimeType = null): ?string
 {
-    global $mediaGalleryIdCache;
-    
-    // Usar cache si ya se obtuvo el galleryId
-    if ($mediaGalleryIdCache === null) {
-        $mediaGalleryIdCache = getMediaGalleryId();
-    }
-    
-    // Si no se pudo obtener dinámicamente, usar fallback hardcodeado
-    $galleryId = $mediaGalleryIdCache ?? 29;
-    error_log("trackerGram: Using galleryId: $galleryId");
-    $uploadUrl = TIKIWIKI_API_URL . 'galleries/upload';
-    
-    $cfile = curl_file_create($filePath, $mimeType ?: 'application/octet-stream', $fileName);
-    
-    $postData = [
-        'galleryId' => $galleryId,
-        'data' => $cfile,
-        'name' => $fileName,
-        'title' => $fileName,
-        'description' => 'Archivo subido desde Telegram - ' . date('Y-m-d H:i:s')
-    ];
-    
-    $ch = curl_init();
+    $galleryId = getCachedMediaGalleryId() ?? TikiWikiClient::getMediaGalleryId() ?? 29;
+    return TikiWikiClient::uploadFile($filePath, $fileName, $galleryId);
+}
     curl_setopt($ch, CURLOPT_URL, $uploadUrl);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
@@ -419,28 +184,24 @@ function uploadToTikiWiki(string $filePath, string $fileName, ?string $mimeType 
 
 /**
  * Descargar archivo de Telegram y subir a TikiWiki
+ * Usa TelegramClient y TikiWikiClient
  */
 function downloadAndUploadMedia(string $fileId, ?string $fileName = null, ?string $mimeType = null): ?string
 {
-    $fileUrl = getFileUrl($fileId);
-    if (!$fileUrl) {
-        error_log("trackerGram: Cannot get URL for FileID: $fileId");
-        return false;
+    // Descargar archivo usando TelegramClient
+    $fileContent = TelegramClient::getFileContent($fileId);
+    if ($fileContent === null) {
+        error_log("trackerGram: Cannot download file from Telegram: $fileId");
+        return null;
     }
     
-    $ctx = stream_context_create(['http' => ['timeout' => 10]]);
-    $fileContent = @file_get_contents($fileUrl, false, $ctx);
-    
-    if ($fileContent === false) {
-        error_log("trackerGram: Cannot download from: $fileUrl");
-        return false;
-    }
-    
+    // Guardar en archivo temporal
     $tempFile = tempnam(sys_get_temp_dir(), 'tg_media_');
     if (file_put_contents($tempFile, $fileContent) === false) {
-        return false;
+        return null;
     }
     
+    // Subir usando TikiWikiClient
     $result = uploadToTikiWiki($tempFile, $fileName, $mimeType);
     unlink($tempFile);
     

@@ -15,10 +15,10 @@ class TelegramClient
      */
     public static function getFileUrl(string $fileId): ?string
     {
-        $url = self::$baseUrl . '/file/bot' . TELEGRAM_BOT_TOKEN . '/';
+        $apiUrl = self::$baseUrl . '/bot' . TELEGRAM_BOT_TOKEN . '/getFile';
 
         $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url . 'getFile?file_id=' . urlencode($fileId));
+        curl_setopt($ch, CURLOPT_URL, $apiUrl . '?file_id=' . urlencode($fileId));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TELEGRAM_API);
 
@@ -28,7 +28,7 @@ class TelegramClient
         $data = json_decode($response, true);
 
         if (isset($data['result']['file_path'])) {
-            return $url . $data['result']['file_path'];
+            return self::$baseUrl . '/file/bot' . TELEGRAM_BOT_TOKEN . '/' . $data['result']['file_path'];
         }
 
         return null;
@@ -68,7 +68,6 @@ class TelegramClient
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TELEGRAM_DOWNLOAD);
-        curl_setopt($ch, CURLOPT_MAXFILESIZE, MAX_DOWNLOAD_SIZE);
 
         $fileContent = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -96,7 +95,6 @@ class TelegramClient
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TELEGRAM_DOWNLOAD);
-        curl_setopt($ch, CURLOPT_MAXFILESIZE, MAX_DOWNLOAD_SIZE);
 
         $fileContent = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
