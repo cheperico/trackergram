@@ -246,35 +246,35 @@ if (!checkAuth()) {
     exit;
 }
 
-// Procesar formulario de configuración de Telegram
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save_telegram') {
+// Procesar formulario de configuración general
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save_general') {
     validateCSRFToken($_POST['csrf_token'] ?? '');
     
     $env = loadEnvFromFile();
     $env['TELEGRAM_BOT_TOKEN'] = validateInput($_POST['telegram_bot_token'] ?? '', 'token');
     $env['TELEGRAM_WEBHOOK_SECRET'] = validateInput($_POST['telegram_webhook_secret'] ?? '', 'token');
     $env['CUSTOM_WEBHOOK_URL'] = validateInput($_POST['custom_webhook_url'] ?? '', 'url');
+    $env['TIKIWIKI_API_URL'] = validateInput($_POST['tikiwiki_api_url'] ?? '', 'url');
+    $env['TIKIWIKI_TOKEN'] = validateInput($_POST['tikiwiki_token'] ?? '', 'token');
     
     if (saveEnv($env)) {
-        $success = "Configuración de Telegram guardada exitosamente";
+        $success = "Configuración general guardada exitosamente";
     } else {
         $error = "Error al guardar configuración";
     }
 }
 
-// Procesar formulario de configuración de TikiWiki
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save_tikiwiki') {
+// Procesar formulario de tracker del webhook
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'save_tracker') {
     validateCSRFToken($_POST['csrf_token'] ?? '');
     
     $env = loadEnvFromFile();
-    $env['TIKIWIKI_API_URL'] = validateInput($_POST['tikiwiki_api_url'] ?? '', 'url');
-    $env['TIKIWIKI_TOKEN'] = validateInput($_POST['tikiwiki_token'] ?? '', 'token');
     $env['TIKIWIKI_TRACKER_ID'] = validateInput($_POST['tikiwiki_tracker_id'] ?? '1', 'number');
     
     if (saveEnv($env)) {
-        $success = "Configuración de TikiWiki guardada exitosamente";
+        $success = "Tracker actualizado exitosamente";
     } else {
-        $error = "Error al guardar configuración";
+        $error = "Error al guardar tracker";
     }
 }
 
@@ -389,32 +389,43 @@ if (!checkAuth()) {
     
     <h2>Índice</h2>
     <ul>
-        <li><a href="#config-telegram">1. Configuración de Telegram</a></li>
+        <li><a href="#config-general">1. Configuración general</a></li>
         <li><a href="#tracker-importar">2. Importar conversaciones</a></li>
-        <li><a href="#tracker-directo">3. Configuración de TikiWiki</a></li>
+        <li><a href="#tracker-webhook">3. Tracker que recibe el webhook</a></li>
         <li><a href="#webhook">4. Webhook de Telegram</a></li>
         <li><a href="#crear-tracker">5. Crear Tracker en TikiWiki</a></li>
     </ul>
     
-    <h2 id="config-telegram">1. Configuración de Telegram</h2>
+    <h2 id="config-general">1. Configuración general</h2>
+    <p>Configuración básica del bot de Telegram y la instalación de TikiWiki.</p>
     <form method="post">
-        <input type="hidden" name="action" value="save_telegram">
+        <input type="hidden" name="action" value="save_general">
         <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
         
-        <label>Telegram Bot Token:</label><br>
+        <h3>Telegram</h3>
+        <label>Bot Token:</label><br>
         <input type="password" name="telegram_bot_token" value="<?php echo htmlspecialchars($config['telegram_bot_token']); ?>" size="60" placeholder="Click para ver">
         <button type="button" onclick="this.previousElementSibling.type = this.previousElementSibling.type === 'password' ? 'text' : 'password'">👁</button>
         <br><br>
         
-        <label>Telegram Webhook Secret:</label><br>
+        <label>Webhook Secret:</label><br>
         <input type="password" name="telegram_webhook_secret" value="<?php echo htmlspecialchars($config['telegram_webhook_secret']); ?>" size="50" placeholder="Click para ver">
         <button type="button" onclick="this.previousElementSibling.type = this.previousElementSibling.type === 'password' ? 'text' : 'password'">👁</button>
         <br><br>
         
         <label>Custom Webhook URL (opcional):</label><br>
-        <input type="text" name="custom_webhook_url" value="<?php echo htmlspecialchars($config['custom_webhook_url'] ?? ''); ?>" size="50" placeholder="https://example.com"><br><br>
+        <input type="text" name="custom_webhook_url" value="<?php echo htmlspecialchars($config['custom_webhook_url'] ?? ''); ?>" size="50" placeholder="https://ejemplo.com/api.php"><br><br>
         
-        <button type="submit">Guardar Configuración de Telegram</button>
+        <h3>TikiWiki</h3>
+        <label>API URL:</label><br>
+        <input type="text" name="tikiwiki_api_url" value="<?php echo htmlspecialchars($config['tikiwiki_api_url']); ?>" size="50"><br><br>
+        
+        <label>Token de API:</label><br>
+        <input type="password" name="tikiwiki_token" value="<?php echo htmlspecialchars($config['tikiwiki_token']); ?>" size="50" placeholder="Click para ver">
+        <button type="button" onclick="this.previousElementSibling.type = this.previousElementSibling.type === 'password' ? 'text' : 'password'">👁</button>
+        <br><br>
+        
+        <button type="submit">Guardar Configuración General</button>
     </form>
     
     <h2 id="tracker-importar">2. Importar conversaciones <span style="color: orange; font-size: 0.8em;">(funcionalidad en desarrollo)</span></h2>
@@ -480,24 +491,17 @@ if (!checkAuth()) {
     }
     </script>
     
-    <h2 id="tracker-directo">3. Configuración de TikiWiki</h2>
+    <h2 id="tracker-webhook">3. Tracker que recibe el webhook</h2>
+    <p>ID del tracker de TikiWiki donde se enviarán los mensajes en vivo desde Telegram.</p>
     <form method="post">
-        <input type="hidden" name="action" value="save_tikiwiki">
+        <input type="hidden" name="action" value="save_tracker">
         <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-        
-        <label>TikiWiki API URL:</label><br>
-        <input type="text" name="tikiwiki_api_url" value="<?php echo htmlspecialchars($config['tikiwiki_api_url']); ?>" size="50"><br><br>
-        
-        <label>TikiWiki Token:</label><br>
-        <input type="password" name="tikiwiki_token" value="<?php echo htmlspecialchars($config['tikiwiki_token']); ?>" size="50" placeholder="Click para ver">
-        <button type="button" onclick="this.previousElementSibling.type = this.previousElementSibling.type === 'password' ? 'text' : 'password'">👁</button>
-        <br><br>
         
         <label>TikiWiki Tracker ID:</label><br>
         <input type="text" name="tikiwiki_tracker_id" value="<?php echo htmlspecialchars($config['tikiwiki_tracker_id']); ?>" size="10">
-        <small>(ID del tracker que recibe los mensajes del webhook y se usa para importar)</small><br><br>
+        <br><br>
         
-        <button type="submit">Guardar Configuración de TikiWiki</button>
+        <button type="submit">Guardar Tracker</button>
     </form>
     
     <h2 id="webhook">4. Webhook de Telegram <span style="color: orange; font-size: 0.8em;">(funcionalidad en desarrollo)</span></h2>
