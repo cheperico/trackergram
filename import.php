@@ -210,16 +210,17 @@ foreach ($messages as $i => $msg) {
         $filePath = findFileInTemp($tempDir, $fileName);
     } elseif (!empty($msg['file'])) {
         $fileName = $msg['file_name'] ?? basename($msg['file']);
-        if (strpos($msg['file'] ?? '', 'sticker') !== false) {
+        $mediaType = $msg['media_type'] ?? '';
+        if (strpos($msg['file'] ?? '', 'sticker') !== false || $mediaType === 'sticker') {
             $messageType = 'sticker';
-        } elseif (strpos($msg['file'] ?? '', 'video') !== false) {
+        } elseif (strpos($msg['file'] ?? '', 'video') !== false || $mediaType === 'video_message') {
             $messageType = 'video';
-        } elseif (strpos($msg['file'] ?? '', 'audio') !== false) {
+        } elseif (strpos($msg['file'] ?? '', 'audio') !== false || $mediaType === 'audio') {
             $messageType = 'audio';
         } else {
             $messageType = 'document';
         }
-        $filePath = findFileInTemp($tempDir, basename($msg['file']));
+        $filePath = findFileInTemp($tempDir, $fileName);
     }
 
     // Subir archivo si existe
