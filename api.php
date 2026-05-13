@@ -124,7 +124,6 @@ function messageExistsInTracker(int $messageId): bool
 {
     return TikiWikiClient::messageExists(TIKIWIKI_TRACKER_ID, $messageId);
 }
-}
 
 /**
  * Obtener el galleryId del campo de archivo en el tracker
