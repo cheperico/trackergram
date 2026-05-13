@@ -7,6 +7,8 @@
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
+session_start();
+
 // Manejo de errores para evitar HTML en respuesta
 error_log("import.php: INICIO - POST size: " . ($_SERVER['CONTENT_LENGTH'] ?? 0));
 
@@ -65,6 +67,8 @@ if ($extension !== 'zip') {
 
 // Validar CSRF token
 $csrfToken = $_POST['csrf_token'] ?? '';
+error_log("import.php: csrfToken = " . ($csrfToken ? 'presente' : 'VACIO'));
+error_log("import.php: session csrf = " . ($_SESSION['csrf_token'] ?? 'NO HAY'));
 if (empty($csrfToken)) {
     echo json_encode(['error' => 'Token CSRF requerido']);
     exit;
