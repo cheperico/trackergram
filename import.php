@@ -134,7 +134,7 @@ error_log("import.php: result.json encontrado en $jsonFile");
 $jsonContent = file_get_contents($jsonFile);
 error_log("import.php: JSON leido, size = " . strlen($jsonContent));
 $data = json_decode($jsonContent, true);
-error_log("import.php: JSON decodificado, messages count = " . ($data['messages'] ?? 0));
+error_log("import.php: JSON decodificado, messages count = " . (isset($data['messages']) ? count($data['messages']) : 0));
 if (!$data || !isset($data['messages'])) {
     array_map('unlink', glob("$tempDir/*"));
     rmdir($tempDir);
