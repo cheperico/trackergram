@@ -4,7 +4,7 @@
 - **Fix**: TypeError fatal en PHP 8.5 al pasar string `'general'` donde se esperaba `int` (`getTopicName`)
 - **Fix**: Eliminada llamada API a `getForumTopic` (no existe en Telegram Bot API)
 - **Fix**: Admin.php ya no pisa `CUSTOM_WEBHOOK_URL` al hacer "Actualizar Webhook"
-- **Fix**: Separados formularios de admin.php en secciones independientes (Telegram y TikiWiki ya no se guardan juntos)
+- **Fix**: Reorganizado admin panel en secciones lógicas: Configuración general (Telegram + TikiWiki), Importar, Tracker del webhook, Webhook, Crear Tracker. Cada formulario guarda solo sus campos.
 - **Docs**: Agregada sección "Resolución de Nombres de Topics" en TECHNICAL.md
 - **Docs**: Agregados links de referencia de APIs en CONTEXTO.md
 

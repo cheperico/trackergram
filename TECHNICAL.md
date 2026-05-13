@@ -444,9 +444,16 @@ El sistema mapea automáticamente los campos de Telegram a los campos del tracke
 
 ### Formularios mezclados en admin.php (v0.1.5)
 
-**Problema**: La sección 1 (Configuración de Telegram) y la sección 3 (Tracker en directo) compartían el mismo `action=save_config`, que guardaba todas las variables del `.env` juntas. Cambiar el tracker ID en sección 3 requería re-enviar (y potencialmente pisar) los valores de Telegram, y viceversa.
+**Problema**: Las secciones del panel de administración mezclaban campos de Telegram y TikiWiki en un mismo formulario. Guardar la configuración general requería re-enviar (y potencialmente pisar) todos los valores. La sección 3 (Tracker en directo) usaba campos ocultos para re-enviar datos de Telegram, lo que hacía frágil el formulario.
 
-**Fix**: Cada sección ahora tiene su propio action (`save_telegram`, `save_tikiwiki`) y solo guarda los campos que le corresponden.
+**Fix**: Reorganización completa del admin panel:
+- Sección 1: Configuración general (Telegram + TikiWiki, sin tracker ID)
+- Sección 2: Importar conversaciones (sin cambios)
+- Sección 3: Tracker que recibe el webhook (solo tracker ID)
+- Sección 4: Webhook (solo actualizar webhook en Telegram)
+- Sección 5: Crear Tracker (sin cambios)
+
+Cada sección tiene su propio action handler y solo guarda los campos que le corresponden. Ya no se usan campos ocultos para preservar valores entre secciones.
 
 ### getForumTopic no existe en Telegram Bot API (v0.1.5)
 
