@@ -91,6 +91,11 @@ if ($extension !== 'zip') {
 
 // Validar CSRF token
 $csrfToken = $_POST['csrf_token'] ?? '';
+if (!isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $csrfToken)) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Token CSRF inválido']);
+    exit;
+}
 
 // Extraer el ZIP en carpeta temporal
 $tempDir = sys_get_temp_dir() . '/trackergram_import_' . time();
