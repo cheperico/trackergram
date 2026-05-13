@@ -3,52 +3,49 @@
 ## Estado del Proyecto
 
 - **Estado**: Activo - En desarrollo
-- **Última versión**: v0.1.4
+- **Última versión**: v0.1.5
 - **Funcionalidad principal**: Recibe webhooks de Telegram y envía mensajes directamente a TikiWiki trackers
 
 ## Pendientes
 
-### Arquitectura y Mejoras Técnicas
+### Seguridad - Prioridad Alta (implementar primero)
 
-- [x] **Separación de responsabilidades**: TikiWikiClient, TelegramClient, MessageMapper
-  - Archivos separados para mejor mantenibilidad
-  - Código más testeable y reusable
-  - Cada cliente tiene su propia responsabilidad
+- [x] ~~TELEGRAM_WEBHOOK_SECRET obligatorio con hash_equals()~~ ✅
+- [x] ~~checkAuth() antes de procesar acciones mutantes~~ ✅
+- [x] ~~Validación CSRF en import.php~~ ✅
+- [x] ~~setup_webhook.php protegido (solo CLI/localhost)~~ ✅
+- [ ] **Hash de contraseña admin**: Usar password_hash()/password_verify() en vez de comparación en claro
+- [ ] **Path Traversal en ZIP**: Validar nombres de archivos al extraer ZIPs subidos por usuarios
+- [ ] **Limitar tamaño de descarga de media**: Descargas en chunks en lugar de cargar todo en memoria
+- [ ] **display_errors=0 en admin**: Apagar errores visibles en producción
+
+### Seguridad - Prioridad Media
+
+- [ ] **Deduplicación por (chat_id, message_id)**: Actualmente filtra solo por message_id
+- [ ] **ALLOWED_CHAT_IDS por defecto**: No aceptar todos los chats, permitir solo los autorizados
+- [ ] **No guardar URLs con token**: Descargar media via proxy o usar token limitado
+- [ ] **Rate limiting webhook**: Para prevenir abuso del endpoint
+
+### Arquitectura - Mejoras Técnicas
+
+- [x] **Separación de responsabilidades**: TikiWikiClient, TelegramClient, MessageMapper ✅
+- [ ] **Integrar MessageMapper completamente**: Unificar transformación de mensajes en MessageMapper
+- [ ] **Refactorizar api.php**: Extraer processUpdate y sendToTikiWiki a clientes
+- [ ] **Manejo de errores consistente**: Estandarizar retornos (excepciones en vez de null/false mixtos)
 
 ### Funcionalidades
 
 - [~] **Creación automática de tracker**: Parcialmente implementado
-   - Panel admin: crear nuevo tracker con nombre → genera campos automáticamente
-   - Tipos de campo: implementación básica (no todos los tipos documentados)
    - Pendiente: corregir tipos de campo (FG, G, D) y valores por defecto
    - Pendiente: conectar correctamente la UI de "Crear Tracker" en admin.php
-- [ ] **Sistema de etiquetas**: Extraer hashtags (#etiqueta) de mensajes de Telegram y guardarlos en campo del tracker para conectar con el sistema de tags de TikiWiki
-- [x] **Importar export de Telegram**: Importar conversaciones desde JSON exportado de Telegram
-   - Implementado: procesamiento por upload ZIP
-   - Pendiente: optimizar rendimiento (27 msgs/2min es lento para exports grandes)
-   - Opciones futuras: batch API, procesamiento async, cacheo de conexiones
-   - **Por FTP + carpeta local**: Recomendado para exports muy grandes - subir por FTP y procesar en chunks sin límites de upload
+- [x] **Importar export de Telegram**: Implementado (pendiente optimizar para exports grandes)
+- [ ] **Sistema de etiquetas**: Extraer hashtags de mensajes
 
-### Seguridad
+### Estrategia - Pendientes (para después)
 
-- [ ] **Deduplicación por (chat_id, message_id)**: Actualmente filtra solo por message_id - puede fallar entre diferentes chats
-  - [x] ~~Deduplicación básica~~ ✅ Parcialmente implementado
-- [x] ~~checkAuth() antes de procesar acciones mutantes~~ ✅
-- [x] ~~Validación CSRF en import.php~~ ✅ Agregado en v0.1.3
-- [x] ~~setup_webhook.php protegido (solo CLI/localhost)~~ ✅
-- [x] ~~TELEGRAM_WEBHOOK_SECRET obligatorio con hash_equals()~~ ✅
-- [x] ~~Logs de debug condicionados por DEBUG_MODE~~ ✅
-- [ ] **Rotar token del bot**: Si ya se usó con media real, el token quedó expuesto en URLs de archivos guardados en TikiWiki
-- [ ] **Limitar tamaño de descarga de media**: Descargas completas en memoria pueden agotar recursos
-- [ ] **Hash de contraseña admin**: Usar password_hash()/password_verify() en vez de comparación en claro
-- [ ] **Forzar HTTPS**: No permitir TIKIWIKI_API_URL en http://
-- [ ] **No guardar URLs con token**: Descargar media via proxy o usar token limitado en lugar de guardar URLs con token de Telegram
-- [ ] **Límite de tamaño de archivos**: Evitar DoS por archivos grandes (descarga completa en memoria)
-- [ ] **ALLOWED_CHAT_IDS por defecto**: No aceptar todos los chats, permitir solo los autorizados
-- [ ] **display_errors=0 en admin**: Apagar errores visibles en producción
-- [ ] **Rate limiting webhook**: Para prevenir abuso del endpoint (importante para producción)
-- [ ] **Logging de accesos no autorizados**: Registrar intentos de acceso fallidos
-- [ ] **IP whitelisting para admin**: Restringir acceso a interfaz administrativa por IP
+- [ ] **Mensajes editados/borrados**: Manejar updates de tipo edited_message y deleted
+- [ ] **Importación asíncrona**: Procesar exports grandes por FTP + CLI en vez de HTTP
+- [ ] **Múltiples chats**: Crear trackers separados por chat_id o implementar filtros
 
 ### Bugs
 
