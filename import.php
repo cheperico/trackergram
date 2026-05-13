@@ -23,6 +23,23 @@ function handleError($errno, $errstr, $errfile, $errline) {
 }
 set_error_handler('handleError');
 
+function rrmdir($dir) {
+    if (is_dir($dir)) {
+        $files = array_diff(scandir($dir), array('.','..'));
+        foreach ($files as $file) {
+            $path = "$dir/$file";
+            if (is_dir($path)) {
+                rrmdir($path);
+            } else {
+                unlink($path);
+            }
+        }
+        rmdir($dir);
+    } elseif (is_file($dir)) {
+        unlink($dir);
+    }
+}
+
 function handleException($exc) {
     error_log("import.php: EXCEPTION " . $exc->getMessage() . " in " . $exc->getFile() . ":" . $exc->getLine());
     http_response_code(500);
@@ -123,8 +140,7 @@ foreach ($files as $f) {
 }
 
 if (!$jsonFile) {
-    array_map('unlink', glob("$tempDir/*"));
-    rmdir($tempDir);
+    rrmdir($tempDir);
     echo json_encode(['error' => 'No se encontró result.json en el export']);
     exit;
 }
@@ -136,8 +152,7 @@ error_log("import.php: JSON leido, size = " . strlen($jsonContent));
 $data = json_decode($jsonContent, true);
 error_log("import.php: JSON decodificado, messages count = " . (isset($data['messages']) ? count($data['messages']) : 0));
 if (!$data || !isset($data['messages'])) {
-    array_map('unlink', glob("$tempDir/*"));
-    rmdir($tempDir);
+    rrmdir($tempDir);
     echo json_encode(['error' => 'Formato de export inválido']);
     exit;
 }
@@ -257,9 +272,7 @@ foreach ($messages as $i => $msg) {
 }
 
 // Limpiar directorio temporal
-array_map('unlink', glob("$tempDir/*/*"));
-array_map('unlink', glob("$tempDir/*"));
-rmdir($tempDir);
+rrmdir($tempDir);
 
 error_log("import.php: COMPLETADO - imported=$imported, skipped=$skipped");
 
