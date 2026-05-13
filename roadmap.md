@@ -40,6 +40,10 @@
    - Pendiente: conectar correctamente la UI de "Crear Tracker" en admin.php
 - [x] **Importar export de Telegram**: Implementado (pendiente optimizar para exports grandes)
 - [ ] **Sistema de etiquetas**: Extraer hashtags de mensajes
+- [ ] **Mensajes estructurados con prefijos**: Detectar y parsear mensajes con prefijos especiales que contienen datos estructurados
+  - Ejemplo: "📍GPS fabian.ciclista 34.051628,-118.240126,14.3" → extrae "fabian.ciclista" como nombre/usuario y coordenadas al campo ubicación
+  - Implementar parser configurable en MessageMapper
+  - Permitir definir patrones regex para diferentes tipos de mensajes (GPS, alertas, etc.)
 
 ### Estrategia - Pendientes (para después)
 
