@@ -22,11 +22,11 @@
     - `n` (position 160) - Media Size
     - `G` (position 180) - Location (ubicación geográfica)
 - [ ] **Sistema de etiquetas**: Extraer hashtags (#etiqueta) de mensajes de Telegram y guardarlos en campo del tracker para conectar con el sistema de tags de TikiWiki
-- [ ] **Importar export de Telegram**: Importar conversaciones desde JSON exportado de Telegram (para carga masiva de datos históricos)
-  - **Por zip**: Requiere aumentar límites de PHP (para exports pequeños)
-    - Mostrar límites claramente en panel (lenguaje usuario + datos técnicos)
-    - Después de procesar, borrar archivo importado
-  - **Por FTP + carpeta local**: Recomendado - subir export por FTP a una carpeta y procesar desde ahí (sin límites de upload, procesamiento en chunks)
+- [x] **Importar export de Telegram**: Importar conversaciones desde JSON exportado de Telegram
+   - Implementado: procesamiento por upload ZIP
+   - Pendiente: optimizar rendimiento (27 msgs/2min es lento para exports grandes)
+   - Opciones futuras: batch API, procesamiento async, cacheo de conexiones
+   - **Por FTP + carpeta local**: Recomendado para exports muy grandes - subir por FTP y procesar en chunks sin límites de upload
 
 ### Seguridad
 
