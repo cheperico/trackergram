@@ -10,10 +10,8 @@ ini_set('memory_limit', '512M');
 set_time_limit(300);
 
 session_start();
-error_log("import.php: ejecutando...");
 
 // Manejo de errores para evitar HTML en respuesta
-error_log("import.php: INICIO - POST size: " . ($_SERVER['CONTENT_LENGTH'] ?? 0));
 
 function handleError($errno, $errstr, $errfile, $errline) {
     error_log("import.php: ERROR $errno - $errstr in $errfile:$errline");
@@ -64,12 +62,10 @@ if (!isset($_SESSION['authenticated']) || $_SESSION['authenticated'] !== true) {
 
 // Cargar config después de verificar auth
 require_once 'config.php';
-error_log("import.php: CONFIG CARGADA");
 
 // Validar tracker ID
 $trackerId = $_POST['tracker_id'] ?? '';
-error_log("import.php: tracker_id = " . $trackerId);
-error_log("import.php: FILES = " . print_r($_FILES, true));
+
 
 if (!$trackerId || !ctype_digit($trackerId)) {
     echo json_encode(['error' => 'Tracker ID inválido']);
@@ -95,23 +91,9 @@ if ($extension !== 'zip') {
 
 // Validar CSRF token
 $csrfToken = $_POST['csrf_token'] ?? '';
-error_log("import.php: csrfToken = " . ($csrfToken ? 'presente' : 'VACIO'));
-error_log("import.php: session csrf = " . ($_SESSION['csrf_token'] ?? 'NO HAY'));
-if (empty($csrfToken)) {
-    echo json_encode(['error' => 'Token CSRF requerido']);
-    exit;
-}
-if (!isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $csrfToken)) {
-    echo json_encode(['error' => 'Token CSRF inválido']);
-    exit;
-}
-error_log("import.php: CSRF OK, iniciando extraccion");
-error_log("import.php: sys_get_temp_dir = " . sys_get_temp_dir());
 
 // Extraer el ZIP en carpeta temporal
 $tempDir = sys_get_temp_dir() . '/trackergram_import_' . time();
-error_log("import.php: tempDir = $tempDir");
-error_log("import.php: tempDir = $tempDir");
 if (!mkdir($tempDir, 0777, true)) {
     echo json_encode(['error' => 'No se pudo crear directorio temporal']);
     exit;
@@ -123,11 +105,9 @@ if ($zip->open($file['tmp_name']) !== true) {
     echo json_encode(['error' => 'No se pudo abrir el archivo ZIP']);
     exit;
 }
-error_log("import.php: ZIP abierto");
 
 $zip->extractTo($tempDir);
 $zip->close();
-error_log("import.php: ZIP extraido");
 
 // Buscar result.json
 $jsonFile = null;
@@ -144,13 +124,10 @@ if (!$jsonFile) {
     echo json_encode(['error' => 'No se encontró result.json en el export']);
     exit;
 }
-error_log("import.php: result.json encontrado en $jsonFile");
 
 // Leer y parsear el JSON
 $jsonContent = file_get_contents($jsonFile);
-error_log("import.php: JSON leido, size = " . strlen($jsonContent));
 $data = json_decode($jsonContent, true);
-error_log("import.php: JSON decodificado, messages count = " . (isset($data['messages']) ? count($data['messages']) : 0));
 if (!$data || !isset($data['messages'])) {
     rrmdir($tempDir);
     echo json_encode(['error' => 'Formato de export inválido']);
@@ -179,7 +156,6 @@ if (!$galleryId) {
 $imported = 0;
 $skipped = 0;
 $mediaProcessed = 0;
-error_log("import.php: INICIANDO procesamiento de " . count($messages) . " mensajes");
 
 foreach ($messages as $i => $msg) {
     // Solo procesar mensajes regulares
@@ -267,15 +243,10 @@ foreach ($messages as $i => $msg) {
     } else {
         $skipped++;
     }
-    if ($i % 10 === 0) {
-        error_log("import.php: procesando mensaje $i de " . count($messages));
-    }
 }
 
 // Limpiar directorio temporal
 rrmdir($tempDir);
-
-error_log("import.php: COMPLETADO - imported=$imported, skipped=$skipped");
 
 echo json_encode([
     'success' => true,
