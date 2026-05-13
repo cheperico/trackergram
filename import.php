@@ -6,8 +6,11 @@
 
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
+ini_set('memory_limit', '512M');
+set_time_limit(300);
 
 session_start();
+error_log("import.php: ejecutando...");
 
 // Manejo de errores para evitar HTML en respuesta
 error_log("import.php: INICIO - POST size: " . ($_SERVER['CONTENT_LENGTH'] ?? 0));
