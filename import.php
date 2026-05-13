@@ -23,6 +23,14 @@ function handleError($errno, $errstr, $errfile, $errline) {
 }
 set_error_handler('handleError');
 
+function handleException($exc) {
+    error_log("import.php: EXCEPTION " . $exc->getMessage() . " in " . $exc->getFile() . ":" . $exc->getLine());
+    http_response_code(500);
+    echo json_encode(['error' => "Exception: " . $exc->getMessage()]);
+    exit;
+}
+set_exception_handler('handleException');
+
 // Iniciar sesión para CSRF y autenticación
 if (session_status() === PHP_SESSION_NONE) {
     @session_start();
@@ -81,9 +89,11 @@ if (!isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $cs
     exit;
 }
 error_log("import.php: CSRF OK, iniciando extraccion");
+error_log("import.php: sys_gettempdir = " . sys_gettempdir());
 
 // Extraer el ZIP en carpeta temporal
 $tempDir = sys_gettempdir() . '/trackergram_import_' . time();
+error_log("import.php: tempDir = $tempDir");
 error_log("import.php: tempDir = $tempDir");
 if (!mkdir($tempDir, 0777, true)) {
     echo json_encode(['error' => 'No se pudo crear directorio temporal']);
