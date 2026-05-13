@@ -4,6 +4,9 @@
  * Procesa archivos ZIP exportados desde Telegram y crea items en TikiWiki
  */
 
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 // Manejo de errores para evitar HTML en respuesta
 error_log("import.php: INICIO - POST size: " . ($_SERVER['CONTENT_LENGTH'] ?? 0));
 
