@@ -38,6 +38,9 @@ trackergram/
 ├── import.php           # Importación de exports de Telegram
 ├── config.php           # Configuración y variables de entorno
 ├── setup_webhook.php    # Script de configuración inicial
+├── TikiWikiClient.php   # Cliente para API de TikiWiki
+├── TelegramClient.php   # Cliente para API de Telegram
+├── MessageMapper.php    # Transformación de mensajes
 ├── .env.example         # Plantilla de variables de entorno
 ├── .env                 # Variables de entorno (creado por usuario)
 ├── .htaccess            # Configuración Apache y seguridad
@@ -46,8 +49,32 @@ trackergram/
 ├── TECHNICAL.md         # Documentación técnica
 ├── INSTALL.md           # Guía de instalación
 ├── CAMBIOS.md           # Changelog
+├── CONTEXTO.md          # Guía para nuevos integrantes
 └── roadmap.md           # Roadmap del proyecto
 ```
+
+### Arquitectura de Clientes
+
+El proyecto usa una arquitectura basada en clientes para separar responsabilidades:
+
+#### TikiWikiClient
+- `getMediaGalleryId($trackerId)` - Obtiene ID de galería de archivos del tracker
+- `uploadFile($filePath, $fileName, $galleryId)` - Sube archivo a TikiWiki
+- `createTrackerItem($trackerId, $fields)` - Crea item en tracker
+- `messageExists($trackerId, $messageId)` - Verifica si mensaje ya existe
+- `createTracker($name)` - Crea tracker con campos automáticamente
+
+#### TelegramClient
+- `getFileUrl($fileId)` - Obtiene URL de descarga de archivo de Telegram
+- `getChat($chatId)` - Obtiene información del chat
+- `downloadFile($fileUrl, $path)` - Descarga archivo a disco
+- `getFileContent($fileId)` - Descarga archivo y retorna contenido
+
+#### MessageMapper
+- `toTrackerFields($message, $context)` - Transforma mensaje a campos TikiWiki
+- `detectMessageType($message)` - Detecta tipo de mensaje y extrae info de media
+- `extractText($message)` - Extrae texto de various formatos
+- `extractDate($message)` - Convierte fecha a UNIX timestamp
 
 ## API y Webhooks
 

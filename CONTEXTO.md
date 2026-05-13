@@ -26,10 +26,11 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Su función principa
 
 ### Estado Actual
 
-- Versión: **v0.1.3** (beta funcional)
+- Versión: **v0.1.4** (beta funcional)
 - Funcionalidad principal: operativa
 - Importación ZIP: operativa pero lenta para exports grandes
 - Creación automática de trackers: parcial (tipos de campo incompletos)
+- Arquitectura: separada en clientes (TikiWikiClient, TelegramClient, MessageMapper)
 
 ---
 
@@ -39,11 +40,19 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Su función principa
 
 | Archivo | Propósito |
 |---------|-----------|
-| `api.php` | **Punto de entrada principal**. Recibe webhooks de Telegram, procesa mensajes y envía a TikiWiki. ~900 líneas - mezcla muchas responsabilidades. |
+| `api.php` | **Punto de entrada principal**. Recibe webhooks de Telegram, procesa mensajes y envía a TikiWiki. Delega a los clientes especializados. |
 | `admin.php` | **Interfaz de administración web**. Panel para configurar bot, crear trackers, importar exports, ver logs. |
 | `import.php` | **Script de importación**. Procesa archivos ZIP exportados de Telegram y crea items en TikiWiki. |
 | `config.php` | **Carga de configuración**. Lee variables de entorno y define constantes globales. |
 | `setup_webhook.php` | **Script de configuración inicial**. Configura el webhook de Telegram automáticamente. Solo ejecutable desde CLI o localhost. |
+
+### Clientes/Clases (en la raíz del proyecto)
+
+| Archivo | Propósito |
+|---------|-----------|
+| `TikiWikiClient.php` | **Cliente para TikiWiki**. Encapsula toda la comunicación con la API de TikiWiki: trackers, galleries, items. |
+| `TelegramClient.php` | **Cliente para Telegram**. Encapsula la comunicación con la API de Telegram: descarga de archivos, info de chats. |
+| `MessageMapper.php` | **Mapeador de mensajes**. Transforma mensajes de Telegram al formato de campos de TikiWiki tracker. |
 
 ### Archivos de Documentación
 

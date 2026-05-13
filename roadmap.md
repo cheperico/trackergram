@@ -3,10 +3,17 @@
 ## Estado del Proyecto
 
 - **Estado**: Activo - En desarrollo
-- **Última versión**: v0.1.3
+- **Última versión**: v0.1.4
 - **Funcionalidad principal**: Recibe webhooks de Telegram y envía mensajes directamente a TikiWiki trackers
 
 ## Pendientes
+
+### Arquitectura y Mejoras Técnicas
+
+- [x] **Separación de responsabilidades**: TikiWikiClient, TelegramClient, MessageMapper
+  - Archivos separados para mejor mantenibilidad
+  - Código más testeable y reusable
+  - Cada cliente tiene su propia responsabilidad
 
 ### Funcionalidades
 

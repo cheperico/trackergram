@@ -1,11 +1,20 @@
 <?php
 /**
  * trackerGram - Webhook endpoint para Telegram → TikiWiki
+ * 
+ * Punto de entrada para webhooks de Telegram.
+ * Usa clientes separados para mejor mantenibilidad:
+ * - TikiWikiClient: comunicación con API de TikiWiki
+ * - TelegramClient: comunicación con API de Telegram
+ * - MessageMapper: transformación de mensajes
  */
 
 require_once 'config.php';
+require_once 'TikiWikiClient.php';
+require_once 'TelegramClient.php';
+require_once 'MessageMapper.php';
 
-// Cache para el galleryId (usando variable estática en función en vez de global)
+// Cache para el galleryId (legacy - ahora se maneja en TikiWikiClient)
 $mediaGalleryIdCache = null;
 
 /**
