@@ -5,7 +5,10 @@
  */
 
 // Manejo de errores para evitar HTML en respuesta
+error_log("import.php: INICIO - POST size: " . ($_SERVER['CONTENT_LENGTH'] ?? 0));
+
 function handleError($errno, $errstr, $errfile, $errline) {
+    error_log("import.php: ERROR $errno - $errstr in $errfile:$errline");
     http_response_code(500);
     echo json_encode(['error' => "Error: $errstr"]);
     exit;
@@ -20,6 +23,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 if (!isset($_SESSION['authenticated']) || $_SESSION['authenticated'] !== true) {
+    error_log("import.php: NO AUTENTICADO");
     http_response_code(403);
     echo json_encode(['error' => 'No autenticado']);
     exit;
@@ -27,6 +31,7 @@ if (!isset($_SESSION['authenticated']) || $_SESSION['authenticated'] !== true) {
 
 // Cargar config después de verificar auth
 require_once 'config.php';
+error_log("import.php: CONFIG CARGADA");
 
 // Validar tracker ID
 $trackerId = $_POST['tracker_id'] ?? '';
