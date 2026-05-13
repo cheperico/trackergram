@@ -240,7 +240,7 @@ foreach ($messages as $i => $msg) {
     $userId = $msg['from_id'] ?? '';
     $userId = str_replace('user', '', $userId);
 
-    $date = $msg['date'] ?? '';
+    $date = is_numeric($msg['date'] ?? '') ? $msg['date'] : strtotime($msg['date'] ?? '');
 
     // Construir data
     $itemData = [
