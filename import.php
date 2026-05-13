@@ -238,7 +238,7 @@ foreach ($messages as $msg) {
         'first_name' => $firstName,
         'last_name' => $lastName,
         'message_type' => $messageType,
-        'text' => $msg['text'] ?? '',
+        'text' => is_array($msg['text'] ?? '') ? json_encode($msg['text']) : ($msg['text'] ?? ''),
         'media_caption' => $mediaCaption,
         'date' => $date,
         'file_id' => $fileId
