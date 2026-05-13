@@ -79,30 +79,10 @@ function getTopicName(int $chatId, int $messageThreadId): string
         }
     }
     
-    // Intentar con la API
-    $url = TELEGRAM_API_URL . 'getForumTopic';
-    $postFields = http_build_query([
-        'chat_id' => $chatId,
-        'message_thread_id' => $messageThreadId
-    ]);
-    
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TELEGRAM_API);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    if ($httpCode === 200) {
-        $data = json_decode($response, true);
-        if (isset($data['result']['name'])) {
-            return $data['result']['name'];
-        }
-    }
+    // No hay API en Telegram para obtener el nombre de un topic por ID
+    // (getForumTopic no existe como método Bot API)
+    // Los nombres se obtienen via reply_to_message.forum_topic_created
+    // y se cachean en topic_names.json
     
     return 'General';
 }
@@ -556,25 +536,25 @@ $message = $update['message'];
         return;
     }
 
-    $topicId = $message['message_thread_id'] ?? 'general';
+    $topicId = $message['message_thread_id'] ?? 0;
     
-    // Intentar obtener el nombre del topic desde reply_to_message (si es el mensaje de creación)
+    // Intentar obtener el nombre del topic
     $topicName = null;
     if (isset($message['reply_to_message']['forum_topic_created']['name'])) {
         $topicName = $message['reply_to_message']['forum_topic_created']['name'];
-        // Guardar en cache
         $cacheFile = __DIR__ . '/topic_names.json';
         $topics = file_exists($cacheFile) ? json_decode(file_get_contents($cacheFile), true) : [];
         $topics[$topicId] = $topicName;
         file_put_contents($cacheFile, json_encode($topics));
-    } else {
-        // Buscar en cache
+    } elseif ($topicId > 0) {
         $topicName = getTopicName($chatId, $topicId);
     }
     
-    // Si no se pudo obtener, usar ID como fallback
-    if ($topicName === 'General' && is_numeric($topicId)) {
+    // Fallback: topics conocidos o grupo sin temas
+    if ($topicId > 0 && $topicName === 'General') {
         $topicName = 'Topic-' . $topicId;
+    } elseif (!$topicName) {
+        $topicName = 'General';
     }
 
     // Determinar tipo de mensaje y extraer datos

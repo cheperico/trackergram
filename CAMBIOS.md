@@ -1,6 +1,16 @@
 # Cambios - Changelog
 
-## v0.1.3
+## v0.1.5
+- **Fix**: TypeError fatal en PHP 8.5 al pasar string `'general'` donde se esperaba `int` (`getTopicName`)
+- **Fix**: Eliminada llamada API a `getForumTopic` (no existe en Telegram Bot API)
+- **Fix**: Admin.php ya no pisa `CUSTOM_WEBHOOK_URL` al hacer "Actualizar Webhook"
+- **Fix**: Separados formularios de admin.php en secciones independientes (Telegram y TikiWiki ya no se guardan juntos)
+- **Docs**: Agregada sección "Resolución de Nombres de Topics" en TECHNICAL.md
+- **Docs**: Agregados links de referencia de APIs en CONTEXTO.md
+
+## v0.1.4
+- Refactorización: Separación de responsabilidades en clientes (TikiWikiClient, TelegramClient, MessageMapper)
+- Fix: error de integración en la refactorización (braces extraviados, código residual)
 - Importación de exports de Telegram: procesamiento de archivos ZIP exportados
 - Soporte para varios tipos de mensaje: texto, foto, video, audio, documento, sticker
 - Extracción de topics desde mensajes de tipo service (topic_created)

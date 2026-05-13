@@ -58,8 +58,8 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Su función principa
 
 | Archivo | Qué contiene | Cuándo actualizar |
 |---------|----------------|-------------------|
-| `README.md` | Guía para usuarios finales. Cómo instalar, configurar, usar. | Cuando cambia la UI o el flujo de uso |
-| `TECHNICAL.md` | Documentación técnica. Arquitectura, estructura, dependencias, decisiones de diseño. | Cuando cambia la arquitectura o se agregan features |
+| `README.md` | Guía para usuarios finales. Cómo instalar, configurar, usar. Puede tener secciones técnicas y no técnicas. | Cuando cambia la UI o el flujo de uso. |
+| `TECHNICAL.md` | **Documentación para programadores**. Explica el razonamiento detrás de las soluciones implementadas: qué problema se resolvió, por qué se hizo de cierta manera, cómo se relacionan los componentes. Un programador debería poder leerlo y entender "ah, así fue como lo resolvieron". No es una lista de funciones ni una referencia técnica. | Cuando se agrega una solución nueva, se cambia un enfoque existente, o se descubre que algo no funcionaba como se pensaba. |
 | `INSTALL.md` | Instrucciones de instalación paso a paso. | Cuando cambia el proceso de instalación |
 | `CAMBIOS.md` | Changelog. Lista de cambios por versión. | Cada release o fix significativo |
 | `roadmap.md` | Estado del proyecto y pendientes. Lista de features, bugs, mejoras pendientes. | Cuando se completa algo o se agrega pendiente |
@@ -181,6 +181,15 @@ Admin (ZIP) → import.php → Extrae ZIP → Parsea result.json → TikiWiki AP
 - El proyecto creció orgánicamente desde un script simple
 - Priorizó funcionalidad sobre arquitectura al principio
 - Ahora que está funcionando, hay deuda técnica que pagar
+
+---
+
+## Referencias de API
+
+| API | Documentación |
+|-----|---------------|
+| **Telegram Bot API** | [https://core.telegram.org/bots/api](https://core.telegram.org/bots/api) |
+| **TikiWiki API (chela.org.ar)** | [https://wiki.chela.org.ar/api/](https://wiki.chela.org.ar/api/) |
 
 ---
 

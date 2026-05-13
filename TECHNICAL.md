@@ -129,7 +129,7 @@ X-Telegram-Bot-Api-Secret-Token: <secret_token_configurado>
 | `telegrammessageChatId` | `message.chat.id` | Integer |
 | `telegrammessageChatTitle` | `message.chat.title` o `username` | String |
 | `telegrammessageTopicId` | `message.message_thread_id` | Integer/String |
-| `telegrammessageTopicTitle` | Hardcoded "General" | String |
+| `telegrammessageTopicTitle` | Cache local + fallback (ver sección "Resolución de Nombres de Topics") | String |
 | `telegrammessageUserId` | `message.from.id` | Integer |
 | `telegrammessageUsername` | `message.from.username` | String |
 | `telegrammessageFirstName` | `message.from.first_name` | String |
@@ -214,6 +214,30 @@ DEBUG_MODE=false
     Header set Referrer-Policy "strict-origin-when-cross-origin"
 </IfModule>
 ```
+
+## Resolución de Nombres de Topics (Forums)
+
+### El problema
+
+En grupos de Telegram con temas (forums), cada mensaje pertenece a un topic identificado por `message_thread_id`. El webhook recibe este ID pero **no** el nombre del topic. Telegram Bot API no tiene un método `getForumTopic` para obtener el nombre a partir del ID.
+
+### La solución
+
+Se usan tres mecanismos en orden de prioridad:
+
+1. **`reply_to_message.forum_topic_created.name`** — Cuando un mensaje responde al mensaje de creación de un topic (el service message `forum_topic_created`), Telegram incluye el nombre del topic en `reply_to_message`. Esto permite capturar el nombre exacto sin llamar a ninguna API.
+
+2. **Cache local (`topic_names.json`)** — Cuando se detecta un `forum_topic_created`, el nombre se guarda en un archivo JSON con el `message_thread_id` como clave. Los mensajes posteriores en el mismo topic leen el nombre desde esta cache sin necesidad de repetir el paso 1.
+
+3. **Fallback** — Si no se pudo obtener el nombre por ninguno de los mecanismos anteriores:
+   - Si hay un `message_thread_id` numérico (grupo con temas): se usa `'Topic-XX'` como identificador
+   - Si no hay `message_thread_id` (grupo sin temas): se usa `'General'`, que es el nombre por defecto
+
+### Nota
+
+`getForumTopic` no existe como método de la Telegram Bot API. Cualquier intento de usarlo fallará silenciosamente. La resolución de nombres depende exclusivamente de los mensajes de creación de topics y la cache local.
+
+---
 
 ## Procesamiento de Mensajes
 
