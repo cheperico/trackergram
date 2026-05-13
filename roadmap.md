@@ -10,17 +10,11 @@
 
 ### Funcionalidades
 
-- [x] **Creación automática de tracker**: Crear tracker con campos via API de TikiWiki
-  - Panel admin: crear nuevo tracker con nombre → genera campos automáticamente
-  - Tipos de campo TikiWiki: `t` (text), `a` (textarea), `n` (numeric), `f` (datetime), `D` (dropdown+other), `FG` (files), `G` (location)
-  - Campos del tracker:
-    - `t` (position 0-180) - Telegram Message ID, Chat ID, Chat Title, Topic ID, Topic Title, User ID, Username, First Name, Last Name, Media URL, File URL, Media Type, Media Caption
-    - `f` (position 50) - Message Date (fecha y hora)
-    - `D` (position 100) - Message Type con opciones: text, photo, video, audio, document, sticker, voice, video_note, system
-    - `a` (position 110) - Text
-    - `FG` (position 120) - Media (archivos, requiere galleryId en opciones)
-    - `n` (position 160) - Media Size
-    - `G` (position 180) - Location (ubicación geográfica)
+- [~] **Creación automática de tracker**: Parcialmente implementado
+   - Panel admin: crear nuevo tracker con nombre → genera campos automáticamente
+   - Tipos de campo: implementación básica (no todos los tipos documentados)
+   - Pendiente: corregir tipos de campo (FG, G, D) y valores por defecto
+   - Pendiente: conectar correctamente la UI de "Crear Tracker" en admin.php
 - [ ] **Sistema de etiquetas**: Extraer hashtags (#etiqueta) de mensajes de Telegram y guardarlos en campo del tracker para conectar con el sistema de tags de TikiWiki
 - [x] **Importar export de Telegram**: Importar conversaciones desde JSON exportado de Telegram
    - Implementado: procesamiento por upload ZIP
@@ -30,8 +24,10 @@
 
 ### Seguridad
 
-- [x] ~~Deduplicación: ahora filtra por message_id específico~~ ✅
+- [ ] **Deduplicación por (chat_id, message_id)**: Actualmente filtra solo por message_id - puede fallar entre diferentes chats
+  - [x] ~~Deduplicación básica~~ ✅ Parcialmente implementado
 - [x] ~~checkAuth() antes de procesar acciones mutantes~~ ✅
+- [x] ~~Validación CSRF en import.php~~ ✅ Agregado en v0.1.3
 - [x] ~~setup_webhook.php protegido (solo CLI/localhost)~~ ✅
 - [x] ~~TELEGRAM_WEBHOOK_SECRET obligatorio con hash_equals()~~ ✅
 - [x] ~~Logs de debug condicionados por DEBUG_MODE~~ ✅
@@ -43,9 +39,6 @@
 - [ ] **Límite de tamaño de archivos**: Evitar DoS por archivos grandes (descarga completa en memoria)
 - [ ] **ALLOWED_CHAT_IDS por defecto**: No aceptar todos los chats, permitir solo los autorizados
 - [ ] **display_errors=0 en admin**: Apagar errores visibles en producción
-
-### Seguridad
-
 - [ ] **Rate limiting webhook**: Para prevenir abuso del endpoint (importante para producción)
 - [ ] **Logging de accesos no autorizados**: Registrar intentos de acceso fallidos
 - [ ] **IP whitelisting para admin**: Restringir acceso a interfaz administrativa por IP
