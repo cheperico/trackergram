@@ -77,6 +77,7 @@ if (!isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $cs
     echo json_encode(['error' => 'Token CSRF inválido']);
     exit;
 }
+error_log("import.php: CSRF OK, iniciando extraccion");
 
 // Extraer el ZIP en carpeta temporal
 $tempDir = sys_gettempdir() . '/trackergram_import_' . time();
