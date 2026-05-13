@@ -1,5 +1,15 @@
 # Cambios - Changelog
 
+## v0.1.3
+- Importación de exports de Telegram: procesamiento de archivos ZIP exportados
+- Soporte para varios tipos de mensaje: texto, foto, video, audio, documento, sticker
+- Extracción de topics desde mensajes de tipo service (topic_created)
+- Subida de archivos multimedia a TikiWiki durante importación
+- Fix: conversion de fecha a UNIX timestamp para TikiWiki API
+- Fix: manejo de texto como array (formatos complejos de Telegram)
+- Fix: limpiar directorios recursivamente al finalizar importación
+- Fix: usar file_name y media_type para detectar tipo de archivo correctamente
+
 ## v0.1.2
 - Creación automática de tracker con campos via API de TikiWiki
 - Interfaz reorganizada con índice y secciones (tracker en directo, importación)

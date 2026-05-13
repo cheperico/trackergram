@@ -27,6 +27,7 @@ Telegram Bot → Webhook (api.php) → Procesamiento → TikiWiki API → Tracke
   - `json` (para procesar webhooks de Telegram)
   - `mbstring` (para manejo de strings)
   - `session` (para administración)
+  - `zip` (para importar exports de Telegram)
 
 ### Estructura de Archivos
 
