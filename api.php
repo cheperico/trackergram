@@ -143,43 +143,6 @@ function uploadToTikiWiki(string $filePath, string $fileName, ?string $mimeType 
     $galleryId = getCachedMediaGalleryId() ?? TikiWikiClient::getMediaGalleryId() ?? 29;
     return TikiWikiClient::uploadFile($filePath, $fileName, $galleryId);
 }
-    curl_setopt($ch, CURLOPT_URL, $uploadUrl);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "Authorization: Bearer " . TIKIWIKI_TOKEN,
-        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    ]);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TIKIWIKI_UPLOAD);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
-    
-    $response = curl_exec($ch);
-    $error = curl_error($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    if ($httpCode !== 200 && $httpCode !== 201) {
-        error_log("trackerGram: ERROR uploading file: HTTP $httpCode, Response: $response");
-        return false;
-    }
-    
-    $responseData = json_decode($response, true);
-    if (!$responseData) {
-        error_log("trackerGram: ERROR: Response is not valid JSON: $response");
-        return false;
-    }
-    
-    $fileId = $responseData['fileId'] ?? $responseData['file_id'] ?? null;
-    
-    if ($fileId) {
-        error_log("trackerGram: File uploaded to TikiWiki gallery, fileId: $fileId");
-        return $fileId;
-    }
-    
-    error_log("trackerGram: ERROR: No fileId in response: " . json_encode($responseData));
-    return false;
-}
 
 /**
  * Descargar archivo de Telegram y subir a TikiWiki
