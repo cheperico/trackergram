@@ -428,6 +428,32 @@ El sistema mapea automáticamente los campos de Telegram a los campos del tracke
 - **Browser DevTools**: Para interfaz admin
 - **Logs del servidor**: Para problemas de red
 
+## Lecciones Aprendidas (Bugs y Fixes)
+
+### TypeError en getTopicName (v0.1.5)
+
+**Problema**: En grupos de Telegram sin temas (sin `message_thread_id`), `$topicId` quedaba como el string `'general'`. Este string se pasaba a `getTopicName(int $messageThreadId)`, que espera `int`. En PHP 8.5, un string no-numérico como `'general'` no se puede coercionar a `int` y lanza TypeError fatal, deteniendo todo el webhook.
+
+**Fix**: Cambiar el default de `$topicId` a `0` (int) y solo llamar a `getTopicName()` cuando `$topicId > 0`. Cuando no hay thread_id, el nombre del topic es simplemente `'General'`.
+
+### CUSTOM_WEBHOOK_URL pisada por admin.php (v0.1.5)
+
+**Problema**: El botón "Actualizar Webhook" en admin.php generaba la URL automáticamente (usando `$_SERVER['HTTP_HOST']`) y la guardaba en `.env` pisando `CUSTOM_WEBHOOK_URL`. Esto hacía que una URL auto-detectada incorrecta reemplazara a la URL personalizada que funcionaba.
+
+**Fix**: El botón ahora usa `CUSTOM_WEBHOOK_URL` si está configurada en `.env`, y solo usa la auto-detección como fallback. Ya no modifica el `.env`.
+
+### Formularios mezclados en admin.php (v0.1.5)
+
+**Problema**: La sección 1 (Configuración de Telegram) y la sección 3 (Tracker en directo) compartían el mismo `action=save_config`, que guardaba todas las variables del `.env` juntas. Cambiar el tracker ID en sección 3 requería re-enviar (y potencialmente pisar) los valores de Telegram, y viceversa.
+
+**Fix**: Cada sección ahora tiene su propio action (`save_telegram`, `save_tikiwiki`) y solo guarda los campos que le corresponden.
+
+### getForumTopic no existe en Telegram Bot API (v0.1.5)
+
+Ver sección "Resolución de Nombres de Topics (Forums)" más arriba.
+
+---
+
 ## Versiones y Cambios
 
 ### v0.1.2 (Beta) - Actual
