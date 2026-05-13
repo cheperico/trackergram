@@ -89,10 +89,10 @@ if (!isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $cs
     exit;
 }
 error_log("import.php: CSRF OK, iniciando extraccion");
-error_log("import.php: sys_gettempdir = " . sys_gettempdir());
+error_log("import.php: sys_get_temp_dir = " . sys_get_temp_dir());
 
 // Extraer el ZIP en carpeta temporal
-$tempDir = sys_gettempdir() . '/trackergram_import_' . time();
+$tempDir = sys_get_temp_dir() . '/trackergram_import_' . time();
 error_log("import.php: tempDir = $tempDir");
 error_log("import.php: tempDir = $tempDir");
 if (!mkdir($tempDir, 0777, true)) {
