@@ -3,7 +3,7 @@
 ## Estado del Proyecto
 
 - **Estado**: Activo - En desarrollo
-- **Última versión**: v0.1.5
+- **Última versión**: v0.1.6
 - **Funcionalidad principal**: Recibe webhooks de Telegram y envía mensajes directamente a TikiWiki trackers
 
 ## Pendientes
@@ -14,24 +14,24 @@
 - [x] ~~checkAuth() antes de procesar acciones mutantes~~ ✅
 - [x] ~~Validación CSRF en import.php~~ ✅
 - [x] ~~setup_webhook.php protegido (solo CLI/localhost)~~ ✅
-- [ ] **Hash de contraseña admin**: Usar password_hash()/password_verify() en vez de comparación en claro
-- [ ] **Path Traversal en ZIP**: Validar nombres de archivos al extraer ZIPs subidos por usuarios
-- [ ] **Limitar tamaño de descarga de media**: Descargas en chunks en lugar de cargar todo en memoria
-- [ ] **display_errors=0 en admin**: Apagar errores visibles en producción
+- [x] ~~**Hash de contraseña admin**: Usar password_hash()/password_verify() en vez de comparación en claro~~ ✅
+- [x] ~~**Path Traversal en ZIP**: Validar nombres de archivos al extraer ZIPs subidos por usuarios~~ ✅
+- [x] ~~**Limitar tamaño de descarga de media**: Descargas en chunks en lugar de cargar todo en memoria~~ ✅
+- [x] ~~**display_errors=0 en admin**: Apagar errores visibles en producción~~ ✅
 
 ### Seguridad - Prioridad Media
 
-- [ ] **Deduplicación por (chat_id, message_id)**: Actualmente filtra solo por message_id
-- [ ] **ALLOWED_CHAT_IDS por defecto**: No aceptar todos los chats, permitir solo los autorizados
-- [ ] **No guardar URLs con token**: Descargar media via proxy o usar token limitado
-- [ ] **Rate limiting webhook**: Para prevenir abuso del endpoint
+- [x] ~~**Deduplicación por (chat_id, message_id)**: Actualmente filtra solo por message_id~~ ✅
+- [x] ~~**ALLOWED_CHAT_IDS por defecto**: No aceptar todos los chats, permitir solo los autorizados~~ ✅
+- [x] ~~**No guardar URLs con token**: Descargar media via proxy o usar token limitado~~ ✅
+- [x] ~~**Rate limiting webhook**: Para prevenir abuso del endpoint~~ ✅
 
 ### Arquitectura - Mejoras Técnicas
 
 - [x] **Separación de responsabilidades**: TikiWikiClient, TelegramClient, MessageMapper ✅
-- [ ] **Integrar MessageMapper completamente**: Unificar transformación de mensajes en MessageMapper
-- [ ] **Refactorizar api.php**: Extraer processUpdate y sendToTikiWiki a clientes
-- [ ] **Manejo de errores consistente**: Estandarizar retornos (excepciones en vez de null/false mixtos)
+- [x] ~~**Integrar MessageMapper completamente**: Unificar transformación de mensajes en MessageMapper~~ ✅ (toWikiFields + createTrackerItem)
+- [x] ~~**Refactorizar api.php**: Extraer processUpdate y sendToTikiWiki a clientes~~ ✅ (sendToTikiWiki delegado, processUpdate pendiente)
+- [x] ~~**Manejo de errores consistente**: Estandarizar retornos (excepciones en vez de null/false mixtos)~~ ✅
 
 ### Funcionalidades
 
@@ -39,6 +39,25 @@
    - Pendiente: corregir tipos de campo (FG, G, D) y valores por defecto
    - Pendiente: conectar correctamente la UI de "Crear Tracker" en admin.php
 - [x] **Importar export de Telegram**: Implementado (pendiente optimizar para exports grandes)
+
+### Service Messages (Eventos del Grupo)
+| Evento | Webhook | Import |
+|--------|---------|--------|
+| `forum_topic_created` / `action: topic_created` | ✅ | ✅ |
+| `forum_topic_edited` / `action: topic_edit` | ✅ | ✅ |
+| `forum_topic_closed/reopened` | ✅ | ✅ |
+| `new_chat_members` / `action: invite_members` | ✅ | ✅ |
+| `left_chat_member` / `action: left` | ✅ | ✅ |
+| `pinned_message` / `action: pin_message` | ✅ | ✅ |
+| `group_chat_created` / `supergroup_chat_created` | ✅ | ⬜ |
+| `action: remove_members` | ⬜ | ✅ |
+| `action: joined` | ⬜ | ✅ |
+| `action: title_edit` | ⬜ | ✅ |
+| `action: photo_edit` / `photo_delete` | ⬜ | ⬜ |
+| `message_reaction` / `message_reaction_count` | ⬜ | ⬜ |
+
+- [ ] **Reacciones a mensajes**: Procesar updates de tipo `message_reaction` y `message_reaction_count`
+- [ ] **Service messages faltantes**: `photo_edit`, `photo_delete` en webhook e import
 - [ ] **Sistema de etiquetas**: Extraer hashtags de mensajes
 - [ ] **Mensajes estructurados con prefijos**: Detectar y parsear mensajes con prefijos especiales que contienen datos estructurados
   - Ejemplo: "📍GPS fabian.ciclista 34.051628,-118.240126,14.3" → extrae "fabian.ciclista" como nombre/usuario y coordenadas al campo ubicación
@@ -53,8 +72,8 @@
 
 ### Bugs
 
-- [ ] **Manejo inconsistente de errores**: api.php tiene funciones que retornan null, otras retornan false
-- [ ] **Código duplicado**: Detección de protocolo y construcción de URL del webhook duplicada en admin.php
+- [x] ~~**Manejo inconsistente de errores**: api.php tiene funciones que retornan null, otras retornan false~~ ✅
+- [x] ~~**Código duplicado**: Detección de protocolo y construcción de URL del webhook duplicada en admin.php~~ ✅
 - [x] ~~**Fix api.php line 298**: Log message has incorrect spacing~~ ✅ Corregido
 - [x] ~~**Fix api.php line 278**: media_url assigned to both media_url and file_url fields unintentionally~~ ✅ Corregido
 - [x] ~~**Fix api.php line 299**: Remove or fix sleep(1) in retry loop~~ ✅ Corregido - ahora usa usleep
