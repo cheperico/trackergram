@@ -4,9 +4,11 @@
  * Permite configurar credenciales y actualizar el webhook de Telegram
  */
 
-// Habilitar visualización de errores para diagnóstico
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+// Mostrar errores solo si DEBUG_MODE está activo
+if (defined('DEBUG_MODE') && DEBUG_MODE) {
+    error_reporting(E_ALL);
+    ini_set('display_errors', 1);
+}
 
 // Configuración segura de sesión
 ini_set('session.cookie_httponly', 1);
@@ -195,17 +197,54 @@ function checkAuth() {
 
     if (!isset($_SESSION['authenticated'])) {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_username']) && isset($_POST['login_password'])) {
-            // Verificar rate limit antes de procesar login
             checkRateLimit();
             
-            if ($_POST['login_username'] === $username && $_POST['login_password'] === $password) {
-                $_SESSION['authenticated'] = true;
-                resetFailedLogin(); // Resetear contador en login exitoso
-                return true;
-            } else {
-                incrementFailedLogin(); // Incrementar contador en login fallido
-                return false;
+            if ($_POST['login_username'] === $username) {
+                $loginOk = false;
+                
+                // Si la contraseña almacenada es un hash bcrypt, usar password_verify
+                if (str_starts_with($password, '$2y$')) {
+                    $loginOk = password_verify($_POST['login_password'], $password);
+                } else {
+                    // Compatibilidad hacia atrás: comparación en texto plano
+                    $loginOk = $_POST['login_password'] === $password;
+                    // Si es correcta, re-guardar como hash
+                    if ($loginOk) {
+                        $env = loadEnvFromFile();
+                        $env['ADMIN_PASSWORD'] = password_hash($_POST['login_password'], PASSWORD_BCRYPT);
+                        saveEnv($env);
+    }
+}
+
+// Procesar cambio de contraseña
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'change_password') {
+    validateCSRFToken($_POST['csrf_token'] ?? '');
+    
+    $newPassword = trim($_POST['admin_password'] ?? '');
+    if (strlen($newPassword) < 8) {
+        $error = "La contraseña debe tener al menos 8 caracteres";
+    } else {
+        $env = loadEnvFromFile();
+        $env['ADMIN_PASSWORD'] = password_hash($newPassword, PASSWORD_BCRYPT);
+        if (saveEnv($env)) {
+            $success = "Contraseña cambiada exitosamente";
+        } else {
+            $error = "Error al guardar la nueva contraseña";
+        }
+    }
+}
+                
+                if ($loginOk) {
+                    $_SESSION['authenticated'] = true;
+                    resetFailedLogin();
+                    return true;
+                } else {
+                    incrementFailedLogin();
+                    return false;
+                }
             }
+            incrementFailedLogin();
+            return false;
         }
         return false;
     }
@@ -392,8 +431,7 @@ if (!checkAuth()) {
         <li><a href="#config-general">1. Configuración general</a></li>
         <li><a href="#tracker-importar">2. Importar conversaciones</a></li>
         <li><a href="#tracker-webhook">3. Tracker que recibe el webhook</a></li>
-        <li><a href="#webhook">4. Webhook de Telegram</a></li>
-        <li><a href="#crear-tracker">5. Crear Tracker en TikiWiki</a></li>
+        <li><a href="#crear-tracker">4. Crear Tracker en TikiWiki</a></li>
     </ul>
     
     <h2 id="config-general">1. Configuración general</h2>
@@ -413,7 +451,7 @@ if (!checkAuth()) {
         <button type="button" onclick="this.previousElementSibling.type = this.previousElementSibling.type === 'password' ? 'text' : 'password'">👁</button>
         <br><br>
         
-        <label>Custom Webhook URL (opcional):</label><br>
+        <label>Custom Webhook URL <small>(solo si la auto-detectada no funciona)</small>:</label><br>
         <input type="text" name="custom_webhook_url" value="<?php echo htmlspecialchars($config['custom_webhook_url'] ?? ''); ?>" size="50" placeholder="https://ejemplo.com/api.php"><br><br>
         
         <h3>TikiWiki</h3>
@@ -426,6 +464,37 @@ if (!checkAuth()) {
         <br><br>
         
         <button type="submit">Guardar Configuración General</button>
+    </form>
+    
+    <h3>Cambiar contraseña de admin</h3>
+    <form method="post">
+        <input type="hidden" name="action" value="change_password">
+        <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+        
+        <label>Nueva contraseña:</label><br>
+        <input type="password" name="admin_password" required minlength="8" size="30">
+        <br><br>
+        
+        <button type="submit">Cambiar Contraseña</button>
+    </form>
+    
+    <h3>Webhook</h3>
+    <p>URL del webhook: 
+        <?php
+        $detectedUrl = generateWebhookUrl();
+        $customUrl = $env['CUSTOM_WEBHOOK_URL'] ?? '';
+        $webhookUrl = !empty($customUrl) ? $customUrl : $detectedUrl;
+        echo htmlspecialchars($webhookUrl);
+        ?>
+        <?php if (!empty($customUrl)): ?>
+            <br><small>(CUSTOM_WEBHOOK_URL en .env sobreescribe la auto-detectada: <?php echo htmlspecialchars($detectedUrl); ?>)</small>
+        <?php endif; ?>
+    </p>
+    <form method="post">
+        <input type="hidden" name="action" value="update_webhook">
+        <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+        
+        <button type="submit">Actualizar Webhook</button>
     </form>
     
     <h2 id="tracker-importar">2. Importar conversaciones <span style="color: orange; font-size: 0.8em;">(funcionalidad en desarrollo)</span></h2>
@@ -502,23 +571,6 @@ if (!checkAuth()) {
         <br><br>
         
         <button type="submit">Guardar Tracker</button>
-    </form>
-    
-    <h2 id="webhook">4. Webhook de Telegram <span style="color: orange; font-size: 0.8em;">(funcionalidad en desarrollo)</span></h2>
-    <p>URL que se usará: 
-        <?php
-        $customUrl = $env['CUSTOM_WEBHOOK_URL'] ?? '';
-        echo htmlspecialchars(!empty($customUrl) ? $customUrl : generateWebhookUrl());
-        ?>
-        <?php if (!empty($customUrl)): ?>
-            <br><small>(desde CUSTOM_WEBHOOK_URL en .env)</small>
-        <?php endif; ?>
-    </p>
-    <form method="post">
-        <input type="hidden" name="action" value="update_webhook">
-        <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-        
-        <button type="submit">Actualizar Webhook</button>
     </form>
     
     <!-- Sección de importación movida arriba -->

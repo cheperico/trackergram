@@ -66,6 +66,9 @@ define('TIMEOUT_TIKIWIKI_UPLOAD', 30);
 define('RETRY_MAX_ATTEMPTS', 2);
 define('RETRY_DELAY_MICROSECONDS', 100000); // 0.1 segundos
 
+// Límite de descarga de media (20 MB)
+define('MEDIA_DOWNLOAD_MAX_SIZE', 20 * 1024 * 1024);
+
 // Configuración de caché
 define('CACHE_ENABLED', true);
 

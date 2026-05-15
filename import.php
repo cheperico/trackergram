@@ -4,8 +4,8 @@
  * Procesa archivos ZIP exportados desde Telegram y crea items en TikiWiki
  */
 
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
+ini_set('display_errors', 0);
+error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE);
 ini_set('memory_limit', '512M');
 set_time_limit(300);
 
@@ -108,6 +108,24 @@ $zip = new ZipArchive();
 if ($zip->open($file['tmp_name']) !== true) {
     rmdir($tempDir);
     echo json_encode(['error' => 'No se pudo abrir el archivo ZIP']);
+    exit;
+}
+
+// Validar que ningún archivo del ZIP intente path traversal
+$safeExtract = true;
+for ($i = 0; $i < $zip->numEntries; $i++) {
+    $entryName = $zip->getNameIndex($i);
+    // Rechazar nombres con ".." o rutas absolutas
+    if (strpos($entryName, '..') !== false || str_starts_with($entryName, '/')) {
+        $safeExtract = false;
+        break;
+    }
+}
+
+if (!$safeExtract) {
+    $zip->close();
+    rrmdir($tempDir);
+    echo json_encode(['error' => 'El archivo ZIP contiene rutas no válidas']);
     exit;
 }
 

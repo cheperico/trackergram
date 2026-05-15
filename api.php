@@ -130,16 +130,43 @@ function uploadToTikiWiki(string $filePath, string $fileName, ?string $mimeType 
  */
 function downloadAndUploadMedia(string $fileId, ?string $fileName = null, ?string $mimeType = null): ?string
 {
-    // Descargar archivo usando TelegramClient
-    $fileContent = TelegramClient::getFileContent($fileId);
-    if ($fileContent === null) {
-        error_log("trackerGram: Cannot download file from Telegram: $fileId");
+    // Obtener URL de descarga
+    $fileUrl = TelegramClient::getFileUrl($fileId);
+    if (!$fileUrl) {
+        error_log("trackerGram: Cannot get download URL for file: $fileId");
         return null;
     }
     
-    // Guardar en archivo temporal
+    // Obtener tamaño del archivo (HEAD request)
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $fileUrl);
+    curl_setopt($ch, CURLOPT_NOBODY, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TELEGRAM_API);
+    curl_exec($ch);
+    $contentLength = curl_getinfo($ch, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
+    curl_close($ch);
+    
+    if ($contentLength > MEDIA_DOWNLOAD_MAX_SIZE) {
+        error_log("trackerGram: File too large ($contentLength bytes) for file_id: $fileId");
+        return null;
+    }
+    
+    // Descargar directamente a archivo temporal (sin cargar en memoria)
     $tempFile = tempnam(sys_get_temp_dir(), 'tg_media_');
-    if (file_put_contents($tempFile, $fileContent) === false) {
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $fileUrl);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_FILE, fopen($tempFile, 'wb'));
+    curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TELEGRAM_DOWNLOAD);
+    curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    
+    if ($httpCode !== 200) {
+        error_log("trackerGram: Cannot download file from Telegram: $fileId (HTTP $httpCode)");
+        unlink($tempFile);
         return null;
     }
     
