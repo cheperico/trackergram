@@ -63,7 +63,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Su función principa
 | `INSTALL.md` | Instrucciones de instalación paso a paso. | Cuando cambia el proceso de instalación |
 | `CAMBIOS.md` | Changelog. Lista de cambios por versión. | Cada release o fix significativo |
 | `roadmap.md` | Estado del proyecto y pendientes. Lista de features, bugs, mejoras pendientes. | Cuando se completa algo o se agrega pendiente |
-| `CONTEXTO.md` | **Este archivo**. Guía de entrada para nuevos miembros. | Cuando cambia la estructura o visión del proyecto |
+| `CONTEXTO.md` | **Este archivo**. Guía de entrada para nuevos miembros: visión general, cómo está organizado el proyecto, y referencias a fuentes de información (documentación de APIs, links útiles, etc.). | Cuando cambia la estructura o visión del proyecto, o se agregan nuevas referencias externas. |
 
 ### Archivos de Configuración
 
