@@ -576,7 +576,7 @@ if (!checkAuth()) {
     
     <!-- Sección de importación movida arriba -->
     
-    <h2 id="crear-tracker">5. Crear Tracker en TikiWiki <span style="color: orange; font-size: 0.8em;">(funcionalidad en desarrollo)</span></h2>
+    <h2 id="crear-tracker">4. Crear Tracker en TikiWiki <span style="color: orange; font-size: 0.8em;">(funcionalidad en desarrollo)</span></h2>
     
     <form method="post">
         <input type="hidden" name="action" value="create_tracker">
