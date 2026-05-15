@@ -497,8 +497,9 @@ if (!checkAuth()) {
         <button type="submit">Actualizar Webhook</button>
     </form>
     
-    <h2 id="tracker-importar">2. Importar conversaciones <span style="color: orange; font-size: 0.8em;">(funcionalidad en desarrollo)</span></h2>
+    <h2 id="tracker-importar">2. Importar conversaciones</h2>
     <p>Importar conversaciones desde archivos ZIP exportados de Telegram. Los archivos (fotos, stickers, videos) se subirán a la file gallery del tracker.</p>
+    <p><small>Límites: ZIP de hasta 50MB | Archivos multimedia individuales de hasta 20MB</small></p>
     
     <form id="import-form" enctype="multipart/form-data">
         <input type="hidden" name="action" value="import">
