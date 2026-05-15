@@ -26,9 +26,9 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Su función principa
 
 ### Estado Actual
 
-- Versión: **v0.1.4** (beta funcional)
+- Versión: **v0.1.6** (beta funcional)
 - Funcionalidad principal: operativa
-- Importación ZIP: operativa pero lenta para exports grandes
+- Importación ZIP: operativa, optimizada con índice de archivos y descarga en chunks
 - Creación automática de trackers: parcial (tipos de campo incompletos)
 - Arquitectura: separada en clientes (TikiWikiClient, TelegramClient, MessageMapper)
 
@@ -118,26 +118,32 @@ Admin (ZIP) → import.php → Extrae ZIP → Parsea result.json → TikiWiki AP
 
 - Webhook endpoint para Telegram
 - Envío de mensajes a TikiWiki trackers
-- Soporte para múltiples tipos de mensaje (texto, foto, video, audio, documento, sticker, ubicación, contacto)
-- Deduplicación de mensajes (por message_id)
-- Importación de exports ZIP
-- Subida de archivos multimedia a TikiWiki galleries
-- Panel de administración web
+- Soporte para múltiples tipos de mensaje (texto, foto, video, audio, documento, sticker, ubicación, contacto, encuesta, animación)
+- Service messages del grupo (miembros que entran/salen, topics creados/renombrados, mensajes fijados)
+- Deduplicación de mensajes por (chat_id, message_id)
+- Importación de exports ZIP con índice de archivos
+- Subida de archivos multimedia a TikiWiki galleries (descarga en chunks, límite 20MB)
+- Panel de administración web con secciones independientes
 - CSRF protection en formularios
+- Hash de contraseña admin con bcrypt
+- Rate limiting en webhook y login
+- ALLOWED_CHAT_IDS configurable desde .env
+- Los tokens de Telegram ya no se guardan en TikiWiki
+- Path traversal prevention en extracción de ZIP
 
 ### ⚠️ Parcial
 
 - **Creación automática de trackers**: Crea el tracker pero los tipos de campo no son exactamente los documentados (FG, G, D)
-- **Importación**: Funciona pero es lenta (~2 min para 27 mensajes)
+- **Importación**: Funciona pero exports muy grandes (>1GB) pueden requerir procesamiento asíncrono
+- **Refactorización**: sendToTikiWiki delegado a clientes, processUpdate aún tiene lógica de orquestación
 
-### ❌ Pendiente
+### ❌ Pendiente (ver roadmap.md para detalle)
 
-- Deduplicación por (chat_id + message_id)
-- display_errors=0 en producción
-- Password hashing para admin
-- Rate limiting
-- ALLOWED_CHAT_IDS por defecto
-- Optimización de importación para exports grandes
+- Reacciones a mensajes (message_reaction)
+- Service messages: photo_edit, photo_delete
+- Mensajes editados/borrados (edited_message)
+- Sistema de etiquetas (hashtags)
+- Mensajes estructurados con prefijos (GPS, alertas)
 
 ---
 
@@ -147,9 +153,30 @@ Admin (ZIP) → import.php → Extrae ZIP → Parsea result.json → TikiWiki AP
 
 1. **Leer este archivo** (contexto.md)
 2. **Leer README.md** para entender el uso
-3. **Leer TECHNICAL.md** para entender la arquitectura
-4. **Ejecutar setup_webhook.php** para ver el sistema en acción
-5. **Revisar roadmap.md** para ver qué hay pendiente
+3. **Leer TECHNICAL.md** para entender el razonamiento detrás de las soluciones
+4. **Revisar roadmap.md** para ver qué hay pendiente
+
+### Por dónde empezar a leer el código
+
+Si querés entender el flujo completo, seguí este orden:
+
+1. **`api.php`** desde la línea 615 hacia abajo — es el punto de entrada del webhook. Ahí se recibe el POST de Telegram y se llama a `processUpdate()`.
+2. **`api.php::processUpdate()`** (línea 492) — orquesta todo: valida el mensaje, resuelve el topic, chequea duplicados, envía a TikiWiki.
+3. **`api.php::extractMessageData()`** (línea 158) — parsea el mensaje de Telegram y clasifica su tipo (texto, foto, video, etc.).
+4. **`TikiWikiClient.php`** — cómo se comunica con TikiWiki.
+5. **`TelegramClient.php`** — cómo se comunica con Telegram.
+6. **`MessageMapper.php`** — cómo se transforman los datos entre formatos.
+7. **`import.php`** — el flujo de importación de exports ZIP.
+
+### Entorno de desarrollo local
+
+El proyecto corre en PHP 8.0+ con extensiones `curl`, `json`, `mbstring`, `session` y `zip`. Para probar localmente:
+
+```bash
+php -S localhost:8000
+```
+
+Y configurar un túnel con ngrok o similar para recibir webhooks de Telegram. Ver `INSTALL.md` para la configuración completa.
 
 ### Dónde buscar ayuda
 
@@ -171,10 +198,10 @@ Admin (ZIP) → import.php → Extrae ZIP → Parsea result.json → TikiWiki AP
 
 ### Problemas conocidos (técnico)
 
-- `api.php` tiene ~900 líneas y mezcla muchas responsabilidades
-- Falta refactorización para separar en módulos (TelegramClient, TikiWikiClient, etc.)
-- Algunos tipos de campo en creación automática de tracker no coinciden con documentación
-- Deduplicación actual solo por message_id (no considera chat_id)
+- `api.php` tiene ~620 líneas y `processUpdate()` sigue siendo una función monolítica que mezcla validación, deduplicación, reintentos y orquestación
+- Las clases cliente usan métodos estáticos — no hay inyección de dependencias, lo que dificulta el testing unitario
+- Algunos tipos de campo en creación automática de tracker no coinciden con documentación (FG, G, D)
+- `importItemToTikiWiki` e `import.php` comparten lógica con `api.php` pero con formatos de entrada diferentes
 
 ### Por qué está así
 
