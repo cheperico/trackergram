@@ -430,7 +430,7 @@ if (!checkAuth()) {
     <ul>
         <li><a href="#config-general">1. Configuración general</a></li>
         <li><a href="#tracker-importar">2. Importar conversaciones</a></li>
-        <li><a href="#tracker-webhook">3. Tracker que recibe el webhook</a></li>
+        <li><a href="#tracker-webhook">3. Tracker en directo (recibe el webhook)</a></li>
         <li><a href="#crear-tracker">4. Crear Tracker en TikiWiki</a></li>
     </ul>
     
@@ -561,7 +561,7 @@ if (!checkAuth()) {
     }
     </script>
     
-    <h2 id="tracker-webhook">3. Tracker que recibe el webhook</h2>
+    <h2 id="tracker-webhook">3. Tracker en directo (recibe el webhook)</h2>
     <p>ID del tracker de TikiWiki donde se enviarán los mensajes en vivo desde Telegram.</p>
     <form method="post">
         <input type="hidden" name="action" value="save_tracker">
