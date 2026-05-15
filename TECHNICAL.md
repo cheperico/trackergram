@@ -303,7 +303,27 @@ Se usan tres mecanismos en orden de prioridad:
 | Encuesta | `message.poll` | Pregunta y opciones |
 | Animation | `message.animation` | Tipo de archivo |
 | Sistema | `message.forum_topic_*` | Texto descriptivo |
-| No soportado | (otros) | Muestra tipo de mensaje |
+
+### Service Messages (Eventos del Grupo)
+
+TrackerGram procesa eventos del grupo como items en el tracker, tanto en webhook como en import:
+
+| Evento | Webhook | Import | Estado |
+|--------|---------|--------|--------|
+| `forum_topic_created` / `action: topic_created` | ✅ | ✅ | |
+| `forum_topic_edited` / `action: topic_edit` | ✅ | ✅ | |
+| `forum_topic_closed/`reopened` | ✅ | ✅ | |
+| `new_chat_members` / `action: invite_members` | ✅ | ✅ | |
+| `left_chat_member` / `action: left` | ✅ | ✅ | |
+| `pinned_message` / `action: pin_message` | ✅ | ✅ | |
+| `group_chat_created` / `supergroup_chat_created` | ✅ | ⬜ | No aparece en exports |
+| `action: remove_members` | ⬜ | ✅ | |
+| `action: joined` | ⬜ | ✅ | |
+| `action: title_edit` | ⬜ | ✅ | |
+| `action: photo_edit` / `photo_delete` | ⬜ | ⬜ | Pendiente |
+| `message_reaction` / `message_reaction_count` | ⬜ | ⬜ | Pendiente — reacciones a mensajes |
+
+Los tipos `message_reaction` y `message_reaction_count` son updates separados que envía Telegram cuando alguien reacciona a un mensaje. Actualmente no se procesan porque trackerGram solo maneja el campo `message` del update, y una reacción no es un mensaje nuevo sino una modificación sobre uno existente. Para soportarlas habría que extender el handler de updates en api.php para recibir estos tipos además de `message`.
 
 ### Flujo de Procesamiento
 
