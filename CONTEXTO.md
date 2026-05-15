@@ -114,36 +114,9 @@ Admin (ZIP) → import.php → Extrae ZIP → Parsea result.json → TikiWiki AP
 
 ## Funcionalidades Actuales y su Estado
 
-### ✅ Completado
+El estado detallado del proyecto (completado, parcial, pendiente) se mantiene en **[roadmap.md](roadmap.md)**. El historial de cambios por versión está en **[CAMBIOS.md](CAMBIOS.md)**.
 
-- Webhook endpoint para Telegram
-- Envío de mensajes a TikiWiki trackers
-- Soporte para múltiples tipos de mensaje (texto, foto, video, audio, documento, sticker, ubicación, contacto, encuesta, animación)
-- Service messages del grupo (miembros que entran/salen, topics creados/renombrados, mensajes fijados)
-- Deduplicación de mensajes por (chat_id, message_id)
-- Importación de exports ZIP con índice de archivos
-- Subida de archivos multimedia a TikiWiki galleries (descarga en chunks, límite 20MB)
-- Panel de administración web con secciones independientes
-- CSRF protection en formularios
-- Hash de contraseña admin con bcrypt
-- Rate limiting en webhook y login
-- ALLOWED_CHAT_IDS configurable desde .env
-- Los tokens de Telegram ya no se guardan en TikiWiki
-- Path traversal prevention en extracción de ZIP
-
-### ⚠️ Parcial
-
-- **Creación automática de trackers**: Crea el tracker pero los tipos de campo no son exactamente los documentados (FG, G, D)
-- **Importación**: Funciona pero exports muy grandes (>1GB) pueden requerir procesamiento asíncrono
-- **Refactorización**: sendToTikiWiki delegado a clientes, processUpdate aún tiene lógica de orquestación
-
-### ❌ Pendiente (ver roadmap.md para detalle)
-
-- Reacciones a mensajes (message_reaction)
-- Service messages: photo_edit, photo_delete
-- Mensajes editados/borrados (edited_message)
-- Sistema de etiquetas (hashtags)
-- Mensajes estructurados con prefijos (GPS, alertas)
+A modo de resumen: la funcionalidad principal (recibir mensajes de Telegram y enviarlos a TikiWiki) está operativa. Lo mismo la importación de exports ZIP. Para el detalle fino de qué falta y qué prioridad tiene, ver `roadmap.md`.
 
 ---
 
