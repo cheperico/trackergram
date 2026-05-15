@@ -148,6 +148,11 @@ class TikiWikiClient
     public static function messageExists(int $trackerId, int $messageId, ?int $chatId = null): bool
     {
         $url = TIKIWIKI_API_URL . "trackers/$trackerId/items?filter[fields][telegrammessageTelegramMessageId]=$messageId";
+        
+        // Si tenemos chat_id, filtrar también por chat para mayor precisión
+        if ($chatId !== null) {
+            $url .= "&filter[fields][telegrammessageChatId]=$chatId";
+        }
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);

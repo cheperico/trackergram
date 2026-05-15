@@ -113,7 +113,7 @@ if ($zip->open($file['tmp_name']) !== true) {
 
 // Validar que ningún archivo del ZIP intente path traversal
 $safeExtract = true;
-for ($i = 0; $i < $zip->numEntries; $i++) {
+for ($i = 0; $i < $zip->numFiles; $i++) {
     $entryName = $zip->getNameIndex($i);
     // Rechazar nombres con ".." o rutas absolutas
     if (strpos($entryName, '..') !== false || str_starts_with($entryName, '/')) {

@@ -100,9 +100,9 @@ function createTrackerWithFields(string $trackerName): ?int
  * Verificar si un message_id ya existe en el tracker (para evitar duplicados)
  * Delegate a TikiWikiClient
  */
-function messageExistsInTracker(int $messageId): bool
+function messageExistsInTracker(int $messageId, ?int $chatId = null): bool
 {
-    return TikiWikiClient::messageExists(TIKIWIKI_TRACKER_ID, $messageId);
+    return TikiWikiClient::messageExists(TIKIWIKI_TRACKER_ID, $messageId, $chatId);
 }
 
 /**
@@ -204,7 +204,7 @@ function extractMessageData(array $message): array
     if (isset($message['photo'])) {
         $photo = end($message['photo']); // Última foto (mayor resolución)
         $data['type'] = 'photo';
-        $data['media_url'] = getFileUrl($photo['file_id']) ?? $photo['file_id'];
+        $data['media_url'] = $photo['file_id'];
         $data['media_type'] = 'image/jpeg';
         $data['media_size'] = $photo['file_size'] ?? null;
         
@@ -225,7 +225,7 @@ function extractMessageData(array $message): array
     if (isset($message['video'])) {
         $video = $message['video'];
         $data['type'] = 'video';
-        $data['media_url'] = getFileUrl($video['file_id']) ?? $video['file_id'];
+        $data['media_url'] = $video['file_id'];
         $data['media_type'] = $video['mime_type'] ?? 'video/mp4';
         $data['media_size'] = $video['file_size'] ?? null;
         $data['media_caption'] = $message['caption'] ?? null;
@@ -244,7 +244,7 @@ function extractMessageData(array $message): array
     if (isset($message['audio'])) {
         $audio = $message['audio'];
         $data['type'] = 'audio';
-        $data['media_url'] = getFileUrl($audio['file_id']) ?? $audio['file_id'];
+        $data['media_url'] = $audio['file_id'];
         $data['media_type'] = $audio['mime_type'] ?? 'audio/mpeg';
         $data['media_size'] = $audio['file_size'] ?? null;
         
@@ -262,7 +262,7 @@ function extractMessageData(array $message): array
     if (isset($message['document'])) {
         $document = $message['document'];
         $data['type'] = 'document';
-        $data['media_url'] = getFileUrl($document['file_id']) ?? $document['file_id'];
+        $data['media_url'] = $document['file_id'];
         $data['media_type'] = $document['mime_type'] ?? 'application/octet-stream';
         $data['media_size'] = $document['file_size'] ?? null;
         $data['media_caption'] = $message['caption'] ?? null;
@@ -278,7 +278,7 @@ function extractMessageData(array $message): array
     if (isset($message['sticker'])) {
         $sticker = $message['sticker'];
         $data['type'] = 'sticker';
-        $data['media_url'] = getFileUrl($sticker['file_id']) ?? $sticker['file_id'];
+        $data['media_url'] = $sticker['file_id'];
         $data['media_type'] = 'image/webp';
         
         // Subir sticker a TikiWiki
@@ -292,7 +292,7 @@ function extractMessageData(array $message): array
     if (isset($message['voice'])) {
         $voice = $message['voice'];
         $data['type'] = 'voice';
-        $data['media_url'] = getFileUrl($voice['file_id']) ?? $voice['file_id'];
+        $data['media_url'] = $voice['file_id'];
         $data['media_type'] = $voice['mime_type'] ?? 'audio/ogg';
         $data['media_size'] = $voice['file_size'] ?? null;
         
@@ -321,7 +321,7 @@ function extractMessageData(array $message): array
     if (isset($message['video_note'])) {
         $videoNote = $message['video_note'];
         $data['type'] = 'video_note';
-        $data['media_url'] = getFileUrl($videoNote['file_id']) ?? $videoNote['file_id'];
+        $data['media_url'] = $videoNote['file_id'];
         $data['media_type'] = $videoNote['mime_type'] ?? 'video/mp4';
         $data['media_size'] = $videoNote['file_size'] ?? null;
         
@@ -588,7 +588,7 @@ $message = $update['message'];
     $messageData = extractMessageData($message);
 
     // Verificar si el mensaje ya existe (evitar duplicados)
-    if (messageExistsInTracker($message['message_id'])) {
+    if (messageExistsInTracker($message['message_id'], $chatId)) {
         error_log("trackerGram: SKIPPING duplicate message_id={$message['message_id']}");
         return;
     }
@@ -642,6 +642,29 @@ $message = $update['message'];
 // Manejar webhook de Telegram - solo ejecutar si es llamado directamente (no incluido)
 if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php') {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        // Rate limiting básico: max 30 requests por minuto por IP
+        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $rateFile = sys_get_temp_dir() . '/tg_rate_' . md5($ip);
+        $window = 60;
+        $maxRequests = 30;
+        $now = time();
+        $requests = [];
+        if (file_exists($rateFile)) {
+            $content = @file_get_contents($rateFile);
+            if ($content) {
+                $requests = json_decode($content, true) ?? [];
+                $requests = array_values(array_filter($requests, fn($t) => $t > $now - $window));
+            }
+        }
+        $requests[] = $now;
+        @file_put_contents($rateFile, json_encode($requests));
+        
+        if (count($requests) > $maxRequests) {
+            http_response_code(429);
+            echo json_encode(['error' => 'Too Many Requests']);
+            exit;
+        }
+        
         $input = file_get_contents('php://input');
         $update = json_decode($input, true);
 

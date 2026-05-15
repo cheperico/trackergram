@@ -45,10 +45,10 @@ define('APP_NAME', 'trackerGram');
 define('TIMEZONE', 'America/Argentina/Buenos_Aires');
 
 // Configuración de múltiples chats
-// Array de chat_ids permitidos (obtener el ID del grupo/grupo de Telegram)
-// Ejemplo: define('ALLOWED_CHAT_IDS', [123456789, 987654321]);
-// NOTA: Si está vacío, el sistema procesará todos los chats
-define('ALLOWED_CHAT_IDS', []); // Vacío = procesar todos los chats
+// Lista de chat_ids permitidos separados por coma en .env (ALLOWED_CHAT_IDS=123,456,789)
+// Vacío = procesar todos los chats
+$allowedChatIds = getenv('ALLOWED_CHAT_IDS');
+define('ALLOWED_CHAT_IDS', $allowedChatIds ? array_map('intval', explode(',', $allowedChatIds)) : []);
 
 // Establecer timezone
 date_default_timezone_set(TIMEZONE);
