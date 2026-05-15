@@ -500,6 +500,15 @@ El sistema mapea automáticamente los campos de Telegram a los campos del tracke
 
 Cada sección tiene su propio action handler y solo guarda los campos que le corresponden. Ya no se usan campos ocultos para preservar valores entre secciones.
 
+### Código curl duplicado en sendToTikiWiki e import (v0.1.6)
+
+**Problema**: `api.php::sendToTikiWiki()` e `import.php::importItemToTikiWiki()` tenían código curl casi idéntico para enviar items a TikiWiki. Cada función construía los campos, armaba el POST y validaba la respuesta por separado. Cualquier cambio en el endpoint o la validación requería modificar ambos.
+
+**Fix**: 
+- Se agregó `MessageMapper::toWikiFields($data)` que toma el array intermedio de `processUpdate()` y devuelve los campos formateados con `fields[permName]` y el encoding HTML correspondiente. Un solo lugar para el mapeo.
+- `TikiWikiClient::createTrackerItem()` se mejoró con la misma validación de respuesta (cURL error, HTTP status, JSON con `itemId`). Un solo lugar para el envío.
+- Ambas funciones ahora son wrappers que convierten sus datos al formato intermedio y delegan.
+
 ### getForumTopic no existe en Telegram Bot API (v0.1.5)
 
 Ver sección "Resolución de Nombres de Topics (Forums)" más arriba.

@@ -1,5 +1,17 @@
 # Cambios - Changelog
 
+## v0.1.6
+- **Seguridad**: Hash de contraseña admin con `password_hash()`/`password_verify()`. Migración automática desde texto plano.
+- **Seguridad**: Path traversal en ZIP - validación de nombres de archivo al extraer exports.
+- **Seguridad**: Descarga de multimedia en chunks con límite de 20MB (ya no carga todo en memoria).
+- **Seguridad**: Rate limiting en webhook (máx 30 req/min por IP).
+- **Seguridad**: URLs de Telegram con token ya no se guardan en TikiWiki.
+- **Seguridad**: ALLOWED_CHAT_IDS configurable desde .env.
+- **Arquitectura**: `sendToTikiWiki()` e `importItemToTikiWiki()` refactorizados para usar `MessageMapper::toWikiFields()` + `TikiWikiClient::createTrackerItem()`. Eliminado curl duplicado.
+- **Fix**: `display_errors` condicional a DEBUG_MODE en admin.php e import.php.
+- **Fix**: Deduplicación ahora considera (chat_id, message_id), no solo message_id.
+- **Fix**: `ZipArchive::$numEntries` → `$numFiles` (PHP 8.2).
+
 ## v0.1.5
 - **Fix**: TypeError fatal en PHP 8.5 al pasar string `'general'` donde se esperaba `int` (`getTopicName`)
 - **Fix**: Eliminada llamada API a `getForumTopic` (no existe en Telegram Bot API)
