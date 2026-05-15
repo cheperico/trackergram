@@ -161,11 +161,19 @@ $messages = $data['messages'];
 $chatTitle = $data['name'] ?? 'Unknown Chat';
 $chatId = $data['id'] ?? 0;
 
-// Mapear topics creados (action: topic_created)
+// Mapear topics creados y renombrados
 $topics = [];
 foreach ($messages as $msg) {
-    if (($msg['type'] ?? '') === 'service' && ($msg['action'] ?? '') === 'topic_created') {
-        $topics[$msg['id']] = $msg['title'] ?? 'Topic ' . $msg['id'];
+    if (($msg['type'] ?? '') === 'service') {
+        if (($msg['action'] ?? '') === 'topic_created') {
+            $topics[$msg['id']] = $msg['title'] ?? 'Topic ' . $msg['id'];
+        } elseif (($msg['action'] ?? '') === 'topic_edit' && isset($msg['new_title'])) {
+            // Buscar el topic original por reply_to_message_id si existe
+            $replyTo = $msg['reply_to_message_id'] ?? null;
+            if ($replyTo && isset($topics[$replyTo])) {
+                $topics[$replyTo] = $msg['new_title'];
+            }
+        }
     }
 }
 

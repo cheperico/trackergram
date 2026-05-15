@@ -340,19 +340,28 @@ function extractMessageData(array $message): array
         $data['system_message'] = 'Topic creado: ' . $topicName;
         $data['text'] = 'Topic creado: ' . $topicName;
         $data['topic_name'] = $topicName;
-        // Guardar en un archivo temporal para uso posterior
+        // Guardar en cache (mergeando con entradas existentes)
         if (isset($message['message_thread_id'])) {
-            file_put_contents(__DIR__ . '/topic_names.json', json_encode([
-                $message['message_thread_id'] => $topicName
-            ]), JSON_PRETTY_PRINT);
+            $cacheFile = __DIR__ . '/topic_names.json';
+            $topics = file_exists($cacheFile) ? json_decode(file_get_contents($cacheFile), true) : [];
+            $topics[$message['message_thread_id']] = $topicName;
+            file_put_contents($cacheFile, json_encode($topics));
         }
     }
     
     if (isset($message['forum_topic_edited'])) {
         $topicEdit = $message['forum_topic_edited'];
         $data['type'] = 'system';
-        $data['system_message'] = 'Topic renombrado: ' . ($topicEdit['name'] ?? 'Desconocido');
-        $data['text'] = 'Topic renombrado';
+        $newName = $topicEdit['name'] ?? 'Desconocido';
+        $data['system_message'] = 'Topic renombrado: ' . $newName;
+        $data['text'] = 'Topic renombrado a: ' . $newName;
+        // Actualizar cache con el nuevo nombre
+        if (isset($message['message_thread_id'])) {
+            $cacheFile = __DIR__ . '/topic_names.json';
+            $topics = file_exists($cacheFile) ? json_decode(file_get_contents($cacheFile), true) : [];
+            $topics[$message['message_thread_id']] = $newName;
+            file_put_contents($cacheFile, json_encode($topics));
+        }
     }
 
     if (isset($message['forum_topic_closed'])) {
