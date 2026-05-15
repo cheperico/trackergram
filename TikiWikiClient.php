@@ -109,15 +109,12 @@ class TikiWikiClient
 
     /**
      * Crear item en TikiWiki tracker
+     * @param int $trackerId ID del tracker
+     * @param array $postFields Campos formateados como fields[permName] => valor (listo para http_build_query)
      */
-    public static function createTrackerItem(int $trackerId, array $fields): bool
+    public static function createTrackerItem(int $trackerId, array $postFields): bool
     {
         $url = TIKIWIKI_API_URL . "trackers/$trackerId/items";
-
-        $postFields = [];
-        foreach ($fields as $key => $value) {
-            $postFields["fields[$key]"] = $value;
-        }
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
@@ -125,9 +122,10 @@ class TikiWikiClient
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postFields));
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             "Authorization: Bearer " . TIKIWIKI_TOKEN,
-            "User-Agent: Mozilla/5.0"
+            "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         ]);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TIKIWIKI_API);
 
         $response = curl_exec($ch);
@@ -135,11 +133,26 @@ class TikiWikiClient
         $error = curl_error($ch);
         curl_close($ch);
 
-        if ($httpCode !== 200 && DEBUG_MODE) {
-            error_log("TikiWikiClient: Error creando item - HTTP $httpCode, response: $response, error: $error");
+        if ($error) {
+            error_log("TikiWikiClient: cURL error al crear item: $error");
+            return false;
         }
 
-        return $httpCode === 200;
+        if ($httpCode !== 200 && $httpCode !== 201) {
+            error_log("TikiWikiClient: HTTP $httpCode al crear item - Response: $response");
+            return false;
+        }
+
+        // Validar respuesta JSON con itemId (detecta errores PHP que devuelven 200)
+        $responseData = json_decode($response, true);
+        if (!$responseData || !isset($responseData['itemId'])) {
+            $clean = str_replace(["\r", "\n"], ' ', strip_tags(substr($response, 0, 300)));
+            error_log("TikiWikiClient: Respuesta inválida (Status $httpCode): $clean");
+            return false;
+        }
+
+        error_log("TikiWikiClient: Item creado - itemId={$responseData['itemId']}");
+        return true;
     }
 
     /**

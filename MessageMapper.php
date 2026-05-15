@@ -232,4 +232,38 @@ class MessageMapper
             'zoom' => 15
         ];
     }
+
+    /**
+     * Transformar datos estructurados de un mensaje a campos con encoding para TikiWiki API
+     * Recibe el array $tikiData de processUpdate() y devuelve fields[permName] listo para POST
+     */
+    public static function toWikiFields(array $data): array
+    {
+        $fields = [
+            'fields[telegrammessageTelegramMessageId]' => $data['message_id'],
+            'fields[telegrammessageChatId]' => $data['chat_id'],
+            'fields[telegrammessageChatTitle]' => htmlspecialchars($data['chat_title'] ?? '', ENT_QUOTES, 'UTF-8'),
+            'fields[telegrammessageTopicId]' => $data['topic_id'],
+            'fields[telegrammessageTopicTitle]' => htmlspecialchars($data['topic_title'] ?? '', ENT_QUOTES, 'UTF-8'),
+            'fields[telegrammessageUserId]' => $data['user_id'],
+            'fields[telegrammessageUsername]' => htmlspecialchars($data['username'] ?? '', ENT_QUOTES, 'UTF-8'),
+            'fields[telegrammessageFirstName]' => htmlspecialchars($data['first_name'] ?? '', ENT_QUOTES, 'UTF-8'),
+            'fields[telegrammessageLastName]' => htmlspecialchars($data['last_name'] ?? '', ENT_QUOTES, 'UTF-8'),
+            'fields[telegrammessageMessageType]' => $data['message_type'],
+            'fields[telegrammessageText]' => htmlspecialchars($data['text'] ?? '', ENT_QUOTES, 'UTF-8'),
+            'fields[telegrammessageLocation]' => $data['location'] ?? '',
+            'fields[telegrammessageMediaUrl]' => $data['media_url'],
+            'fields[telegrammessageFileUrl]' => $data['file_url'],
+            'fields[telegrammessageMediaType]' => $data['media_type'],
+            'fields[telegrammessageMediaSize]' => $data['media_size'],
+            'fields[telegrammessageMediaCaption]' => htmlspecialchars($data['media_caption'] ?? '', ENT_QUOTES, 'UTF-8'),
+            'fields[telegrammessageMessageDate]' => $data['date']
+        ];
+
+        if (!empty($data['uploaded_file_id'])) {
+            $fields['fields[telegrammessageMedia]'] = $data['uploaded_file_id'];
+        }
+
+        return $fields;
+    }
 }

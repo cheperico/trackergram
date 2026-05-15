@@ -436,80 +436,8 @@ function extractMessageData(array $message): array
  */
 function sendToTikiWiki(array $data): bool
 {
-    $trackerId = TIKIWIKI_TRACKER_ID;
-    $url = TIKIWIKI_API_URL . "trackers/{$trackerId}/items";
-
-    // Mapear campos del mensaje a los permanent names de TikiWiki con formato fields[fieldName]
-    $postFields = [
-        'fields[telegrammessageTelegramMessageId]' => $data['message_id'],
-        'fields[telegrammessageChatId]' => $data['chat_id'],
-        'fields[telegrammessageChatTitle]' => htmlspecialchars($data['chat_title'] ?? '', ENT_QUOTES, 'UTF-8'),
-        'fields[telegrammessageTopicId]' => $data['topic_id'],
-        'fields[telegrammessageTopicTitle]' => htmlspecialchars($data['topic_title'] ?? '', ENT_QUOTES, 'UTF-8'),
-        'fields[telegrammessageUserId]' => $data['user_id'],
-        'fields[telegrammessageUsername]' => htmlspecialchars($data['username'] ?? '', ENT_QUOTES, 'UTF-8'),
-        'fields[telegrammessageFirstName]' => htmlspecialchars($data['first_name'] ?? '', ENT_QUOTES, 'UTF-8'),
-        'fields[telegrammessageLastName]' => htmlspecialchars($data['last_name'] ?? '', ENT_QUOTES, 'UTF-8'),
-        'fields[telegrammessageMessageType]' => $data['message_type'],
-        'fields[telegrammessageText]' => htmlspecialchars($data['text'] ?? '', ENT_QUOTES, 'UTF-8'),
-        'fields[telegrammessageLocation]' => $data['location'] ?? '',
-        'fields[telegrammessageMediaUrl]' => $data['media_url'],
-        'fields[telegrammessageFileUrl]' => $data['file_url'],
-        'fields[telegrammessageMediaType]' => $data['media_type'],
-        'fields[telegrammessageMediaSize]' => $data['media_size'],
-        'fields[telegrammessageMediaCaption]' => htmlspecialchars($data['media_caption'] ?? '', ENT_QUOTES, 'UTF-8'),
-        'fields[telegrammessageMessageDate]' => $data['date']
-    ];
-    
-    // Agregar archivo subido si existe
-    if (!empty($data['uploaded_file_id'])) {
-        $postFields['fields[telegrammessageMedia]'] = $data['uploaded_file_id'];
-    }
-
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postFields));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "Authorization: Bearer " . TIKIWIKI_TOKEN,
-        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    ]);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TIKIWIKI_API);
-
-    $response = curl_exec($ch);
-    $error = curl_error($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    if ($error) {
-        error_log("Error cURL al enviar a TikiWiki: $error");
-        return false;
-    }
-
-    if ($httpCode !== 200 && $httpCode !== 201) {
-        error_log("Error HTTP al enviar a TikiWiki: $httpCode - Response: $response");
-        return false;
-    }
-
-    // Validar que la respuesta sea JSON y contenga itemId (para detectar errores PHP que devuelven 200)
-    $responseData = json_decode($response, true);
-    if (!$responseData || !isset($responseData['itemId'])) {
-        // Limpiar respuesta para logging: remover tags y newlines, truncar a 300 chars
-        // Evitar truncar en medio de tags HTML
-        $cleanResponse = strip_tags($response);
-        $cleanResponse = str_replace(["\r", "\n"], ' ', $cleanResponse);
-        $cleanResponse = substr($cleanResponse, 0, 300);
-        if (strlen($cleanResponse) >= 300) {
-            $cleanResponse .= '... [truncated]';
-        }
-        error_log("Error de formato en respuesta de TikiWiki (Status $httpCode): $cleanResponse");
-        return false;
-    }
-
-    error_log("Mensaje enviado a TikiWiki: message_id={$data['message_id']}");
-    return true;
+    $fields = MessageMapper::toWikiFields($data);
+    return TikiWikiClient::createTrackerItem(TIKIWIKI_TRACKER_ID, $fields);
 }
 
 /**

@@ -386,48 +386,29 @@ function uploadFileToTikiWiki(string $filePath, string $fileName, int $galleryId
  * Enviar item a TikiWiki
  */
 function importItemToTikiWiki(int $trackerId, array $data): bool {
-    $url = TIKIWIKI_API_URL . "trackers/{$trackerId}/items";
-    
-    $postFields = [
-        'fields[telegrammessageTelegramMessageId]' => $data['message_id'],
-        'fields[telegrammessageChatId]' => $data['chat_id'],
-        'fields[telegrammessageChatTitle]' => htmlspecialchars($data['chat_title'] ?? '', ENT_QUOTES, 'UTF-8'),
-        'fields[telegrammessageTopicId]' => $data['topic_id'],
-        'fields[telegrammessageTopicTitle]' => htmlspecialchars($data['topic_title'] ?? '', ENT_QUOTES, 'UTF-8'),
-        'fields[telegrammessageUserId]' => $data['user_id'],
-        'fields[telegrammessageUsername]' => htmlspecialchars($data['username'] ?? '', ENT_QUOTES, 'UTF-8'),
-        'fields[telegrammessageFirstName]' => htmlspecialchars($data['first_name'] ?? '', ENT_QUOTES, 'UTF-8'),
-        'fields[telegrammessageLastName]' => htmlspecialchars($data['last_name'] ?? '', ENT_QUOTES, 'UTF-8'),
-        'fields[telegrammessageMessageType]' => $data['message_type'],
-        'fields[telegrammessageText]' => htmlspecialchars($data['text'] ?? '', ENT_QUOTES, 'UTF-8'),
-        'fields[telegrammessageMediaCaption]' => htmlspecialchars($data['media_caption'] ?? '', ENT_QUOTES, 'UTF-8'),
-        'fields[telegrammessageMessageDate]' => $data['date']
+    // Convertir formato de importación ($data) al mismo formato que processUpdate ($tikiData)
+    $tikiData = [
+        'message_id' => $data['message_id'],
+        'chat_id' => $data['chat_id'],
+        'chat_title' => $data['chat_title'] ?? '',
+        'topic_id' => $data['topic_id'] ?? '',
+        'topic_title' => $data['topic_title'] ?? '',
+        'user_id' => $data['user_id'] ?? '',
+        'username' => $data['username'] ?? '',
+        'first_name' => $data['first_name'] ?? '',
+        'last_name' => $data['last_name'] ?? '',
+        'message_type' => $data['message_type'] ?? 'text',
+        'text' => $data['text'] ?? '',
+        'media_url' => '',
+        'file_url' => '',
+        'media_type' => '',
+        'media_size' => '',
+        'media_caption' => $data['media_caption'] ?? '',
+        'location' => '',
+        'uploaded_file_id' => $data['file_id'] ?? '',
+        'date' => $data['date'] ?? time()
     ];
-    
-    // Agregar archivo si se subió
-    if (!empty($data['file_id'])) {
-        $postFields['fields[telegrammessageMedia]'] = $data['file_id'];
-    }
-    
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postFields));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "Authorization: Bearer " . TIKIWIKI_TOKEN,
-        "User-Agent: Mozilla/5.0"
-    ]);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TIKIWIKI_API);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
-    curl_close($ch);
-    
-    if ($httpCode !== 200) {
-        error_log("import.php: Tiki API error - HTTP $httpCode, response: $response, error: $error");
-    }
-    
-    return $httpCode === 200;
+
+    $fields = MessageMapper::toWikiFields($tikiData);
+    return TikiWikiClient::createTrackerItem($trackerId, $fields);
 }
