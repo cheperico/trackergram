@@ -5,7 +5,52 @@
 ### Flujo de Datos
 
 ```
-Telegram Bot → Webhook (api.php) → Procesamiento → TikiWiki API → Tracker Item
+Alguien escribe en el grupo de Telegram
+       ↓
+Telegram busca el webhook configurado para ese bot
+       ↓
+Telegram hace POST a la URL del webhook con los datos del mensaje (JSON)
+       ↓
+api.php recibe el POST, procesa el mensaje
+       ↓
+api.php envía los datos a la API de TikiWiki
+       ↓
+El mensaje aparece como un item en el tracker de TikiWiki
+```
+
+### ¿Qué es un webhook?
+
+Un webhook es una forma de que Telegram **te avise** cuando pasa algo, sin necesidad de que vos estés preguntando constantemente.
+
+**Sin webhook**: Tu servidor tiene que preguntar "¿hay mensajes nuevos?" cada 2 segundos (polling). Ineficiente y lento.
+
+**Con webhook**: Telegram te llama a vos cuando hay un mensaje nuevo. Vos solo tenés que darle una URL pública donde recibir el aviso. Telegram hace un POST a esa URL con un JSON que contiene todos los datos del mensaje.
+
+### Requisitos de la URL del webhook
+
+La URL del webhook debe cumplir con estas condiciones para que Telegram pueda usarla:
+
+- **Pública**: Telegram debe poder llegar a ella desde internet. No sirven IPs privadas (192.168.x.x, 127.0.0.1) ni localhost.
+- **HTTPS**: Telegram solo acepta URLs con HTTPS (certificado SSL válido).
+- **Apuntar a `api.php`**: La URL debe terminar en `/api.php`, que es el endpoint que procesa los mensajes.
+
+Ejemplo válido: `https://trackergram.chelachela.duckdns.org/api.php`
+Ejemplo inválido: `http://localhost/trackergram/api.php` (no es pública ni HTTPS)
+
+### Cómo se configura el webhook en trackerGram
+
+Hay tres formas:
+
+1. **Desde el admin panel** (sección 4): apretar "Actualizar Webhook". Usa la URL de `CUSTOM_WEBHOOK_URL` del `.env` si está configurada, o auto-detecta la URL del servidor.
+2. **Desde la línea de comandos**: ejecutar `setup_webhook.php` en el servidor (solo CLI o localhost por seguridad).
+3. **Manual**: usando curl para llamar a la API de Telegram directamente:
+   ```bash
+   curl -s "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://midominio.com/api.php&secret_token=MI_SECRET"
+   ```
+
+Para verificar el estado actual del webhook:
+```bash
+curl -s "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
 ```
 
 ### Componentes Principales
