@@ -175,15 +175,31 @@ if (!$galleryId) {
     $galleryId = 29; // Default fallback
 }
 
+// Indexar archivos una sola vez (evita escanear recursivamente por cada mensaje)
+$fileIndex = [];
+$dirIterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($tempDir));
+foreach ($dirIterator as $f) {
+    if ($f->isFile()) {
+        $fileIndex[$f->getFilename()] = $f->getPathname();
+    }
+}
+
 // Procesar mensajes
 $imported = 0;
 $skipped = 0;
 $mediaProcessed = 0;
+$totalMessages = count($messages);
+$processedCount = 0;
 
 foreach ($messages as $i => $msg) {
     // Solo procesar mensajes regulares
     if (($msg['type'] ?? '') !== 'message') {
         continue;
+    }
+
+    $processedCount++;
+    if ($processedCount % 10 === 0) {
+        error_log("trackerGram: Importando mensaje $processedCount de $totalMessages...");
     }
 
     // Determinar topic
@@ -205,8 +221,8 @@ foreach ($messages as $i => $msg) {
         $messageType = 'photo';
         $fileName = basename($msg['photo']);
         $mediaCaption = $msg['photo_caption'] ?? '';
-        // Buscar el archivo en la carpeta temporal
-        $filePath = findFileInTemp($tempDir, $fileName);
+        // Buscar el archivo en el índice
+        $filePath = $fileIndex[$fileName] ?? findFileInTempFallback($tempDir, $fileName);
     } elseif (!empty($msg['file'])) {
         $fileName = $msg['file_name'] ?? basename($msg['file']);
         $mediaType = $msg['media_type'] ?? '';
@@ -219,7 +235,7 @@ foreach ($messages as $i => $msg) {
         } else {
             $messageType = 'document';
         }
-        $filePath = findFileInTemp($tempDir, $fileName);
+        $filePath = $fileIndex[$fileName] ?? findFileInTempFallback($tempDir, $fileName);
     }
 
     // Subir archivo si existe
@@ -280,9 +296,9 @@ echo json_encode([
 ]);
 
 /**
- * Buscar archivo en carpeta temporal por nombre
+ * Buscar archivo en carpeta temporal por nombre (fallback cuando el índice no encuentra coincidencia exacta)
  */
-function findFileInTemp(string $tempDir, string $fileName): string {
+function findFileInTempFallback(string $tempDir, string $fileName): string {
     $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($tempDir));
     foreach ($files as $f) {
         if ($f->getFilename() === $fileName || strpos($f->getFilename(), $fileName) !== false) {
