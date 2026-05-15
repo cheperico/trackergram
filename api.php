@@ -420,11 +420,37 @@ function extractMessageData(array $message): array
         $data['text'] = '🎬 Animation: ' . $data['media_type'];
     }
 
+    // Nuevos miembros agregados
+    if (isset($message['new_chat_members'])) {
+        $names = array_map(fn($u) => $u['first_name'] . ' ' . ($u['last_name'] ?? ''), $message['new_chat_members']);
+        $data['type'] = 'system';
+        $data['text'] = '👤 Se unieron: ' . implode(', ', $names);
+    }
+
+    // Miembro salió
+    if (isset($message['left_chat_member'])) {
+        $u = $message['left_chat_member'];
+        $data['type'] = 'system';
+        $data['text'] = '🚪 ' . ($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '') . ' salió del grupo';
+    }
+
+    // Mensaje fijado
+    if (isset($message['pinned_message'])) {
+        $data['type'] = 'system';
+        $data['text'] = '📌 Mensaje fijado';
+    }
+
+    // Grupo creado
+    if (isset($message['group_chat_created']) || isset($message['supergroup_chat_created']) || isset($message['channel_chat_created'])) {
+        $data['type'] = 'system';
+        $data['text'] = '🆕 Grupo creado';
+    }
+
     // Otros tipos no manejados específicamente
     if ($data['type'] === 'text' && !isset($message['text'])) {
-        // Obtener las claves del mensaje para mostrar qué tipo es
         $messageKeys = array_keys($message);
-        $unknownTypes = array_diff($messageKeys, ['message_id', 'from', 'chat', 'date', 'text', 'photo', 'video', 'audio', 'document', 'sticker', 'voice', 'video_note', 'location', 'contact', 'poll', 'animation', 'forum_topic_edited', 'forum_topic_closed', 'forum_topic_reopened', 'caption', 'edit_date', 'entities', 'forward_from', 'forward_from_chat', 'reply_to_message', 'via_bot']);
+        $knownTypes = ['message_id', 'from', 'chat', 'date', 'text', 'photo', 'video', 'audio', 'document', 'sticker', 'voice', 'video_note', 'location', 'contact', 'poll', 'animation', 'forum_topic_edited', 'forum_topic_created', 'forum_topic_closed', 'forum_topic_reopened', 'caption', 'edit_date', 'entities', 'forward_from', 'forward_from_chat', 'reply_to_message', 'via_bot', 'new_chat_members', 'left_chat_member', 'pinned_message', 'group_chat_created', 'supergroup_chat_created'];
+        $unknownTypes = array_diff($messageKeys, $knownTypes);
         
         if (!empty($unknownTypes)) {
             $data['type'] = 'other';

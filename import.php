@@ -200,8 +200,9 @@ $totalMessages = count($messages);
 $processedCount = 0;
 
 foreach ($messages as $i => $msg) {
-    // Solo procesar mensajes regulares
-    if (($msg['type'] ?? '') !== 'message') {
+    // Solo procesar mensajes regulares y service messages relevantes
+    $msgType = $msg['type'] ?? 'message';
+    if ($msgType !== 'message' && $msgType !== 'service') {
         continue;
     }
 
@@ -219,52 +220,75 @@ foreach ($messages as $i => $msg) {
         $topicTitle = $topics[$replyTo];
     }
 
-    // Determinar message_type y archivo
-    $messageType = 'text';
+    // Variables para media
     $filePath = '';
     $fileName = '';
     $mediaCaption = '';
-
-    if (!empty($msg['photo'])) {
-        $messageType = 'photo';
-        $fileName = basename($msg['photo']);
-        $mediaCaption = $msg['photo_caption'] ?? '';
-        // Buscar el archivo en el índice
-        $filePath = $fileIndex[$fileName] ?? findFileInTempFallback($tempDir, $fileName);
-    } elseif (!empty($msg['file'])) {
-        $fileName = $msg['file_name'] ?? basename($msg['file']);
-        $mediaType = $msg['media_type'] ?? '';
-        if (strpos($msg['file'] ?? '', 'sticker') !== false || $mediaType === 'sticker') {
-            $messageType = 'sticker';
-        } elseif (strpos($msg['file'] ?? '', 'video') !== false || $mediaType === 'video_message') {
-            $messageType = 'video';
-        } elseif (strpos($msg['file'] ?? '', 'audio') !== false || $mediaType === 'audio') {
-            $messageType = 'audio';
-        } else {
-            $messageType = 'document';
-        }
-        $filePath = $fileIndex[$fileName] ?? findFileInTempFallback($tempDir, $fileName);
-    }
-
-    // Subir archivo si existe
     $fileId = '';
-    if ($filePath && file_exists($filePath)) {
-        $fileId = uploadFileToTikiWiki($filePath, $fileName, $galleryId);
-        if ($fileId) {
-            $mediaProcessed++;
-        }
-    }
 
     // Extraer nombre
-    $from = $msg['from'] ?? '';
+    $from = $msg['from'] ?? $msg['actor'] ?? '';
     $fromParts = explode(' ', $from, 2);
     $firstName = $fromParts[0] ?? '';
     $lastName = $fromParts[1] ?? '';
 
-    $userId = $msg['from_id'] ?? '';
+    $userId = $msg['from_id'] ?? $msg['actor_id'] ?? '';
     $userId = str_replace('user', '', $userId);
 
     $date = is_numeric($msg['date'] ?? '') ? $msg['date'] : strtotime($msg['date'] ?? '');
+
+    // Determinar texto y tipo según tipo de mensaje
+    $text = '';
+    $messageType = 'text';
+
+    if ($msgType === 'message') {
+        $messageType = 'text';
+        $text = is_array($msg['text'] ?? '') ? json_encode($msg['text']) : ($msg['text'] ?? '');
+
+        if (!empty($msg['photo'])) {
+            $messageType = 'photo';
+            $fileName = basename($msg['photo']);
+            $mediaCaption = $msg['photo_caption'] ?? '';
+            $filePath = $fileIndex[$fileName] ?? findFileInTempFallback($tempDir, $fileName);
+        } elseif (!empty($msg['file'])) {
+            $fileName = $msg['file_name'] ?? basename($msg['file']);
+            $mediaType = $msg['media_type'] ?? '';
+            if (strpos($msg['file'] ?? '', 'sticker') !== false || $mediaType === 'sticker') {
+                $messageType = 'sticker';
+            } elseif (strpos($msg['file'] ?? '', 'video') !== false || $mediaType === 'video_message') {
+                $messageType = 'video';
+            } elseif (strpos($msg['file'] ?? '', 'audio') !== false || $mediaType === 'audio') {
+                $messageType = 'audio';
+            } else {
+                $messageType = 'document';
+            }
+            $filePath = $fileIndex[$fileName] ?? findFileInTempFallback($tempDir, $fileName);
+        }
+
+        if ($filePath && file_exists($filePath)) {
+            $fileId = uploadFileToTikiWiki($filePath, $fileName, $galleryId);
+            if ($fileId) {
+                $mediaProcessed++;
+            }
+        }
+    } else {
+        // Service message
+        $messageType = 'system';
+        $action = $msg['action'] ?? '';
+        $text = match ($action) {
+            'topic_created' => '📌 Tema creado: ' . ($msg['title'] ?? ''),
+            'topic_edit' => '✏️ Tema renombrado a: ' . ($msg['new_title'] ?? ''),
+            'topic_closed' => '🔒 Tema cerrado',
+            'topic_reopened' => '🔓 Tema reabierto',
+            'pin_message', 'pinned_message' => '📌 Mensaje fijado por ' . $firstName,
+            'invite_members', 'add_members' => '👤 ' . $firstName . ' agregó a: ' . implode(', ', $msg['members'] ?? []),
+            'remove_members' => '🚫 ' . $firstName . ' eliminó a: ' . implode(', ', $msg['members'] ?? []),
+            'joined' => '👤 ' . $firstName . ' se unió al grupo',
+            'left' => '🚪 ' . $firstName . ' salió del grupo',
+            'title_edit' => '✏️ Título cambiado a: ' . ($msg['title'] ?? ''),
+            default => '🔔 ' . $action . ($msg['title'] ? ': ' . $msg['title'] : '')
+        };
+    }
 
     // Construir data
     $itemData = [
@@ -278,10 +302,10 @@ foreach ($messages as $i => $msg) {
         'first_name' => $firstName,
         'last_name' => $lastName,
         'message_type' => $messageType,
-        'text' => is_array($msg['text'] ?? '') ? json_encode($msg['text']) : ($msg['text'] ?? ''),
-        'media_caption' => $mediaCaption,
+        'text' => $text,
+        'media_caption' => $mediaCaption ?? '',
         'date' => $date,
-        'file_id' => $fileId
+        'file_id' => $fileId ?? ''
     ];
 
     $result = importItemToTikiWiki($trackerId, $itemData);
