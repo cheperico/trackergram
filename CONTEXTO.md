@@ -198,7 +198,7 @@ Este proyecto fue desarrollado con asistencia de LLMs. Si sos un agente de IA to
 | API | Documentación |
 |---|---|
 | Telegram Bot API | https://core.telegram.org/bots/api |
-| TikiWiki API | https://wiki.chela.org.ar/api/ |
+| TikiWiki API | https://doc.tiki.org/API |
 
 ---
 

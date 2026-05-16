@@ -487,5 +487,5 @@ tail -f debug.log
 | Recurso | URL |
 |---|---|
 | Telegram Bot API | https://core.telegram.org/bots/api |
-| TikiWiki API | https://wiki.chela.org.ar/api/ |
+| TikiWiki API | https://doc.tiki.org/API |
 | Webhooks (explicación general) | https://webhooks.fyi/ |
