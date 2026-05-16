@@ -1,320 +1,491 @@
-# trackerGram - Documentación Técnica
+# TECHNICAL.md — Cómo está construido trackerGram
 
-## Arquitectura General
+> Este documento es para personas que quieren entender **cómo** y **por qué** se construyó trackerGram de esta manera. No es una referencia de funciones ni un manual de instalación. Es una explicación paso a paso del razonamiento detrás de cada decisión técnica. Si te enfrentás a un problema similar, este documento debería darte las herramientas para resolverlo.
 
-### Flujo de Datos
+---
 
-```
-Alguien escribe en el grupo de Telegram
-       ↓
-Telegram busca el webhook configurado para ese bot
-       ↓
-Telegram hace POST a la URL del webhook con los datos del mensaje (JSON)
-       ↓
-api.php recibe el POST, procesa el mensaje
-       ↓
-api.php envía los datos a la API de TikiWiki
-       ↓
-El mensaje aparece como un item en el tracker de TikiWiki
-```
+## El Problema
+
+Tenemos un grupo de Telegram donde se generan conversaciones importantes. Queremos que esas conversaciones vivan también en TikiWiki — un wiki con trackers — para que sean buscables, indexables y permanezcan accesibles fuera de Telegram.
+
+El desafío: Telegram y TikiWiki hablan idiomas completamente distintos. Telegram envía webhooks con JSON. TikiWiki espera POSTs con campos específicos. Alguien tiene que traducir.
+
+---
+
+## Paso 1: Recibir mensajes de Telegram
 
 ### ¿Qué es un webhook?
 
-Un webhook es una forma de que Telegram **te avise** cuando pasa algo, sin necesidad de que vos estés preguntando constantemente.
+Imaginate dos formas de saber si llegó correo:
 
-**Sin webhook**: Tu servidor tiene que preguntar "¿hay mensajes nuevos?" cada 2 segundos (polling). Ineficiente y lento.
+1. **Polling**: Abrís tu casilla de correo cada 2 segundos para ver si hay algo nuevo. Ineficiente, lento, gastás recursos.
+2. **Webhook**: El servidor de correo te avisa cuando llega un mensaje. Solo actuás cuando hay algo nuevo.
 
-**Con webhook**: Telegram te llama a vos cuando hay un mensaje nuevo. Vos solo tenés que darle una URL pública donde recibir el aviso. Telegram hace un POST a esa URL con un JSON que contiene todos los datos del mensaje.
+Telegram usa webhooks. Cuando alguien escribe en un grupo donde está tu bot, Telegram hace un POST a una URL que vos le diste. Esa URL es tu servidor, y el POST contiene un JSON con todos los datos del mensaje.
 
-### Requisitos de la URL del webhook
+### El primer problema: la URL debe ser pública
 
-La URL del webhook debe cumplir con estas condiciones para que Telegram pueda usarla:
+Telegram no puede hacer un POST a `localhost`. Necesita una URL pública con HTTPS. Esto significa que tu servidor tiene que ser accesible desde internet.
 
-- **Pública**: Telegram debe poder llegar a ella desde internet. No sirven IPs privadas (192.168.x.x, 127.0.0.1) ni localhost.
-- **HTTPS**: Telegram solo acepta URLs con HTTPS (certificado SSL válido).
-- **Apuntar a `api.php`**: La URL debe terminar en `/api.php`, que es el endpoint que procesa los mensajes.
+Las opciones son:
+- Un servidor con dominio propio y certificado SSL
+- Un túnel como ngrok o Cloudflare Tunnel para desarrollo local
+- DuckDNS u otro servicio de DNS dinámico con Let's Encrypt
 
-Ejemplo válido: `https://trackergram.chelachela.duckdns.org/api.php`
-Ejemplo inválido: `http://localhost/trackergram/api.php` (no es pública ni HTTPS)
+### Cómo recibe el mensaje trackerGram
 
-### Cómo se configura el webhook en trackerGram
+El archivo `api.php` es el punto de entrada. Es intencionalmente simple:
 
-Hay tres formas:
+```php
+require_once 'bootstrap.php';
 
-1. **Desde el admin panel** (sección 4): apretar "Actualizar Webhook". Usa la URL de `CUSTOM_WEBHOOK_URL` del `.env` si está configurada, o auto-detecta la URL del servidor.
-2. **Desde la línea de comandos**: ejecutar `setup_webhook.php` en el servidor (solo CLI o localhost por seguridad).
-3. **Manual**: usando curl para llamar a la API de Telegram directamente:
-   ```bash
-   curl -s "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://midominio.com/api.php&secret_token=MI_SECRET"
-   ```
+// Validar secret token
+$secretToken = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '';
+if (!hash_equals(TELEGRAM_WEBHOOK_SECRET, $secretToken)) {
+    http_response_code(403);
+    die(json_encode(['error' => 'Acceso denegado']));
+}
 
-Para verificar el estado actual del webhook:
-```bash
-curl -s "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
+// Rate limiting
+// ...
+
+// Delegar en WebhookHandler
+WebhookHandler::processUpdate($update);
 ```
 
-### Componentes Principales
+**Por qué está así**: `api.php` no tiene lógica de negocio. Solo valida que la petición venga de Telegram (secret token), limita la cantidad de peticiones (rate limiting), y delega en `WebhookHandler`. Esto se hizo en la refactorización v0.1.7 — antes, `api.php` tenía cientos de líneas de lógica mezclada.
 
-1. **bootstrap.php**: Carga centralizada de dependencias
-2. **api.php**: Entry point HTTP (auth, rate limit, delega en WebhookHandler)
-3. **WebhookHandler.php**: Lógica de negocio (processUpdate, processMessage, etc.)
-4. **config.php**: Configuración y carga de variables de entorno
-5. **admin.php**: Interfaz de administración web
-6. **import.php**: Script de importación de exports de Telegram
+**Lección aprendida**: Separar el "recibir la petición" del "procesar los datos" hace que el código sea más fácil de entender y modificar.
 
-## Especificaciones Técnicas
+---
 
-### Requisitos del Sistema
+## Paso 2: Entender el formato de los mensajes
 
-- **PHP**: 8.0+
-- **Web Server**: Apache con mod_rewrite (recomendado) o Nginx
-- **Extensiones PHP**: 
-  - `curl` (para peticiones HTTP)
-  - `json` (para procesar webhooks de Telegram)
-  - `mbstring` (para manejo de strings)
-  - `session` (para administración)
-  - `zip` (para importar exports de Telegram)
+### El JSON que envía Telegram
 
-### Estructura de Archivos
-
-```
-trackergram/
-├── api.php              # Webhook endpoint (entry point HTTP)
-├── WebhookHandler.php   # Lógica de negocio del webhook
-├── admin.php            # Interfaz de administración
-├── import.php           # Importación de exports de Telegram
-├── bootstrap.php        # Carga centralizada de dependencias
-├── config.php           # Configuración y variables de entorno
-├── TikiWikiClient.php   # Cliente para API de TikiWiki
-├── TelegramClient.php   # Cliente para API de Telegram
-├── MessageMapper.php    # Transformación de mensajes
-├── .env.example         # Plantilla de variables de entorno
-├── .env                 # Variables de entorno (creado por usuario)
-├── .htaccess            # Configuración Apache y seguridad
-├── .gitignore           # Archivos ignorados por Git
-├── README.md            # Documentación para usuarios
-├── TECHNICAL.md         # Documentación técnica
-├── INSTALL.md           # Guía de instalación
-├── CAMBIOS.md           # Changelog
-├── CONTEXTO.md          # Guía para nuevos integrantes
-├── roadmap.md           # Roadmap del proyecto
-└── reports/             # Reportes externos de IA
-```
-
-### Arquitectura de Clientes
-
-El proyecto usa una arquitectura basada en clientes para separar responsabilidades:
-
-#### TikiWikiClient
-- `getMediaGalleryId($trackerId)` - Obtiene ID de galería de archivos del tracker
-- `uploadFile($filePath, $fileName, $galleryId)` - Sube archivo a TikiWiki
-- `createTrackerItem($trackerId, $fields)` - Crea item en tracker
-- `messageExists($trackerId, $messageId)` - Verifica si mensaje ya existe
-- `createTracker($name)` - Crea tracker con campos automáticamente
-
-#### TelegramClient
-- `getFileUrl($fileId)` - Obtiene URL de descarga de archivo de Telegram
-- `getChat($chatId)` - Obtiene información del chat
-- `downloadFile($fileUrl, $path)` - Descarga archivo a disco
-- `getFileContent($fileId)` - Descarga archivo y retorna contenido
-
-#### MessageMapper
-- `toTrackerFields($message, $context)` - Transforma mensaje a campos TikiWiki
-- `detectMessageType($message)` - Detecta tipo de mensaje y extrae info de media
-- `extractText($message)` - Extrae texto de various formatos
-- `extractDate($message)` - Convierte fecha a UNIX timestamp
-
-## API y Webhooks
-
-### Telegram Webhook Endpoint
-
-**URL**: `https://dominio.com/trackergram/api.php`
-**Método**: `POST`
-**Content-Type**: `application/json`
-
-#### Headers de Seguridad
-
-```
-X-Telegram-Bot-Api-Secret-Token: <secret_token_configurado>
-```
-
-#### Estructura del Webhook
+Cuando Telegram hace un POST, el cuerpo es algo así:
 
 ```json
 {
   "update_id": 123456789,
   "message": {
-    "message_id": 123,
-    "from": {
-      "id": 987654321,
-      "is_bot": false,
-      "first_name": "Usuario",
-      "username": "usuario_ejemplo",
-      "language_code": "es"
-    },
-    "chat": {
-      "id": -100123456789,
-      "title": "Grupo de Ejemplo",
-      "type": "supergroup"
-    },
-    "date": 1640995200,
-    "text": "Mensaje de ejemplo"
+    "message_id": 42,
+    "from": { "id": 987654321, "first_name": "Juan", "username": "juan" },
+    "chat": { "id": -1001234567890, "title": "Mi Grupo", "type": "supergroup" },
+    "date": 1700000000,
+    "text": "Hola grupo!"
   }
 }
 ```
 
-### TikiWiki API Integration
+Pero esto es solo el caso más simple. Un mensaje puede tener:
+- `photo` — un array de fotos (Telegram envía varias resoluciones)
+- `video` — un video con su `file_id`
+- `document` — un archivo adjunto
+- `sticker` — un sticker
+- `voice` — una nota de voz
+- `location` — coordenadas GPS
+- `forum_topic_created` — un mensaje de sistema que crea un topic
+- `message_thread_id` — el ID del topic al que pertenece el mensaje
+- Y muchos más...
 
-**Endpoint**: `TIKIWIKI_API_URL/trackers/{TRACKER_ID}/items`
-**Método**: `POST`
-**Autenticación**: Bearer Token
+### Cómo detectamos el tipo de mensaje
 
-#### Campos del Tracker (Permanent Names)
-
-| Campo TikiWiki | Origen | Formato |
-|----------------|--------|---------|
-| `telegrammessageTelegramMessageId` | `message.message_id` | Integer |
-| `telegrammessageChatId` | `message.chat.id` | Integer |
-| `telegrammessageChatTitle` | `message.chat.title` o `username` | String |
-| `telegrammessageTopicId` | `message.message_thread_id` | Integer/String |
-| `telegrammessageTopicTitle` | Cache local + fallback (ver sección "Resolución de Nombres de Topics") | String |
-| `telegrammessageUserId` | `message.from.id` | Integer |
-| `telegrammessageUsername` | `message.from.username` | String |
-| `telegrammessageFirstName` | `message.from.first_name` | String |
-| `telegrammessageLastName` | `message.from.last_name` | String |
-| `telegrammessageMessageType` | `extractMessageData().type` | String |
-| `telegrammessageText` | `extractMessageData().text` | String |
-| `telegrammessageMedia` | `downloadAndUploadMedia().fileId` | File (vinculado a galería) |
-| `telegrammessageMediaType` | `extractMessageData().media_type` | String |
-| `telegrammessageMediaSize` | `extractMessageData().media_size` | Integer |
-| `telegrammessageMediaCaption` | `extractMessageData().media_caption` | String |
-| `telegrammessageMessageDate` | `message.date` | Integer |
-
-## Configuración
-
-### Variables de Entorno (.env)
-
-```bash
-# Modo debug (opcional)
-DEBUG_MODE=true
-```
-
-### Constantes del Sistema
-
-Las siguientes constantes están definidas en `config.php`:
+La clase `MessageMapper` tiene un método `fromWebhook()` que recibe el array del mensaje y devuelve información estructurada:
 
 ```php
-// Timeouts (en segundos)
-TIMEOUT_TELEGRAM_API = 5      // Para llamadas a API de Telegram
-TIMEOUT_TELEGRAM_DOWNLOAD = 10 // Para descarga de archivos de Telegram
-TIMEOUT_TIKIWIKI_API = 30     // Para llamadas a API de TikiWiki
-TIMEOUT_TIKIWIKI_UPLOAD = 30  // Para subida de archivos a TikiWiki
-
-// Reintentos
-RETRY_MAX_ATTEMPTS = 2        // Número máximo de reintentos
-RETRY_DELAY_MICROSECONDS = 100000 // Delay entre reintentos (0.1 segundos)
-
-// Cache
-CACHE_ENABLED = true          // Habilitar cache de galleryId
+$info = MessageMapper::fromWebhook($message);
+// $info['type'] = 'photo', 'video', 'text', 'system', etc.
+// $info['file_id'] = el ID del archivo en Telegram
+// $info['text'] = texto descriptivo
 ```
 
-### Variables de Entorno (.env)
+El enfoque es simple: chequear cada campo posible en orden de prioridad. Si tiene `photo`, es una foto. Si tiene `video`, es un video. Si no tiene ninguno de los campos conocidos, es "otro".
 
-```bash
-# Token del Bot de Telegram (obligatorio)
-TELEGRAM_BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
+**Por qué no usar switch o match**: Porque los campos de Telegram no son mutuamente excluyentes. Un mensaje puede tener `document` Y `caption`. El orden de chequeo importa.
 
-# Secret Token para Webhook (opcional pero recomendado)
-TELEGRAM_WEBHOOK_SECRET=tu_token_secreto_aleatorio_32_chars
+---
 
-# Configuración TikiWiki (obligatorio)
-TIKIWIKI_API_URL=https://wiki.ejemplo.com/api/
-TIKIWIKI_TOKEN=tikiwiki_bearer_token_aqui
-TIKIWIKI_TRACKER_ID=1
+## Paso 3: Enviar a TikiWiki
 
-# Credenciales Administración (obligatorio)
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=contraseña_segura_aqui
+### ¿Qué es un tracker en TikiWiki?
 
-# Configuración Aplicación
-DEBUG_MODE=false
+Un tracker es como una base de datos de formularios. Cada "item" es un registro con campos. Para trackerGram, cada mensaje de Telegram se convierte en un item del tracker.
+
+Los campos del tracker tienen "permanent names" — identificadores únicos que la API usa para referirse a ellos. Por ejemplo: `telegrammessageTelegramMessageId`, `telegrammessageText`, etc.
+
+### El mapeo de campos
+
+`MessageMapper::toWikiFields()` toma los datos estructurados y los convierte al formato que TikiWiki espera:
+
+```php
+$fields = [
+    'fields[telegrammessageTelegramMessageId]' => 42,
+    'fields[telegrammessageChatId]' => -1001234567890,
+    'fields[telegrammessageText]' => 'Hola grupo!',
+    // ...
+];
 ```
 
-### Configuración Apache (.htaccess)
+**Por qué `fields[permName]`**: La API de TikiWiki no acepta JSON para crear items. Espera un POST con `application/x-www-form-urlencoded` donde cada campo tiene el formato `fields[nombreDelCampo]`. Esto es particular de TikiWiki y no es estándar en APIs REST.
 
-```apache
-# Seguridad - Bloquear acceso a archivos sensibles
-<Files ".env">
-    Require all denied
-</Files>
+### El cliente de TikiWiki
 
-<Files "config.php">
-    Require all denied
-</Files>
+`TikiWikiClient::createTrackerItem()` hace el POST a la API:
 
-# Headers de Seguridad
-<IfModule mod_headers.c>
-    Header set X-Frame-Options "DENY"
-    Header set X-Content-Type-Options "nosniff"
-    Header set X-XSS-Protection "1; mode=block"
-    Header set Referrer-Policy "strict-origin-when-cross-origin"
-</IfModule>
+```php
+$url = TIKIWIKI_API_URL . "trackers/$trackerId/items";
+// POST con http_build_query($fields)
+// Header: Authorization: Bearer $TOKEN
 ```
 
-## Resolución de Nombres de Topics (Forums)
+**Lección aprendida**: TikiWiki a veces devuelve errores PHP como HTML con status 200. Por eso verificamos que la respuesta tenga `itemId` en JSON — si no lo tiene, algo falló aunque el HTTP diga 200.
+
+---
+
+## Paso 4: Manejar archivos multimedia
+
+### El flujo
+
+1. Telegram envía un `file_id` en el webhook
+2. Pedimos a Telegram la URL de descarga (`getFile`)
+3. Descargamos el archivo a un temp local
+4. Lo subimos a la file gallery de TikiWiki
+5. Vinculamos el archivo al campo `telegrammessageMedia` del tracker
+
+### El problema del tamaño
+
+Telegram permite archivos de hasta 20MB. Si descargamos un archivo de 20MB y lo cargamos entero en memoria, podemos saturar el servidor.
+
+**Solución**: Verificamos el tamaño antes de descargar usando un HEAD request:
+
+```php
+curl_setopt($ch, CURLOPT_NOBODY, true); // HEAD request
+$contentLength = curl_getinfo($ch, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
+if ($contentLength > MEDIA_DOWNLOAD_MAX_SIZE) {
+    // Rechazar
+}
+```
+
+Esto evita descargar archivos que exceden el límite.
+
+### Cómo encuentra TikiWiki dónde guardar el archivo
+
+Cada tracker tiene una file gallery asociada en su configuración. `TikiWikiClient::getMediaGalleryId()` consulta la configuración del tracker, busca el campo `telegrammessageMedia` de tipo `FG` (File Gallery), y extrae el gallery ID de sus opciones.
+
+**Optimización**: Este ID se cachea en memoria (`static $mediaGalleryIdCache`) para no consultar la API de TikiWiki en cada mensaje.
+
+---
+
+## Paso 5: Los Topics (Forums)
 
 ### El problema
 
-En grupos de Telegram con temas (forums), cada mensaje pertenece a un topic identificado por `message_thread_id`. El webhook recibe este ID pero **no** el nombre del topic. Telegram Bot API no tiene un método `getForumTopic` para obtener el nombre a partir del ID.
+En grupos de Telegram con topics, cada mensaje tiene un `message_thread_id`. Pero Telegram **no envía el nombre del topic** en cada mensaje. Y no existe un método `getForumTopic` en la API de Telegram para obtener el nombre a partir del ID.
+
+Entonces: ¿cómo sabemos el nombre del topic?
+
+### La solución en 3 niveles
+
+**Nivel 1: El mensaje de creación**
+
+Cuando se crea un topic, Telegram envía un mensaje especial con `forum_topic_created` que incluye el nombre:
+
+```json
+{
+  "message_thread_id": 42,
+  "forum_topic_created": { "name": "Anuncios" }
+}
+```
+
+Si un mensaje responde a este mensaje de creación (`reply_to_message.forum_topic_created`), podemos obtener el nombre.
+
+**Nivel 2: Cache local**
+
+Cuando detectamos un `forum_topic_created`, guardamos el nombre en un archivo `topic_names.json`:
+
+```json
+{
+  "-1001234567890:42": "Anuncios",
+  "-1001234567890:99": "General"
+}
+```
+
+La clave es `chatId:messageThreadId`. Los mensajes posteriores leen de este archivo.
+
+**Nivel 3: Fallback**
+
+Si no hay cache ni mensaje de creación:
+- Si hay `message_thread_id`: usamos `Topic-XX` como identificador
+- Si no hay `message_thread_id`: usamos `General`
+
+**Lección aprendida**: Intentamos usar `getChat()` de la API de Telegram para obtener info del topic, pero no funciona para forums. La cache local es la solución más confiable.
+
+---
+
+## Paso 6: Evitar duplicados
+
+### El problema
+
+Telegram puede enviar el mismo webhook dos veces. Si no verificamos, terminamos con mensajes duplicados en TikiWiki.
+
+### La solución: deduplicación por (chat_id, message_id)
+
+Antes de crear un item, verificamos si ya existe:
+
+```php
+if (TikiWikiClient::messageExists(TIKIWIKI_TRACKER_ID, $message['message_id'], $chatId) > 0) {
+    return; // Ya existe, saltar
+}
+```
+
+`messageExists` hace un GET a la API de TikiWiki filtrando por `telegrammessageTelegramMessageId` Y `telegrammessageChatId`. Retorna la cantidad de items encontrados.
+
+**Lección aprendida**: Al principio solo filtrábamos por `message_id`. Pero dos chats diferentes pueden tener mensajes con el mismo ID. La deduplicación correcta es por el par `(chat_id, message_id)`.
+
+### Race conditions
+
+Incluso con verificación previa, puede haber race conditions: dos webhooks del mismo mensaje llegan casi al mismo tiempo, ambos pasan la verificación, y ambos crean el item.
+
+**Solución**: Verificación post-insert:
+
+```php
+if (TikiWikiClient::messageExists(...) > 1) {
+    error_log("WARNING: duplicado detectado post-insert — posible race condition");
+}
+```
+
+Esto no previene el duplicado pero lo detecta para logging.
+
+---
+
+## Paso 7: Reintentos
+
+### El problema
+
+La API de TikiWiki puede fallar temporalmente (timeout, error 500, etc.). No queremos perder un mensaje por un fallo transitorio.
 
 ### La solución
 
-Se usan tres mecanismos en orden de prioridad:
+```php
+for ($i = 0; $i < RETRY_MAX_ATTEMPTS; $i++) {
+    if (TikiWikiClient::createTrackerItem(...)) {
+        return true;
+    }
+    usleep(RETRY_DELAY_MICROSECONDS); // 0.1 segundos
+}
+```
 
-1. **`reply_to_message.forum_topic_created.name`** — Cuando un mensaje responde al mensaje de creación de un topic (el service message `forum_topic_created`), Telegram incluye el nombre del topic en `reply_to_message`. Esto permite capturar el nombre exacto sin llamar a ninguna API.
-
-2. **Cache local (`topic_names.json`)** — Cuando se detecta un `forum_topic_created`, el nombre se guarda en un archivo JSON con `chatId:messageThreadId` como clave. Los mensajes posteriores en el mismo topic leen el nombre desde esta cache sin necesidad de repetir el paso 1.
-
-3. **Fallback** — Si no se pudo obtener el nombre por ninguno de los mecanismos anteriores:
-   - Si hay un `message_thread_id` numérico (grupo con temas): se usa `'Topic-XX'` como identificador
-   - Si no hay `message_thread_id` (grupo sin temas): se usa `'General'`, que es el nombre por defecto
-
-### Nota
-
-`getForumTopic` no existe como método de la Telegram Bot API. Cualquier intento de usarlo fallará silenciosamente. La resolución de nombres depende exclusivamente de los mensajes de creación de topics y la cache local.
+**Lección aprendida**: Al principio usábamos `sleep(1)` — un segundo de espera. En un servidor con muchos mensajes, esto se acumula y satura. Cambiamos a `usleep(100000)` (0.1 segundos) que es suficiente para la mayoría de los casos sin bloquear.
 
 ---
 
-## Procesamiento de Mensajes
+## Paso 8: Importar historial
 
-### Tipos de Mensajes Soportados
+### El formato de export de Telegram
 
-| Tipo | Campo Telegram | Procesamiento |
-|------|----------------|---------------|
-| Texto | `message.text` | Texto plano |
-| Foto | `message.photo` | Sube a TikiWiki gallery, texto: "Foto: image/jpeg" |
-| Video | `message.video` | Sube a TikiWiki gallery, texto: "Video: video/mp4" |
-| Audio | `message.audio` | Sube a TikiWiki gallery, texto: "Audio: audio/mpeg" |
-| Documento | `message.document` | Sube a TikiWiki gallery, texto: "Documento: tipo - nombre" |
-| Sticker | `message.sticker` | Sube a TikiWiki gallery, texto: "Sticker: image/webp" |
-| Voz | `message.voice` | Sube a TikiWiki gallery, texto: "Nota de voz: audio/ogg" |
-| Video Nota | `message.video_note` | Sube a TikiWiki gallery, texto: "Video circular: video/mp4" |
-| Ubicación | `message.location` | Link a Google Maps |
-| Contacto | `message.contact` | Nombre y teléfono |
-| Encuesta | `message.poll` | Pregunta y opciones |
-| Animation | `message.animation` | Tipo de archivo |
-| Sistema | `message.forum_topic_*` | Texto descriptivo |
-| No soportado | (otros) | Muestra tipo de mensaje |
+Cuando exportás un chat desde Telegram, obtenés un ZIP con:
+- `result.json` — todos los mensajes
+- Archivos multimedia (fotos, videos, etc.)
+
+El `result.json` tiene una estructura diferente al webhook:
+
+```json
+{
+  "name": "Mi Grupo",
+  "id": 1234567890,
+  "messages": [
+    {
+      "id": 42,
+      "type": "message",
+      "from": "Juan",
+      "date": "2024-01-15T10:30:00",
+      "text": "Hola"
+    }
+  ]
+}
+```
+
+### Las diferencias con el webhook
+
+| Aspecto | Webhook | Export ZIP |
+|---|---|---|
+| ID del mensaje | `message_id` (int) | `id` (int) |
+| Usuario | `from.id`, `from.first_name` | `from` (string), `from_id` (string) |
+| Fecha | `date` (timestamp) | `date` (string ISO) |
+| Archivos | `file_id` (referencia) | `photo`, `file` (nombres de archivo) |
+| Topics | `message_thread_id` | `reply_to_message_id` → buscar en `topic_created` |
+
+### Cómo resolvimos las diferencias
+
+`import.php` tiene su propio parser porque el formato es distinto. Pero ambos caminos convergen en `MessageMapper::toWikiFields()` para enviar a TikiWiki.
+
+**Optimización importante**: Al principio, para cada mensaje escaneábamos recursivamente todo el ZIP para encontrar el archivo multimedia. Con exports grandes, esto era lentísimo. La solución: indexar todos los archivos una sola vez al inicio:
+
+```php
+$fileIndex = [];
+foreach ($dirIterator as $f) {
+    $fileIndex[$f->getFilename()] = $f->getPathname();
+}
+// Luego: $filePath = $fileIndex[$fileName] ?? '';
+```
+
+De O(n × m) a O(n + m).
 
 ---
 
-## Versiones y Cambios
+## Arquitectura del Proyecto
 
-Ver [CAMBIOS.md](CAMBIOS.md) para el historial completo de cambios por versión.
+### Diagrama de flujo
 
-## Licencia y Soporte
+```
+Telegram
+    ↓ (webhook POST)
+api.php ← valida token, rate limit
+    ↓
+WebhookHandler::processUpdate()
+    ↓ (dispatch)
+WebhookHandler::processMessage()
+    ↓
+1. Validar campos requeridos
+2. Resolver topic (cache → fallback)
+3. Verificar duplicado
+4. MessageMapper::fromWebhook() → extraer datos
+5. downloadAndUploadMedia() → descargar de Telegram, subir a TikiWiki
+6. sendToTikiWikiWithRetries() → crear item con reintentos
+```
 
-- **Licencia**: MIT
-- **Soporte**: Documentación + logs
-- **Contribuciones**: GitHub issues
-- **Versiones**: Semantic versioning
+### Cómo se relacionan los archivos
+
+```
+bootstrap.php
+    ├── config.php          → carga .env, define constantes
+    ├── TikiWikiClient.php  → comunicación con TikiWiki
+    ├── TelegramClient.php  → comunicación con Telegram
+    ├── MessageMapper.php   → transformación de datos
+    └── WebhookHandler.php  → orquesta todo
+
+api.php → bootstrap.php → WebhookHandler::processUpdate()
+admin.php → bootstrap.php → TikiWikiClient::createTracker()
+import.php → bootstrap.php → MessageMapper::toWikiFields() + TikiWikiClient
+```
+
+### Deuda técnica identificada
+
+1. **Clases estáticas**: `TikiWikiClient`, `TelegramClient`, `WebhookHandler` usan métodos estáticos. No hay inyección de dependencias, lo que dificulta el testing unitario.
+2. **Parsers separados**: `WebhookHandler::extractMessageData()` e `import.php` tienen lógica similar pero separada. Deberían converger en un modelo intermedio único.
+3. **Manejo de errores inconsistente**: Algunas funciones retornan `null`, otras `false`, otras usan `die()`. Deberían usar excepciones de dominio.
+
+Estas mejoras están en el roadmap como prioridad alta.
+
+---
+
+## Seguridad: Lo que aprendimos
+
+### Secret Token del Webhook
+
+Telegram permite configurar un `secret_token` que se envía en el header `X-Telegram-Bot-Api-Secret-Token`. Esto verifica que la petición realmente viene de Telegram y no de alguien que descubrió tu URL de webhook.
+
+**Sin esto**: Cualquiera que conozca tu URL puede enviar mensajes falsos.
+
+### CSRF en el Admin Panel
+
+El panel de administración (`admin.php`) genera un token CSRF por sesión que se incluye en cada formulario. Sin este token, las peticiones POST son rechazadas.
+
+**Sin esto**: Un atacante podría hacer que un admin logueado ejecute acciones sin saberlo.
+
+### Hash de Contraseñas
+
+Las contraseñas de admin se almacenan como hash bcrypt (`$2y$...`). Si la contraseña está en texto plano (versiones viejas), se convierte a hash automáticamente en el primer login.
+
+### Path Traversal en ZIPs
+
+Al extraer un ZIP, verificamos que ningún archivo tenga `..` en su nombre o comience con `/`. Sin esto, un ZIP malicioso podría sobrescribir archivos del servidor.
+
+### Rate Limiting
+
+Tanto el webhook como el login del admin tienen rate limiting por IP. Sin esto, un atacante podría hacer fuerza bruta o saturar el servidor.
+
+---
+
+## Ejecución y Debug con Docker
+
+> Esta sección es informal. La iremos mejorando con el tiempo.
+
+trackerGram se ejecuta en un contenedor Docker con Apache + PHP. Los comandos más útiles:
+
+```bash
+# Ver los últimos 30 logs
+docker compose logs --tail 30
+
+# Ver logs en tiempo real
+docker compose logs -f
+
+# Reiniciar el contenedor
+docker compose down
+docker compose up -d
+
+# Ver logs de un servicio específico
+docker compose logs -f trackergram
+```
+
+### Permisos de archivos
+
+Docker y el host pueden tener conflictos de permisos. Los archivos que trackerGram necesita escribir (`.env`, `topic_names.json`, `debug.log`) deben tener permisos adecuados:
+
+```bash
+# Si hay problemas de permisos en Linux:
+sudo chown -R www-data:www-data /ruta/a/trackergram
+sudo chmod -R 755 /ruta/a/trackergram
+sudo chmod 600 /ruta/a/trackergram/.env
+```
+
+Si el contenedor no puede escribir en `.env` o `topic_names.json`, el panel de administración fallará al guardar configuración.
+
+### DEBUG_MODE
+
+Activar `DEBUG_MODE=true` en `.env` para ver logs detallados en `debug.log`:
+
+```bash
+# Ver logs en tiempo real
+docker compose logs -f
+tail -f debug.log
+```
+
+---
+
+## Lecciones Aprendidas
+
+### Problemas que surgieron y cómo los resolvimos
+
+| Problema | Causa | Solución |
+|---|---|---|
+| Mensajes duplicados | Deduplicación solo por `message_id` | Deduplicar por par `(chat_id, message_id)` |
+| ModSecurity bloqueaba peticiones | Sin User-Agent en curl | Agregar `User-Agent: Mozilla/5.0` |
+| TypeError en `getTopicName` | Cache leída como string vacío | Validar tipo antes de acceder |
+| `getForumTopic` no funciona | No existe en la API de Telegram | Cache local + fallback |
+| Import lento en exports grandes | Escaneo recursivo por cada mensaje | Indexar archivos una sola vez |
+| Token de Telegram en logs | URLs de descarga contenían el token | Descargar por proxy, no loguear URLs |
+| XSS en admin panel | `innerHTML` con datos del usuario | Cambiar a `textContent` |
+| Password en texto plano | Sin hash en `.env` | `password_hash()` con bcrypt |
+| Path traversal en ZIP | Sin validación de nombres de archivo | Verificar que no contengan `..` |
+| Race conditions en duplicados | Dos webhooks simultáneos | Verificación post-insert |
+| `sleep(1)` bloqueaba mucho | Reintentos con sleep de 1 segundo | Cambiar a `usleep(100000)` |
+| Doble `/api.php` en URL | Bug en `generateWebhookUrl()` | Corregir lógica de construcción |
+
+### Lo que haríamos diferente
+
+1. **Inyección de dependencias desde el inicio**: Las clases estáticas fueron rápidas pero ahora dificultan el testing.
+2. **Tests unitarios desde el principio**: Muchos bugs se hubieran detectado automáticamente.
+3. **Un modelo intermedio único para mensajes**: Evitaría tener parsers separados para webhook e import.
+4. **Excepciones de dominio**: En vez de mezclar `null`, `false` y `die()`, usar excepciones tipadas.
+
+---
+
+## Referencias
+
+| Recurso | URL |
+|---|---|
+| Telegram Bot API | https://core.telegram.org/bots/api |
+| TikiWiki API | https://wiki.chela.org.ar/api/ |
+| Webhooks (explicación general) | https://webhooks.fyi/ |
