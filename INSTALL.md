@@ -12,7 +12,7 @@
 - **Nginx 1.18+** (alternativa)
 
 ### PHP
-- **PHP 7.4+** (recomendado 8.0+)
+- **PHP 8.0+**
 - Extensiones requeridas:
   ```bash
   # Ubuntu/Debian
@@ -186,14 +186,12 @@ DEBUG_MODE=false
 
 ### 7. Configurar el Webhook
 
-#### Opción A: Script Automático (Recomendado)
+#### Opción A: Usar el panel de administración (Recomendado)
 
-```bash
-# Acceder al script desde el navegador
-https://trackergram.dominio.com/setup_webhook.php
-```
-
-El script detectará automáticamente la URL y configurará el webhook.
+1. Accede a `https://tu-dominio.com/trackergram/admin.php`
+2. Inicia sesión con las credenciales configuradas
+3. Ve al formulario "Actualizar Webhook"
+4. Haz clic en "Actualizar Webhook"
 
 #### Opción B: Configuración Manual
 
@@ -352,7 +350,7 @@ sudo nano /etc/logrotate.d/trackergram
 
 ### Checklist de Instalación
 
-- [ ] PHP 7.4+ con extensiones requeridas
+- [ ] PHP 8.0+ con extensiones requeridas
 - [ ] Servidor web configurado
 - [ ] Permisos de archivos correctos
 - [ ] Variables de entorno configuradas

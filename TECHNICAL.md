@@ -55,17 +55,17 @@ curl -s "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
 
 ### Componentes Principales
 
-1. **api.php**: Endpoint principal del webhook
-2. **config.php**: Configuración y carga de variables de entorno
-3. **admin.php**: Interfaz de administración web
-4. **import.php**: Script de importación de exports de Telegram
-5. **setup_webhook.php**: Script para configuración automática
+1. **api.php**: Entry point HTTP (auth, rate limit, delega en WebhookHandler)
+2. **WebhookHandler.php**: Lógica de negocio (processUpdate, processMessage, etc.)
+3. **config.php**: Configuración y carga de variables de entorno
+4. **admin.php**: Interfaz de administración web
+5. **import.php**: Script de importación de exports de Telegram
 
 ## Especificaciones Técnicas
 
 ### Requisitos del Sistema
 
-- **PHP**: 7.4+ (recomendado 8.0+)
+- **PHP**: 8.0+
 - **Web Server**: Apache con mod_rewrite (recomendado) o Nginx
 - **Extensiones PHP**: 
   - `curl` (para peticiones HTTP)
@@ -78,11 +78,11 @@ curl -s "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
 
 ```
 trackergram/
-├── api.php              # Webhook endpoint (punto de entrada principal)
+├── api.php              # Webhook endpoint (entry point HTTP)
+├── WebhookHandler.php   # Lógica de negocio del webhook
 ├── admin.php            # Interfaz de administración
 ├── import.php           # Importación de exports de Telegram
 ├── config.php           # Configuración y variables de entorno
-├── setup_webhook.php    # Script de configuración inicial
 ├── TikiWikiClient.php   # Cliente para API de TikiWiki
 ├── TelegramClient.php   # Cliente para API de Telegram
 ├── MessageMapper.php    # Transformación de mensajes
@@ -95,7 +95,8 @@ trackergram/
 ├── INSTALL.md           # Guía de instalación
 ├── CAMBIOS.md           # Changelog
 ├── CONTEXTO.md          # Guía para nuevos integrantes
-└── roadmap.md           # Roadmap del proyecto
+├── roadmap.md           # Roadmap del proyecto
+└── reports/             # Reportes externos de IA
 ```
 
 ### Arquitectura de Clientes
@@ -270,7 +271,7 @@ Se usan tres mecanismos en orden de prioridad:
 
 1. **`reply_to_message.forum_topic_created.name`** — Cuando un mensaje responde al mensaje de creación de un topic (el service message `forum_topic_created`), Telegram incluye el nombre del topic en `reply_to_message`. Esto permite capturar el nombre exacto sin llamar a ninguna API.
 
-2. **Cache local (`topic_names.json`)** — Cuando se detecta un `forum_topic_created`, el nombre se guarda en un archivo JSON con el `message_thread_id` como clave. Los mensajes posteriores en el mismo topic leen el nombre desde esta cache sin necesidad de repetir el paso 1.
+2. **Cache local (`topic_names.json`)** — Cuando se detecta un `forum_topic_created`, el nombre se guarda en un archivo JSON con `chatId:messageThreadId` como clave. Los mensajes posteriores en el mismo topic leen el nombre desde esta cache sin necesidad de repetir el paso 1.
 
 3. **Fallback** — Si no se pudo obtener el nombre por ninguno de los mecanismos anteriores:
    - Si hay un `message_thread_id` numérico (grupo con temas): se usa `'Topic-XX'` como identificador
@@ -307,33 +308,7 @@ Se usan tres mecanismos en orden de prioridad:
 
 ## Versiones y Cambios
 
-### v0.1.2 (Beta) - Actual
-- Importación de exports de Telegram (ZIP)
-- Creación automática de trackers con campos via API
-- Interfaz de administración reorganizada con índice
-- Seguridad: deduplicación, CSRF, checkAuth(), hash_equals()
-- Fix: ModSecurity, tipos de campo TikiWiki
-
-### v0.1.1 (Alpha)
-- Deduplicación de mensajes basada en message_id
-- Agregado soporte para ubicaciones, contactos, encuestas, animations
-- Captura de nombre del chat (chat_title)
-- Título del topic (topic_title)
-- Mejor manejo de mensajes no soportados (muestra el tipo)
-- Refactorización: type hints en funciones, constantes de configuración, logging unificado
-
-### v0.1.0 (Alpha)
-- Subida de archivos multimedia a TikiWiki file gallery
-- Los archivos se vinculan al campo `telegrammessageMedia` del tracker
-- El galleryId se obtiene dinámicamente desde la configuración del tracker via API (no hardcodeado)
-- Campo de texto ahora muestra solo el MIME type (no HTML)
-- Mejoras de seguridad en admin.php
-
-### v0.0.1 (Alpha)
-- Primera versión funcional
-- Webhook endpoint para Telegram
-- Integración básica con TikiWiki trackers
-- Interfaz de administración
+Ver [CAMBIOS.md](CAMBIOS.md) para el historial completo de cambios por versión.
 
 ## Licencia y Soporte
 

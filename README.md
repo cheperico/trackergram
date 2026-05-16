@@ -29,7 +29,7 @@ Importar exports ZIP → TikiWiki Tracker
 
 ## Requisitos
 
-- PHP 7.4+ (recomendado 8.0+)
+- PHP 8.0+
 - Apache con mod_rewrite
 - Bot de Telegram (creado con @BotFather)
 - TikiWiki 21.x+ con API habilitada
@@ -92,15 +92,7 @@ DEBUG_MODE=false
 3. Ve a la sección "3. Webhook de Telegram"
 4. Haz clic en "Actualizar Webhook"
 
-**Opción B: Script automático**
-
-1. Accede al script desde tu navegador:
-   ```
-   https://tu-dominio.com/trackergram/setup_webhook.php
-   ```
-2. El script detectará automáticamente la URL del servidor y configurará el webhook
-
-**Opción C: Configuración manual**
+**Opción B: Configuración manual**
 
 1. Determina la URL pública de tu webhook:
    ```
@@ -142,7 +134,7 @@ trackerGram incluye una interfaz web para configurar y administrar:
 En lugar de crear el tracker manualmente, puedes usar la sección "5. Crear Tracker en TikiWiki" del panel de administración. El script creará un tracker con todos los campos necesarios:
 - Telegram Message ID, Chat ID, Chat Title, Topic ID, Topic Title
 - User ID, Username, First Name, Last Name
-- Message Type, Text, Media, Media URL, File URL
+- Message Type, Text, Media
 - Media Type, Media Size, Media Caption, Location, Message Date
 
 ### 7. Importar Conversaciones (Opcional)
@@ -159,9 +151,9 @@ Para importar conversaciones históricas desde Telegram:
 trackergram/
 ├── config.php          # Configuración del proyecto
 ├── api.php             # Webhook endpoint de Telegram
+├── WebhookHandler.php  # Lógica de negocio del webhook
 ├── admin.php           # Interfaz de administración
-├── import.php          # Script de importación de exports
-├── setup_webhook.php   # Script para configurar webhook automáticamente
+├── import.php          # Importación de exports de Telegram
 ├── .env                # Variables de entorno (credenciales)
 ├── .env.example        # Plantilla de variables de entorno
 ├── .htaccess           # Configuración Apache
@@ -170,6 +162,8 @@ trackergram/
 ├── INSTALL.md          # Guía de instalación
 ├── CAMBIOS.md          # Changelog
 ├── roadmap.md          # Roadmap del proyecto
+├── CONTEXTO.md         # Guía para nuevos integrantes
+├── reports/            # Reportes externos
 └── debug.log           # Logs (se crea automáticamente si DEBUG_MODE=true)
 ```
 
@@ -267,8 +261,10 @@ Si ModSecurity bloquea las peticiones a TikiWiki:
 ## Autores y Desarrollo
 
 - **cheperico**: Dirección del proyecto, pruebas y validación
-- **OpenCode (minimax-m2.5-free)**: Asistencia de programación
+- **OpenCode (minimax-m2.5-free / deepseek-v4-flash-free)**: Asistencia de programación
 - **Cascade (SWE-1.5 y SWE-1.6 - Cognition AI Assistant)**: Asistencia de programación
+- **Gemini (Google)**: Reportes de seguridad, arquitectura y revisión estratégica
+- **OpenAI Codex (GPT-based)**: Revisiones de código
 
 ### Sobre el desarrollo
 

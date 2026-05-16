@@ -213,27 +213,9 @@ function checkAuth() {
                         $env = loadEnvFromFile();
                         $env['ADMIN_PASSWORD'] = password_hash($_POST['login_password'], PASSWORD_BCRYPT);
                         saveEnv($env);
-    }
-}
+                    }
+                }
 
-// Procesar cambio de contraseña
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'change_password') {
-    validateCSRFToken($_POST['csrf_token'] ?? '');
-    
-    $newPassword = trim($_POST['admin_password'] ?? '');
-    if (strlen($newPassword) < 8) {
-        $error = "La contraseña debe tener al menos 8 caracteres";
-    } else {
-        $env = loadEnvFromFile();
-        $env['ADMIN_PASSWORD'] = password_hash($newPassword, PASSWORD_BCRYPT);
-        if (saveEnv($env)) {
-            $success = "Contraseña cambiada exitosamente";
-        } else {
-            $error = "Error al guardar la nueva contraseña";
-        }
-    }
-}
-                
                 if ($loginOk) {
                     $_SESSION['authenticated'] = true;
                     resetFailedLogin();
@@ -283,6 +265,25 @@ if (!checkAuth()) {
     </html>
     <?php
     exit;
+}
+
+// Procesar cambio de contraseña
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'change_password') {
+    validateCSRFToken($_POST['csrf_token'] ?? '');
+    
+    $newPassword = trim($_POST['admin_password'] ?? '');
+    if (strlen($newPassword) < 8) {
+        $error = "La contraseña debe tener al menos 8 caracteres";
+    } else {
+        $env = loadEnvFromFile();
+        $env['ADMIN_PASSWORD'] = password_hash($newPassword, PASSWORD_BCRYPT);
+        if (saveEnv($env)) {
+            session_regenerate_id(true);
+            $success = "Contraseña cambiada exitosamente";
+        } else {
+            $error = "Error al guardar la nueva contraseña";
+        }
+    }
 }
 
 // Procesar formulario de configuración general
@@ -410,6 +411,10 @@ if (!checkAuth()) {
 <html>
 <head>
     <title>trackerGram - Administración</title>
+    <style>
+        .import-success { color: green; }
+        .import-error { color: red; }
+    </style>
 </head>
 <body>
     <h1>trackerGram - Administración</h1>
@@ -520,7 +525,8 @@ if (!checkAuth()) {
         var formData = new FormData(form);
         var resultDiv = document.getElementById('import-result');
         
-        resultDiv.innerHTML = 'Importando... Esto puede tomar varios minutos.';
+        resultDiv.textContent = 'Importando... Esto puede tomar varios minutos.';
+        resultDiv.className = '';
         
         fetch('import.php', {
             method: 'POST',
@@ -536,24 +542,28 @@ if (!checkAuth()) {
             try {
                 return JSON.parse(text);
             } catch (e) {
-                resultDiv.innerHTML = '<p style="color: red;">Respuesta no válida: ' + text.substring(0, 200) + '</p>';
+                resultDiv.textContent = 'Respuesta no válida: ' + text.substring(0, 200);
+                resultDiv.className = 'import-error';
                 return null;
             }
         })
         .then(data => {
             if (!data) return;
             if (data.error) {
-                resultDiv.innerHTML = '<p style="color: red;">Error: ' + data.error + '</p>';
+                resultDiv.textContent = 'Error: ' + data.error;
+                resultDiv.className = 'import-error';
             } else {
-                resultDiv.innerHTML = '<p style="color: green;">Importación completada:<br>' +
-                    '- ' + data.imported + ' mensajes importados<br>' +
-                    '- ' + data.skipped + ' errores<br>' +
-                    '- ' + data.media_processed + ' archivos subidos<br>' +
-                    '- ' + data.topics_found + ' topics encontrados</p>';
+                resultDiv.textContent = 'Importación completada:\n' +
+                    '- ' + data.imported + ' mensajes importados\n' +
+                    '- ' + data.skipped + ' errores\n' +
+                    '- ' + data.media_processed + ' archivos subidos\n' +
+                    '- ' + data.topics_found + ' topics encontrados';
+                resultDiv.className = 'import-success';
             }
         })
         .catch(error => {
-            resultDiv.innerHTML = '<p style="color: red;">Error: ' + error.message + '</p>';
+            resultDiv.textContent = 'Error: ' + error.message;
+            resultDiv.className = 'import-error';
         });
     }
     </script>

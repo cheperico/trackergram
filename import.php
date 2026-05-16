@@ -113,13 +113,16 @@ if ($zip->open($file['tmp_name']) !== true) {
 
 // Validar que ningún archivo del ZIP intente path traversal
 $safeExtract = true;
+$totalUncompressedSize = 0;
+$maxDepth = 10;
 for ($i = 0; $i < $zip->numFiles; $i++) {
     $entryName = $zip->getNameIndex($i);
-    // Rechazar nombres con ".." o rutas absolutas
     if (strpos($entryName, '..') !== false || str_starts_with($entryName, '/')) {
         $safeExtract = false;
         break;
     }
+    $stat = $zip->statIndex($i);
+    $totalUncompressedSize += $stat['size'] ?? 0;
 }
 
 if (!$safeExtract) {
@@ -127,6 +130,31 @@ if (!$safeExtract) {
     rrmdir($tempDir);
     echo json_encode(['error' => 'El archivo ZIP contiene rutas no válidas']);
     exit;
+}
+
+if ($zip->numFiles > 10000) {
+    $zip->close();
+    rrmdir($tempDir);
+    echo json_encode(['error' => 'El ZIP contiene demasiados archivos (máx. 10000)']);
+    exit;
+}
+
+if ($totalUncompressedSize > 200 * 1024 * 1024) {
+    $zip->close();
+    rrmdir($tempDir);
+    echo json_encode(['error' => 'El tamaño total descomprimido excede el límite de 200 MB']);
+    exit;
+}
+
+foreach (range(0, $zip->numFiles - 1) as $i) {
+    $entryName = $zip->getNameIndex($i);
+    $depth = substr_count(str_replace('\\', '/', $entryName), '/');
+    if ($depth > $maxDepth) {
+        $zip->close();
+        rrmdir($tempDir);
+        echo json_encode(['error' => 'El ZIP contiene estructuras de carpetas demasiado profundas']);
+        exit;
+    }
 }
 
 $zip->extractTo($tempDir);

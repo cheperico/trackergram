@@ -9,13 +9,15 @@
 require_once 'config.php';
 require_once 'WebhookHandler.php';
 
-if (empty(TELEGRAM_WEBHOOK_SECRET)) {
-    error_log("trackerGram: ERROR - TELEGRAM_WEBHOOK_SECRET no configurado. Configurá un secret en .env");
-}
-
 // Manejar webhook de Telegram
 // solo se ejecuta si api.php es el entry point directo
 if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (empty(TELEGRAM_WEBHOOK_SECRET)) {
+        error_log("trackerGram: TELEGRAM_WEBHOOK_SECRET no configurado — rechazando webhook");
+        http_response_code(500);
+        die(json_encode(['error' => 'Webhook secret no configurado']));
+    }
+
     $input = file_get_contents('php://input');
     $update = json_decode($input, true);
 
@@ -25,13 +27,10 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
         die(json_encode(['error' => 'Invalid JSON']));
     }
 
-    // Verificar secret token si está configurado
-    if (!empty(TELEGRAM_WEBHOOK_SECRET)) {
-        $secretToken = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '';
-        if (!hash_equals(TELEGRAM_WEBHOOK_SECRET, $secretToken)) {
-            http_response_code(403);
-            die(json_encode(['error' => 'Acceso denegado']));
-        }
+    $secretToken = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '';
+    if (!hash_equals(TELEGRAM_WEBHOOK_SECRET, $secretToken)) {
+        http_response_code(403);
+        die(json_encode(['error' => 'Acceso denegado']));
     }
 
     // Rate limiting simple por IP

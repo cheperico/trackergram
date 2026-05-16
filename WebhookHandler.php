@@ -21,8 +21,9 @@ class WebhookHandler
         $cacheFile = __DIR__ . '/topic_names.json';
         if (file_exists($cacheFile)) {
             $topics = json_decode(file_get_contents($cacheFile), true);
-            if (isset($topics[$messageThreadId])) {
-                return $topics[$messageThreadId];
+            $key = $chatId . ':' . $messageThreadId;
+            if (isset($topics[$key])) {
+                return $topics[$key];
             }
         }
 
@@ -93,18 +94,19 @@ class WebhookHandler
             error_log("trackerGram: {$logType} upload result: " . ($uploadedFileId ?? 'null'));
         }
 
+        $chatId = $message['chat']['id'] ?? 0;
         if (isset($message['forum_topic_created']) && isset($message['message_thread_id'])) {
             $cacheFile = __DIR__ . '/topic_names.json';
             $topics = file_exists($cacheFile) ? json_decode(file_get_contents($cacheFile), true) : [];
-            $topics[$message['message_thread_id']] = $info['topic_name'];
-            file_put_contents($cacheFile, json_encode($topics));
+            $topics[$chatId . ':' . $message['message_thread_id']] = $info['topic_name'];
+            file_put_contents($cacheFile, json_encode($topics), LOCK_EX);
         }
 
         if (isset($message['forum_topic_edited']) && isset($message['message_thread_id'])) {
             $cacheFile = __DIR__ . '/topic_names.json';
             $topics = file_exists($cacheFile) ? json_decode(file_get_contents($cacheFile), true) : [];
-            $topics[$message['message_thread_id']] = $info['topic_name'];
-            file_put_contents($cacheFile, json_encode($topics));
+            $topics[$chatId . ':' . $message['message_thread_id']] = $info['topic_name'];
+            file_put_contents($cacheFile, json_encode($topics), LOCK_EX);
         }
 
         return [
@@ -184,8 +186,8 @@ class WebhookHandler
             $topicName = $message['reply_to_message']['forum_topic_created']['name'];
             $cacheFile = __DIR__ . '/topic_names.json';
             $topics = file_exists($cacheFile) ? json_decode(file_get_contents($cacheFile), true) : [];
-            $topics[$topicId] = $topicName;
-            file_put_contents($cacheFile, json_encode($topics));
+            $topics[$chatId . ':' . $topicId] = $topicName;
+            file_put_contents($cacheFile, json_encode($topics), LOCK_EX);
         } elseif ($topicId > 0) {
             $topicName = self::getTopicName($chatId, $topicId);
         }
@@ -198,7 +200,7 @@ class WebhookHandler
 
         $messageData = self::extractMessageData($message);
 
-        if (TikiWikiClient::messageExists(TIKIWIKI_TRACKER_ID, $message['message_id'], $chatId)) {
+        if (TikiWikiClient::messageExists(TIKIWIKI_TRACKER_ID, $message['message_id'], $chatId) > 0) {
             error_log("trackerGram: SKIPPING duplicate message_id={$message['message_id']}");
             return;
         }
@@ -225,6 +227,8 @@ class WebhookHandler
 
         if (!self::sendToTikiWikiWithRetries($tikiData)) {
             error_log("ERROR: No se pudo enviar mensaje a TikiWiki después de " . RETRY_MAX_ATTEMPTS . " intentos: message_id={$tikiData['message_id']}");
+        } elseif (TikiWikiClient::messageExists(TIKIWIKI_TRACKER_ID, $message['message_id'], $chatId) > 1) {
+            error_log("WARNING: duplicado detectado post-insert para message_id={$message['message_id']} — posible race condition");
         }
 
         error_log("Mensaje procesado: Topic $topicId, User {$message['from']['first_name']}");
@@ -256,8 +260,10 @@ class WebhookHandler
         $newStr = implode('', $newEmojis);
         $text = '😀 ' . $firstName . ' ' . $oldStr . $newStr . ' en mensaje ' . $originalMessageId;
 
+        $reactionId = 'reaction_' . $chatId . '_' . $originalMessageId . '_' . $userId . '_' . ($reaction['date'] ?? time());
+
         $tikiData = [
-            'message_id' => -1 * ($reaction['date'] ?? time()),
+            'message_id' => $reactionId,
             'chat_id' => $chatId,
             'chat_title' => $chatTitle,
             'topic_id' => 0,
@@ -303,8 +309,10 @@ class WebhookHandler
         }
         $text = '💬 Mensaje ' . $originalMessageId . ' - reacciones: ' . implode(', ', $counts);
 
+        $reactionCountId = 'reaction_count_' . $chatId . '_' . $originalMessageId . '_' . ($reactionCount['date'] ?? time());
+
         $tikiData = [
-            'message_id' => -1 * ($reactionCount['date'] ?? time()),
+            'message_id' => $reactionCountId,
             'chat_id' => $chatId,
             'chat_title' => $chatTitle,
             'topic_id' => 0,

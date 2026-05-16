@@ -26,11 +26,11 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Su función principa
 
 ### Estado Actual
 
-- Versión: **v0.1.6** (beta funcional)
+- Versión: **v0.1.7** (beta funcional)
 - Funcionalidad principal: operativa
-- Importación ZIP: operativa, optimizada con índice de archivos y descarga en chunks
-- Creación automática de trackers: parcial (tipos de campo incompletos)
-- Arquitectura: separada en clientes (TikiWikiClient, TelegramClient, MessageMapper)
+- Importación ZIP: operativa, optimizada con índices y límites de seguridad
+- Creación automática de trackers: operativa con tipos de campo correctos (FG, G, D)
+- Arquitectura: api.php como entry point puro, lógica en WebhookHandler + clientes
 
 ---
 
@@ -40,16 +40,17 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Su función principa
 
 | Archivo | Propósito |
 |---------|-----------|
-| `api.php` | **Punto de entrada principal**. Recibe webhooks de Telegram, procesa mensajes y envía a TikiWiki. Delega a los clientes especializados. |
-| `admin.php` | **Interfaz de administración web**. Panel para configurar bot, crear trackers, importar exports, ver logs. |
-| `import.php` | **Script de importación**. Procesa archivos ZIP exportados de Telegram y crea items en TikiWiki. |
+| `api.php` | **Punto de entrada HTTP**. Recibe webhooks de Telegram, valida auth + rate limit, delega en WebhookHandler. |
+| `WebhookHandler.php` | **Lógica de negocio**. Procesa mensajes, reacciones, topics, descarga y sube media. |
+| `admin.php` | **Interfaz de administración web**. Panel para configurar bot, crear trackers, importar exports. |
+| `import.php` | **Importación de exports**. Procesa archivos ZIP exportados de Telegram y crea items en TikiWiki. |
 | `config.php` | **Carga de configuración**. Lee variables de entorno y define constantes globales. |
-| `setup_webhook.php` | **Script de configuración inicial**. Configura el webhook de Telegram automáticamente. Solo ejecutable desde CLI o localhost. |
 
 ### Clientes/Clases (en la raíz del proyecto)
 
 | Archivo | Propósito |
 |---------|-----------|
+| `WebhookHandler.php` | Lógica de negocio del webhook | Cuando se agrega o modifica procesamiento de mensajes |
 | `TikiWikiClient.php` | **Cliente para TikiWiki**. Encapsula toda la comunicación con la API de TikiWiki: trackers, galleries, items. |
 | `TelegramClient.php` | **Cliente para Telegram**. Encapsula la comunicación con la API de Telegram: descarga de archivos, info de chats. |
 | `MessageMapper.php` | **Mapeador de mensajes**. Transforma mensajes de Telegram al formato de campos de TikiWiki tracker. |
@@ -133,13 +134,12 @@ A modo de resumen: la funcionalidad principal (recibir mensajes de Telegram y en
 
 Si querés entender el flujo completo, seguí este orden:
 
-1. **`api.php`** desde la línea 615 hacia abajo — es el punto de entrada del webhook. Ahí se recibe el POST de Telegram y se llama a `processUpdate()`.
-2. **`api.php::processUpdate()`** (línea 492) — orquesta todo: valida el mensaje, resuelve el topic, chequea duplicados, envía a TikiWiki.
-3. **`api.php::extractMessageData()`** (línea 158) — parsea el mensaje de Telegram y clasifica su tipo (texto, foto, video, etc.).
-4. **`TikiWikiClient.php`** — cómo se comunica con TikiWiki.
-5. **`TelegramClient.php`** — cómo se comunica con Telegram.
-6. **`MessageMapper.php`** — cómo se transforman los datos entre formatos.
-7. **`import.php`** — el flujo de importación de exports ZIP.
+1. **`api.php`** — entry point del webhook. Recibe POST, valida auth + rate limit, delega en `WebhookHandler::processUpdate()`.
+2. **`WebhookHandler.php`** — orquesta todo: `processMessage()` valida, resuelve topics, chequea duplicados, llama a extractMessageData() y sendToTikiWikiWithRetries().
+3. **`TikiWikiClient.php`** — comunicación con TikiWiki (crear items, subir archivos, verificar duplicados).
+4. **`TelegramClient.php`** — comunicación con Telegram (descarga de archivos).
+5. **`MessageMapper.php`** — transformación entre formatos (Webhook → TikiWiki, import → TikiWiki).
+6. **`import.php`** — flujo de importación de exports ZIP.
 
 ### Entorno de desarrollo local
 
@@ -171,10 +171,8 @@ Y configurar un túnel con ngrok o similar para recibir webhooks de Telegram. Ve
 
 ### Problemas conocidos (técnico)
 
-- `api.php` tiene ~620 líneas y `processUpdate()` sigue siendo una función monolítica que mezcla validación, deduplicación, reintentos y orquestación
 - Las clases cliente usan métodos estáticos — no hay inyección de dependencias, lo que dificulta el testing unitario
-- Algunos tipos de campo en creación automática de tracker no coinciden con documentación (FG, G, D)
-- `importItemToTikiWiki` e `import.php` comparten lógica con `api.php` pero con formatos de entrada diferentes
+- Webhook e importación tienen parsers separados (WebhookHandler vs import.php) que comparten lógica de mapeo pero con formatos de entrada diferentes
 
 ### Por qué está así
 

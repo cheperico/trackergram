@@ -8,18 +8,19 @@ require_once 'config.php';
 
 class TikiWikiClient
 {
-    private static ?int $mediaGalleryIdCache = null;
+    private static array $mediaGalleryIdCache = [];
 
     /**
      * Obtener el ID de la galería de medios del tracker configurado
      */
     public static function getMediaGalleryId(?int $trackerId = null): ?int
     {
-        if (self::$mediaGalleryIdCache !== null) {
-            return self::$mediaGalleryIdCache;
+        $trackerId = $trackerId ?? TIKIWIKI_TRACKER_ID;
+
+        if (isset(self::$mediaGalleryIdCache[$trackerId])) {
+            return self::$mediaGalleryIdCache[$trackerId];
         }
 
-        $trackerId = $trackerId ?? TIKIWIKI_TRACKER_ID;
         $url = TIKIWIKI_API_URL . "trackers/$trackerId";
 
         $ch = curl_init();
@@ -43,8 +44,8 @@ class TikiWikiClient
                         $options = $field['options'] ?? [];
                         foreach ($options as $opt) {
                             if (isset($opt['value'])) {
-                                self::$mediaGalleryIdCache = (int) $opt['value'];
-                                return self::$mediaGalleryIdCache;
+                                self::$mediaGalleryIdCache[$trackerId] = (int) $opt['value'];
+                                return self::$mediaGalleryIdCache[$trackerId];
                             }
                         }
                     }
@@ -56,11 +57,12 @@ class TikiWikiClient
     }
 
     /**
-     * Establecer cache de gallery ID (para testing)
+     * Establecer cache de gallery ID para un tracker (para testing)
      */
-    public static function setMediaGalleryId(?int $galleryId): void
+    public static function setMediaGalleryId(?int $galleryId, ?int $trackerId = null): void
     {
-        self::$mediaGalleryIdCache = $galleryId;
+        $trackerId = $trackerId ?? TIKIWIKI_TRACKER_ID;
+        self::$mediaGalleryIdCache[$trackerId] = $galleryId;
     }
 
     /**
@@ -174,7 +176,7 @@ class TikiWikiClient
     /**
      * Verificar si un mensaje ya existe en el tracker (deduplicación)
      */
-    public static function messageExists(int $trackerId, int $messageId, ?int $chatId = null): bool
+    public static function messageExists(int $trackerId, int $messageId, ?int $chatId = null): int
     {
         $url = TIKIWIKI_API_URL . "trackers/$trackerId/items?filter[fields][telegrammessageTelegramMessageId]=$messageId";
         
@@ -198,10 +200,10 @@ class TikiWikiClient
 
         if ($httpCode === 200) {
             $data = json_decode($response, true);
-            return !empty($data['data'] ?? []);
+            return count($data['data'] ?? []);
         }
 
-        return false;
+        return 0;
     }
 
     /**

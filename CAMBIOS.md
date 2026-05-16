@@ -1,5 +1,21 @@
 # Cambios - Changelog
 
+## v0.1.7
+- **Arquitectura**: `api.php` simplificado a entry point HTTP puro (61 líneas). Toda la lógica extraída a `WebhookHandler.php`.
+- **Arquitectura**: `MessageMapper::fromWebhook()` unifica detección de tipo de mensaje en webhook.
+- **Seguridad**: `TELEGRAM_WEBHOOK_SECRET` ahora obligatorio — bloquea webhook si no está configurado.
+- **Seguridad**: ZIP import ahora valida cantidad de archivos (máx. 10000), tamaño descomprimido (200 MB) y profundidad de carpetas (10).
+- **Fix**: `change_password` en admin.php movido fuera de `checkAuth()` — ahora funciona correctamente.
+- **Fix**: XSS en admin.php — reemplazado `innerHTML` por `textContent` + clases CSS en resultados de import.
+- **Fix**: Cache de topics ahora usa clave `chatId:threadId` (evita colisiones entre múltiples chats).
+- **Fix**: Cache de gallery ID ahora discrimina por tracker (array `[$trackerId => $galleryId]`).
+- **Fix**: Deduplicación post-insert detecta race conditions (cuenta items después de crear).
+- **Fix**: IDs de reacciones ahora usan identificadores únicos hash-based (`reaction_{chat}_{msg}_{user}_{date}`).
+- **Docs**: PHP 7.4+ actualizado a 8.0+ en toda la documentación.
+- **Docs**: Eliminado `setup_webhook.php` (obsoleto, reemplazado por admin.php).
+- **Docs**: Reportes externos movidos a `reports/`.
+- **Docs**: CONTEXTO.md actualizado con nueva arquitectura (WebhookHandler, sin referencias a líneas obsoletas).
+
 ## v0.1.6
 - **Seguridad**: Hash de contraseña admin con `password_hash()`/`password_verify()`. Migración automática desde texto plano.
 - **Seguridad**: Path traversal en ZIP - validación de nombres de archivo al extraer exports.

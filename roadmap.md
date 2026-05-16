@@ -3,7 +3,7 @@
 ## Estado del Proyecto
 
 - **Estado**: Activo - En desarrollo
-- **Última versión**: v0.1.6
+- **Última versión**: v0.1.7
 - **Funcionalidad principal**: Recibe webhooks de Telegram y envía mensajes directamente a TikiWiki trackers
 
 ## Pendientes
@@ -30,14 +30,12 @@
 
 - [x] **Separación de responsabilidades**: TikiWikiClient, TelegramClient, MessageMapper ✅
 - [x] ~~**Integrar MessageMapper completamente**: Unificar transformación de mensajes en MessageMapper~~ ✅ (toWikiFields + createTrackerItem)
-- [x] ~~**Refactorizar api.php**: Extraer processUpdate y sendToTikiWiki a clientes~~ ✅ (sendToTikiWiki delegado, processUpdate pendiente)
+- [x] **Refactorizar api.php**: Extraer processUpdate y sendToTikiWiki a WebhookHandler ✅
 - [x] ~~**Manejo de errores consistente**: Estandarizar retornos (excepciones en vez de null/false mixtos)~~ ✅
 
 ### Funcionalidades
 
-- [~] **Creación automática de tracker**: Parcialmente implementado
-   - Pendiente: corregir tipos de campo (FG, G, D) y valores por defecto
-   - Pendiente: conectar correctamente la UI de "Crear Tracker" en admin.php
+- [x] **Creación automática de tracker**: Implementado con tipos de campo correctos (FG, G, D) ✅
 - [x] **Importar export de Telegram**: Implementado (pendiente optimizar para exports grandes)
 
 ### Service Messages (Eventos del Grupo)
@@ -61,6 +59,15 @@
 - [x] **Creación automática de tracker**: Tipos de campo corregidos (FG, G, etc.), UI conectada ✅
 - [x] **Eliminar thin wrappers de api.php**: Funciones puente reemplazadas por llamadas directas a clientes ✅
 - [x] **Eliminar código duplicado de import.php**: `uploadFileToTikiWiki` y `getGalleryIdForTracker` reemplazadas por `TikiWikiClient` ✅
+- [x] **TELEGRAM_WEBHOOK_SECRET obligatorio en api.php**: Bloquea webhook si falta ✅
+- [x] **Límites de seguridad en import ZIP**: Máx. 10000 archivos, 200 MB descomprimido, profundidad 10 ✅
+- [x] **change_password funcional en admin.php**: Movido fuera de checkAuth() ✅
+- [x] **XSS en admin.php**: innerHTML reemplazado por textContent en import JS ✅
+- [x] **Cache de topics con chat_id**: Clave compuesta chatId:threadId, LOCK_EX en writes ✅
+- [x] **Cache gallery ID por tracker**: Array keyed por tracker ID ✅
+- [x] **Deduplicación atómica**: messageExists retorna int, post-insert verifica duplicados ✅
+- [x] **IDs únicos en reacciones**: reaction_{chat}_{msg}_{user}_{date} en vez de -1*date ✅
+- [x] **PHP 8.0+ en docs**: Actualizado README, INSTALL, TECHNICAL ✅
 - [ ] **Sistema de etiquetas**: Extraer hashtags de mensajes
 - [ ] **Mensajes estructurados con prefijos**: Detectar y parsear mensajes con prefijos especiales que contienen datos estructurados
   - Ejemplo: "📍GPS fabian.ciclista 34.051628,-118.240126,14.3" → extrae "fabian.ciclista" como nombre/usuario y coordenadas al campo ubicación
