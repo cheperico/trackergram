@@ -45,6 +45,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Su función principa
 | `admin.php` | **Interfaz de administración web**. Panel para configurar bot, crear trackers, importar exports. |
 | `import.php` | **Importación de exports**. Procesa archivos ZIP exportados de Telegram y crea items en TikiWiki. |
 | `config.php` | **Carga de configuración**. Lee variables de entorno y define constantes globales. |
+| `bootstrap.php` | **Carga centralizada de dependencias**. Todos los entry points requieren este archivo. |
 
 ### Clientes/Clases (en la raíz del proyecto)
 

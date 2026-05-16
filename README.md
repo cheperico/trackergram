@@ -150,6 +150,7 @@ Para importar conversaciones históricas desde Telegram:
 ```
 trackergram/
 ├── config.php          # Configuración del proyecto
+├── bootstrap.php       # Carga centralizada de dependencias
 ├── api.php             # Webhook endpoint de Telegram
 ├── WebhookHandler.php  # Lógica de negocio del webhook
 ├── admin.php           # Interfaz de administración

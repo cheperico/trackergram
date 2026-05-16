@@ -55,11 +55,12 @@ curl -s "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
 
 ### Componentes Principales
 
-1. **api.php**: Entry point HTTP (auth, rate limit, delega en WebhookHandler)
-2. **WebhookHandler.php**: Lógica de negocio (processUpdate, processMessage, etc.)
-3. **config.php**: Configuración y carga de variables de entorno
-4. **admin.php**: Interfaz de administración web
-5. **import.php**: Script de importación de exports de Telegram
+1. **bootstrap.php**: Carga centralizada de dependencias
+2. **api.php**: Entry point HTTP (auth, rate limit, delega en WebhookHandler)
+3. **WebhookHandler.php**: Lógica de negocio (processUpdate, processMessage, etc.)
+4. **config.php**: Configuración y carga de variables de entorno
+5. **admin.php**: Interfaz de administración web
+6. **import.php**: Script de importación de exports de Telegram
 
 ## Especificaciones Técnicas
 
@@ -82,6 +83,7 @@ trackergram/
 ├── WebhookHandler.php   # Lógica de negocio del webhook
 ├── admin.php            # Interfaz de administración
 ├── import.php           # Importación de exports de Telegram
+├── bootstrap.php        # Carga centralizada de dependencias
 ├── config.php           # Configuración y variables de entorno
 ├── TikiWikiClient.php   # Cliente para API de TikiWiki
 ├── TelegramClient.php   # Cliente para API de Telegram

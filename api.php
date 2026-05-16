@@ -6,8 +6,7 @@
  * La lógica de negocio está en WebhookHandler.
  */
 
-require_once 'config.php';
-require_once 'WebhookHandler.php';
+require_once 'bootstrap.php';
 
 // Manejar webhook de Telegram
 // solo se ejecuta si api.php es el entry point directo

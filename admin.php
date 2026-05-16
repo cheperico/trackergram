@@ -36,7 +36,7 @@ if (!isset($_SESSION['last_regeneration'])) {
     $_SESSION['last_regeneration'] = time();
 }
 
-require_once 'config.php';
+require_once 'bootstrap.php';
 
 // Función para generar y validar CSRF tokens
 function generateCSRFToken() {

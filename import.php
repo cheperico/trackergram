@@ -61,7 +61,7 @@ if (!isset($_SESSION['authenticated']) || $_SESSION['authenticated'] !== true) {
 }
 
 // Cargar config después de verificar auth
-require_once 'config.php';
+require_once 'bootstrap.php';
 
 // Validar tracker ID
 $trackerId = $_POST['tracker_id'] ?? '';

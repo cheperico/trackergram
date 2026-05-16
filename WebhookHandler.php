@@ -6,11 +6,6 @@
  * Separa la lógica de negocio del manejo HTTP (api.php).
  */
 
-require_once 'config.php';
-require_once 'TikiWikiClient.php';
-require_once 'TelegramClient.php';
-require_once 'MessageMapper.php';
-
 class WebhookHandler
 {
     /**
