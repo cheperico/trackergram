@@ -95,6 +95,11 @@
 ### Mejoras Técnicas (Refactorización)
 
 #### Prioridad Alta
+- [ ] **Inyección de dependencias**: Refactorizar clases estáticas en instanciables con configuración inyectada (TikiWikiClient, TelegramClient)
+- [ ] **Unificar parsers de mensajes**: WebhookHandler e import.php tienen lógica duplicada para detectar tipos, topics y media. Definir un modelo intermedio único (ej. NormalizedMessage) y dos parsers específicos (TelegramWebhookParser, TelegramExportParser)
+- [ ] **Estandarizar manejo de errores**: Usar excepciones de dominio (ConfigException, TelegramException, TikiWikiException, ImportException) en vez de mezclar null/false/die/http_response_code
+
+#### Prioridad Alta
 - Extraer clases para APIs externas (TelegramClient, TikiWikiClient)
 - Implementar patrón de inyección de dependencias
 

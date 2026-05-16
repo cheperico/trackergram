@@ -52,39 +52,51 @@ function validateCSRFToken($token) {
     }
 }
 
-// Rate limiting para login
+// Rate limiting para login (por IP, no por sesión)
 function checkRateLimit() {
     $maxAttempts = 5;
-    $lockoutTime = 15 * 60; // 15 minutos en segundos
+    $lockoutTime = 15 * 60;
+    $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $rateFile = sys_get_temp_dir() . '/tg_admin_rate_' . md5($ip);
     
-    // Inicializar contadores si no existen
-    if (!isset($_SESSION['login_attempts'])) {
-        $_SESSION['login_attempts'] = 0;
-        $_SESSION['first_attempt_time'] = time();
+    $data = ['attempts' => 0, 'first_attempt' => time()];
+    if (file_exists($rateFile)) {
+        $content = @file_get_contents($rateFile);
+        if ($content) {
+            $data = json_decode($content, true) ?? $data;
+        }
     }
     
-    // Resetear si pasó el tiempo de bloqueo
-    if (time() - $_SESSION['first_attempt_time'] > $lockoutTime) {
-        $_SESSION['login_attempts'] = 0;
-        $_SESSION['first_attempt_time'] = time();
+    if (time() - $data['first_attempt'] > $lockoutTime) {
+        $data['attempts'] = 0;
+        $data['first_attempt'] = time();
     }
     
-    // Verificar si excedió el límite
-    if ($_SESSION['login_attempts'] >= $maxAttempts) {
-        $remainingTime = $lockoutTime - (time() - $_SESSION['first_attempt_time']);
+    if ($data['attempts'] >= $maxAttempts) {
+        $remainingTime = $lockoutTime - (time() - $data['first_attempt']);
         die("Demasiados intentos de login. Por favor espere " . ceil($remainingTime / 60) . " minutos antes de intentar nuevamente.");
     }
 }
 
-// Incrementar contador de intentos fallidos
 function incrementFailedLogin() {
-    $_SESSION['login_attempts']++;
+    $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $rateFile = sys_get_temp_dir() . '/tg_admin_rate_' . md5($ip);
+    $data = ['attempts' => 0, 'first_attempt' => time()];
+    if (file_exists($rateFile)) {
+        $content = @file_get_contents($rateFile);
+        if ($content) {
+            $data = json_decode($content, true) ?? $data;
+        }
+    }
+    $data['attempts']++;
+    @file_put_contents($rateFile, json_encode($data));
 }
 
-// Resetear contador de intentos (login exitoso)
 function resetFailedLogin() {
-    $_SESSION['login_attempts'] = 0;
-    $_SESSION['first_attempt_time'] = time();
+    $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $rateFile = sys_get_temp_dir() . '/tg_admin_rate_' . md5($ip);
+    $data = ['attempts' => 0, 'first_attempt' => time()];
+    @file_put_contents($rateFile, json_encode($data));
 }
 
 // Función para generar URL de webhook automática del servidor actual
