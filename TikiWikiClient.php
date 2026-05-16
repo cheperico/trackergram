@@ -70,18 +70,21 @@ class TikiWikiClient
     {
         $galleryId = $galleryId ?? self::getMediaGalleryId() ?? 29;
 
-        $url = TIKIWIKI_API_URL . "filegals/$galleryId/files";
+        $url = TIKIWIKI_API_URL . "galleries/upload";
 
         if (!file_exists($filePath)) {
+            error_log("TikiWikiClient: File not found for upload: $filePath");
             return null;
         }
 
         $mimeType = self::getMimeType($filePath);
 
         $postFields = [
-            'file' => curl_file_create($filePath, $mimeType, $fileName),
+            'galleryId' => $galleryId,
+            'data' => curl_file_create($filePath, $mimeType, $fileName),
             'name' => $fileName,
-            'galleryId' => $galleryId
+            'title' => $fileName,
+            'description' => 'Subido desde trackerGram webhook - ' . date('Y-m-d H:i:s')
         ];
 
         $ch = curl_init();
@@ -97,13 +100,26 @@ class TikiWikiClient
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
         curl_close($ch);
 
-        if ($httpCode === 200) {
-            $data = json_decode($response, true);
-            return $data['id'] ?? null;
+        if ($curlError) {
+            error_log("TikiWikiClient: cURL error en uploadFile: $curlError");
+            return null;
         }
 
+        if ($httpCode !== 200 && $httpCode !== 201) {
+            error_log("TikiWikiClient: uploadFile HTTP $httpCode - Response: " . substr($response, 0, 200));
+            return null;
+        }
+
+        $data = json_decode($response, true);
+        $fileId = $data['fileId'] ?? $data['file_id'] ?? $data['id'] ?? null;
+        if ($fileId) {
+            return (string) $fileId;
+        }
+
+        error_log("TikiWikiClient: uploadFile respuesta sin fileId - Response: " . substr($response, 0, 200));
         return null;
     }
 
@@ -210,9 +226,14 @@ class TikiWikiClient
                 ['name' => 'telegrammessageLastName', 'type' => 't', 'permName' => 'telegrammessageLastName'],
                 ['name' => 'telegrammessageMessageType', 'type' => 't', 'permName' => 'telegrammessageMessageType'],
                 ['name' => 'telegrammessageText', 'type' => 'a', 'permName' => 'telegrammessageText'],
+                ['name' => 'telegrammessageLocation', 'type' => 'G', 'permName' => 'telegrammessageLocation'],
+                ['name' => 'telegrammessageMediaUrl', 'type' => 't', 'permName' => 'telegrammessageMediaUrl'],
+                ['name' => 'telegrammessageFileUrl', 'type' => 't', 'permName' => 'telegrammessageFileUrl'],
+                ['name' => 'telegrammessageMediaType', 'type' => 't', 'permName' => 'telegrammessageMediaType'],
+                ['name' => 'telegrammessageMediaSize', 'type' => 't', 'permName' => 'telegrammessageMediaSize'],
                 ['name' => 'telegrammessageMediaCaption', 'type' => 't', 'permName' => 'telegrammessageMediaCaption'],
                 ['name' => 'telegrammessageMessageDate', 'type' => 't', 'permName' => 'telegrammessageMessageDate'],
-                ['name' => 'telegrammessageMedia', 'type' => 't', 'permName' => 'telegrammessageMedia']
+                ['name' => 'telegrammessageMedia', 'type' => 'FG', 'permName' => 'telegrammessageMedia']
             ]
         ];
 

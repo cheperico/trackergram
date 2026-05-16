@@ -121,7 +121,12 @@ function getMediaGalleryId(): ?int
 function uploadToTikiWiki(string $filePath, string $fileName, ?string $mimeType = null): ?string
 {
     $galleryId = getCachedMediaGalleryId() ?? TikiWikiClient::getMediaGalleryId() ?? 29;
-    return TikiWikiClient::uploadFile($filePath, $fileName, $galleryId);
+    error_log("trackerGram: Subiendo archivo a TikiWiki galleryId=$galleryId, fileName=$fileName");
+    $result = TikiWikiClient::uploadFile($filePath, $fileName, $galleryId);
+    if (!$result) {
+        error_log("trackerGram: Fallo upload a TikiWiki galleryId=$galleryId");
+    }
+    return $result;
 }
 
 /**
@@ -208,12 +213,16 @@ function extractMessageData(array $message): array
         $data['media_type'] = 'image/jpeg';
         $data['media_size'] = $photo['file_size'] ?? null;
         
+        error_log("trackerGram: PHOTO - file_id: {$photo['file_id']}, size: {$data['media_size']}");
+        
         // Subir foto a TikiWiki
         $data['uploaded_file_id'] = downloadAndUploadMedia(
             $photo['file_id'],
             'telegram_photo_' . $photo['file_id'] . '.jpg',
             'image/jpeg'
         );
+        
+        error_log("trackerGram: PHOTO upload result: " . ($data['uploaded_file_id'] ?? 'null'));
         
         $data['text'] = 'Foto: ' . $data['media_type'];
         if (isset($message['caption'])) {
@@ -281,9 +290,13 @@ function extractMessageData(array $message): array
         $data['media_url'] = $sticker['file_id'];
         $data['media_type'] = 'image/webp';
         
+        error_log("trackerGram: STICKER - file_id: {$sticker['file_id']}, emoji: " . ($sticker['emoji'] ?? 'none'));
+        
         // Subir sticker a TikiWiki
         $fileName = 'telegram_sticker_' . $sticker['file_id'] . '.webp';
         $data['uploaded_file_id'] = downloadAndUploadMedia($sticker['file_id'], $fileName, 'image/webp');
+        
+        error_log("trackerGram: STICKER upload result: " . ($data['uploaded_file_id'] ?? 'null'));
         
         $data['text'] = 'Sticker: ' . $data['media_type'];
     }
@@ -446,10 +459,28 @@ function extractMessageData(array $message): array
         $data['text'] = '🆕 Grupo creado';
     }
 
+    // Título del grupo cambiado
+    if (isset($message['new_chat_title'])) {
+        $data['type'] = 'system';
+        $data['text'] = '✏️ Título cambiado a: ' . htmlspecialchars($message['new_chat_title']);
+    }
+
+    // Foto del grupo actualizada
+    if (isset($message['new_chat_photo'])) {
+        $data['type'] = 'system';
+        $data['text'] = '🖼️ Foto del grupo actualizada';
+    }
+
+    // Foto del grupo eliminada
+    if (isset($message['delete_chat_photo'])) {
+        $data['type'] = 'system';
+        $data['text'] = '🗑️ Foto del grupo eliminada';
+    }
+
     // Otros tipos no manejados específicamente
     if ($data['type'] === 'text' && !isset($message['text'])) {
         $messageKeys = array_keys($message);
-        $knownTypes = ['message_id', 'from', 'chat', 'date', 'text', 'photo', 'video', 'audio', 'document', 'sticker', 'voice', 'video_note', 'location', 'contact', 'poll', 'animation', 'forum_topic_edited', 'forum_topic_created', 'forum_topic_closed', 'forum_topic_reopened', 'caption', 'edit_date', 'entities', 'forward_from', 'forward_from_chat', 'reply_to_message', 'via_bot', 'new_chat_members', 'left_chat_member', 'pinned_message', 'group_chat_created', 'supergroup_chat_created'];
+        $knownTypes = ['message_id', 'from', 'chat', 'date', 'text', 'photo', 'video', 'audio', 'document', 'sticker', 'voice', 'video_note', 'location', 'contact', 'poll', 'animation', 'forum_topic_edited', 'forum_topic_created', 'forum_topic_closed', 'forum_topic_reopened', 'caption', 'edit_date', 'entities', 'forward_from', 'forward_from_chat', 'reply_to_message', 'via_bot', 'new_chat_members', 'left_chat_member', 'pinned_message', 'group_chat_created', 'supergroup_chat_created', 'new_chat_title', 'new_chat_photo', 'delete_chat_photo'];
         $unknownTypes = array_diff($messageKeys, $knownTypes);
         
         if (!empty($unknownTypes)) {
@@ -476,19 +507,28 @@ function sendToTikiWiki(array $data): bool
 }
 
 /**
- * Procesar actualización de Telegram
- * @param array $update Datos de la actualización recibida del webhook
+ * Enviar datos a TikiWiki con reintentos
  */
-function processUpdate(array $update): void
+function sendToTikiWikiWithRetries(array $tikiData): bool
 {
-error_log("processUpdate iniciado");
-
-    if (!isset($update['message'])) {
-        return;
+    $maxRetries = RETRY_MAX_ATTEMPTS;
+    for ($i = 0; $i < $maxRetries; $i++) {
+        if (sendToTikiWiki($tikiData)) {
+            return true;
+        }
+        if ($i < $maxRetries - 1) {
+            error_log("Reintento " . ($i + 1) . " para message_id={$tikiData['message_id']}");
+            usleep(RETRY_DELAY_MICROSECONDS);
+        }
     }
-    
-$message = $update['message'];
-    
+    return false;
+}
+
+/**
+ * Procesar mensaje regular de Telegram
+ */
+function processMessage(array $message): void
+{
     // Validar campos requeridos del mensaje
     $requiredFields = ['message_id', 'chat', 'from', 'date'];
     foreach ($requiredFields as $field) {
@@ -497,14 +537,14 @@ $message = $update['message'];
             return;
         }
     }
-    
+
     // Validar subcampos requeridos
     $requiredSubFields = [
         'chat.id',
         'from.id',
         'from.first_name'
     ];
-    
+
     foreach ($requiredSubFields as $fieldPath) {
         $keys = explode('.', $fieldPath);
         $value = $message;
@@ -516,7 +556,7 @@ $message = $update['message'];
             $value = $value[$key];
         }
     }
-    
+
     $chatId = $message['chat']['id'];
     $chatTitle = $message['chat']['title'] ?? $message['chat']['username'] ?? 'Chat ' . $chatId;
 
@@ -527,7 +567,7 @@ $message = $update['message'];
     }
 
     $topicId = $message['message_thread_id'] ?? 0;
-    
+
     // Intentar obtener el nombre del topic
     $topicName = null;
     if (isset($message['reply_to_message']['forum_topic_created']['name'])) {
@@ -539,7 +579,7 @@ $message = $update['message'];
     } elseif ($topicId > 0) {
         $topicName = getTopicName($chatId, $topicId);
     }
-    
+
     // Fallback: topics conocidos o grupo sin temas
     if ($topicId > 0 && $topicName === 'General') {
         $topicName = 'Topic-' . $topicId;
@@ -579,27 +619,128 @@ $message = $update['message'];
         'date' => $message['date']
     ];
 
-    // Intentar enviar a TikiWiki con reintentos
-    $maxRetries = RETRY_MAX_ATTEMPTS;
-    $success = false;
-
-    for ($i = 0; $i < $maxRetries; $i++) {
-        if (sendToTikiWiki($tikiData)) {
-            $success = true;
-            break;
-        }
-
-        if ($i < $maxRetries - 1) {
-            error_log("Reintento " . ($i + 1) . " para message_id={$tikiData['message_id']}");
-            usleep(RETRY_DELAY_MICROSECONDS);
-        }
-    }
-
-    if (!$success) {
-        error_log("ERROR: No se pudo enviar mensaje a TikiWiki después de $maxRetries intentos: message_id={$tikiData['message_id']}");
+    if (!sendToTikiWikiWithRetries($tikiData)) {
+        error_log("ERROR: No se pudo enviar mensaje a TikiWiki después de " . RETRY_MAX_ATTEMPTS . " intentos: message_id={$tikiData['message_id']}");
     }
 
     error_log("Mensaje procesado: Topic $topicId, User {$message['from']['first_name']}");
+}
+
+/**
+ * Procesar reacción a mensaje (message_reaction)
+ */
+function processMessageReaction(array $reaction): void
+{
+    $chatId = $reaction['chat']['id'];
+    $chatTitle = $reaction['chat']['title'] ?? $reaction['chat']['username'] ?? 'Chat ' . $chatId;
+
+    if (!empty(ALLOWED_CHAT_IDS) && !in_array($chatId, ALLOWED_CHAT_IDS)) {
+        error_log("Chat $chatId no está en la lista de permitidos");
+        return;
+    }
+
+    $originalMessageId = $reaction['message_id'];
+    $user = $reaction['user'] ?? [];
+    $userId = $user['id'] ?? 0;
+    $firstName = $user['first_name'] ?? 'Unknown';
+    $lastName = $user['last_name'] ?? '';
+
+    $oldEmojis = array_map(fn($r) => $r['emoji'] ?? '❓', $reaction['old_reaction'] ?? []);
+    $newEmojis = array_map(fn($r) => $r['emoji'] ?? '❓', $reaction['new_reaction'] ?? []);
+
+    $oldStr = !empty($oldEmojis) ? implode('', $oldEmojis) . ' → ' : '';
+    $newStr = implode('', $newEmojis);
+    $text = '😀 ' . $firstName . ' ' . $oldStr . $newStr . ' en mensaje ' . $originalMessageId;
+
+    $tikiData = [
+        'message_id' => -1 * ($reaction['date'] ?? time()),
+        'chat_id' => $chatId,
+        'chat_title' => $chatTitle,
+        'topic_id' => 0,
+        'topic_title' => 'General',
+        'user_id' => $userId,
+        'username' => $user['username'] ?? '',
+        'first_name' => $firstName,
+        'last_name' => $lastName,
+        'message_type' => 'system',
+        'text' => $text,
+        'media_url' => '',
+        'file_url' => '',
+        'media_type' => '',
+        'media_size' => '',
+        'media_caption' => '',
+        'location' => '',
+        'uploaded_file_id' => null,
+        'date' => $reaction['date'] ?? time()
+    ];
+
+    if (!sendToTikiWikiWithRetries($tikiData)) {
+        error_log("ERROR: No se pudo enviar reacción a TikiWiki: message_id={$originalMessageId}");
+    }
+}
+
+/**
+ * Procesar conteo de reacciones (message_reaction_count)
+ */
+function processMessageReactionCount(array $reactionCount): void
+{
+    $chatId = $reactionCount['chat']['id'];
+    $chatTitle = $reactionCount['chat']['title'] ?? $reactionCount['chat']['username'] ?? 'Chat ' . $chatId;
+
+    if (!empty(ALLOWED_CHAT_IDS) && !in_array($chatId, ALLOWED_CHAT_IDS)) {
+        error_log("Chat $chatId no está en la lista de permitidos");
+        return;
+    }
+
+    $originalMessageId = $reactionCount['message_id'];
+
+    $counts = [];
+    foreach ($reactionCount['reactions'] ?? [] as $r) {
+        $emoji = $r['emoji'] ?? ($r['type'] === 'custom_emoji' ? '⭐' : '❓');
+        $counts[] = $emoji . ' ' . $r['count'];
+    }
+    $text = '💬 Mensaje ' . $originalMessageId . ' - reacciones: ' . implode(', ', $counts);
+
+    $tikiData = [
+        'message_id' => -1 * ($reactionCount['date'] ?? time()),
+        'chat_id' => $chatId,
+        'chat_title' => $chatTitle,
+        'topic_id' => 0,
+        'topic_title' => 'General',
+        'user_id' => 0,
+        'username' => '',
+        'first_name' => 'System',
+        'last_name' => '',
+        'message_type' => 'system',
+        'text' => $text,
+        'media_url' => '',
+        'file_url' => '',
+        'media_type' => '',
+        'media_size' => '',
+        'media_caption' => '',
+        'location' => '',
+        'uploaded_file_id' => null,
+        'date' => $reactionCount['date'] ?? time()
+    ];
+
+    if (!sendToTikiWikiWithRetries($tikiData)) {
+        error_log("ERROR: No se pudo enviar conteo de reacciones a TikiWiki: message_id={$originalMessageId}");
+    }
+}
+
+/**
+ * Procesar actualización de Telegram (dispatcher)
+ * @param array $update Datos de la actualización recibida del webhook
+ */
+function processUpdate(array $update): void
+{
+    if (isset($update['message'])) {
+        processMessage($update['message']);
+    } elseif (isset($update['message_reaction'])) {
+        processMessageReaction($update['message_reaction']);
+    } elseif (isset($update['message_reaction_count'])) {
+        processMessageReactionCount($update['message_reaction_count']);
+    }
 }
 
 // Manejar webhook de Telegram - solo ejecutar si es llamado directamente (no incluido)

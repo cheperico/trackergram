@@ -281,6 +281,7 @@ foreach ($messages as $i => $msg) {
             'topic_closed' => '🔒 Tema cerrado',
             'topic_reopened' => '🔓 Tema reabierto',
             'pin_message', 'pinned_message' => '📌 Mensaje fijado por ' . $firstName,
+            'create_group' => '🆕 Grupo creado',
             'invite_members', 'add_members' => '👤 ' . $firstName . ' agregó a: ' . implode(', ', $msg['members'] ?? []),
             'remove_members' => '🚫 ' . $firstName . ' eliminó a: ' . implode(', ', $msg['members'] ?? []),
             'joined' => '👤 ' . $firstName . ' se unió al grupo',

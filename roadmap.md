@@ -49,15 +49,16 @@
 | `new_chat_members` / `action: invite_members` | ✅ | ✅ |
 | `left_chat_member` / `action: left` | ✅ | ✅ |
 | `pinned_message` / `action: pin_message` | ✅ | ✅ |
-| `group_chat_created` / `supergroup_chat_created` | ✅ | ⬜ |
+| `group_chat_created` / `supergroup_chat_created` / `action: create_group` | ✅ | ✅ |
+| `new_chat_title` / `action: title_edit` | ✅ | ✅ |
+| `new_chat_photo` / `delete_chat_photo` / `action: photo_edit` / `action: photo_delete` | ✅ | ⬜ |
 | `action: remove_members` | ⬜ | ✅ |
 | `action: joined` | ⬜ | ✅ |
-| `action: title_edit` | ⬜ | ✅ |
-| `action: photo_edit` / `photo_delete` | ⬜ | ⬜ |
-| `message_reaction` / `message_reaction_count` | ⬜ | ⬜ |
+| `message_reaction` / `message_reaction_count` | ✅ | ⬜ |
 
-- [ ] **Reacciones a mensajes**: Procesar updates de tipo `message_reaction` y `message_reaction_count`
-- [ ] **Service messages faltantes**: `photo_edit`, `photo_delete` en webhook e import
+- [x] **Reacciones a mensajes**: Procesar updates de tipo `message_reaction` y `message_reaction_count` ✅
+- [x] **Service messages faltantes en webhook**: `new_chat_title`, `new_chat_photo`, `delete_chat_photo` ✅
+- [x] **Creación automática de tracker**: Tipos de campo corregidos (FG, G, etc.), UI conectada ✅
 - [ ] **Sistema de etiquetas**: Extraer hashtags de mensajes
 - [ ] **Mensajes estructurados con prefijos**: Detectar y parsear mensajes con prefijos especiales que contienen datos estructurados
   - Ejemplo: "📍GPS fabian.ciclista 34.051628,-118.240126,14.3" → extrae "fabian.ciclista" como nombre/usuario y coordenadas al campo ubicación
