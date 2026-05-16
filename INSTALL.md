@@ -158,8 +158,6 @@ DEBUG_MODE=false
 | Message Type | telegrammessageMessageType | Text Field |
 | Text | telegrammessageText | Text Area |
 | Media | telegrammessageMedia | **File Gallery** (vinculado a galería) |
-| Media URL | telegrammessageMediaUrl | Text Field |
-| File URL | telegrammessageFileUrl | Text Field |
 | Media Type | telegrammessageMediaType | Text Field |
 | Media Size | telegrammessageMediaSize | Text Field |
 | Media Caption | telegrammessageMediaCaption | Text Field |

@@ -178,10 +178,7 @@ foreach ($messages as $msg) {
 }
 
 // Obtener galleryId del tracker
-$galleryId = getGalleryIdForTracker($trackerId);
-if (!$galleryId) {
-    $galleryId = 29; // Default fallback
-}
+$galleryId = TikiWikiClient::getMediaGalleryId((int) $trackerId) ?? 29;
 
 // Indexar archivos una sola vez (evita escanear recursivamente por cada mensaje)
 $fileIndex = [];
@@ -266,7 +263,7 @@ foreach ($messages as $i => $msg) {
         }
 
         if ($filePath && file_exists($filePath)) {
-            $fileId = uploadFileToTikiWiki($filePath, $fileName, $galleryId);
+            $fileId = TikiWikiClient::uploadFile($filePath, $fileName, $galleryId);
             if ($fileId) {
                 $mediaProcessed++;
             }
@@ -342,80 +339,6 @@ function findFileInTempFallback(string $tempDir, string $fileName): string {
 }
 
 /**
- * Obtener galleryId del tracker
- */
-function getGalleryIdForTracker(int $trackerId): ?int {
-    $url = TIKIWIKI_API_URL . "trackers/$trackerId/fields";
-    
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "Authorization: Bearer " . TIKIWIKI_TOKEN,
-        "User-Agent: Mozilla/5.0"
-    ]);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TIKIWIKI_API);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    if ($httpCode !== 200) return null;
-    
-    $data = json_decode($response, true);
-    $fields = $data['fields'] ?? [];
-    
-    // Buscar campo de tipo FG (files)
-    foreach ($fields as $field) {
-        if (($field['type'] ?? '') === 'FG') {
-            $options = json_decode($field['options'] ?? '{}', true);
-            return $options['galleryId'] ?? null;
-        }
-    }
-    return null;
-}
-
-/**
- * Subir archivo a TikiWiki
- */
-function uploadFileToTikiWiki(string $filePath, string $fileName, int $galleryId): string {
-    $uploadUrl = TIKIWIKI_API_URL . 'galleries/upload';
-    
-    $mimeType = mime_content_type($filePath);
-    $cfile = curl_file_create($filePath, $mimeType, $fileName);
-    
-    $postData = [
-        'galleryId' => $galleryId,
-        'data' => $cfile,
-        'name' => $fileName,
-        'title' => $fileName,
-        'description' => 'Archivo importado desde Telegram - ' . date('Y-m-d H:i:s')
-    ];
-    
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $uploadUrl);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "Authorization: Bearer " . TIKIWIKI_TOKEN,
-        "User-Agent: Mozilla/5.0"
-    ]);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 60);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    
-    if ($httpCode !== 200 && $httpCode !== 201) {
-        return '';
-    }
-    
-    $responseData = json_decode($response, true);
-    return $responseData['fileId'] ?? $responseData['file_id'] ?? '';
-}
-
-/**
  * Enviar item a TikiWiki
  */
 function importItemToTikiWiki(int $trackerId, array $data): bool {
@@ -432,8 +355,6 @@ function importItemToTikiWiki(int $trackerId, array $data): bool {
         'last_name' => $data['last_name'] ?? '',
         'message_type' => $data['message_type'] ?? 'text',
         'text' => $data['text'] ?? '',
-        'media_url' => '',
-        'file_url' => '',
         'media_type' => '',
         'media_size' => '',
         'media_caption' => $data['media_caption'] ?? '',

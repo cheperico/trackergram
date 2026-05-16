@@ -360,10 +360,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     
     $trackerName = trim($_POST['tracker_name'] ?? 'Telegram Messages');
     
-    // Incluir api.php para tener la función
-    require_once __DIR__ . '/api.php';
-    
-    $newTrackerId = createTrackerWithFields($trackerName);
+    $newTrackerId = TikiWikiClient::createTracker($trackerName);
     
     if (is_array($newTrackerId) && isset($newTrackerId['error'])) {
         $error = $newTrackerId['error'];

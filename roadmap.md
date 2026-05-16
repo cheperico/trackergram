@@ -59,6 +59,8 @@
 - [x] **Reacciones a mensajes**: Procesar updates de tipo `message_reaction` y `message_reaction_count` ✅
 - [x] **Service messages faltantes en webhook**: `new_chat_title`, `new_chat_photo`, `delete_chat_photo` ✅
 - [x] **Creación automática de tracker**: Tipos de campo corregidos (FG, G, etc.), UI conectada ✅
+- [x] **Eliminar thin wrappers de api.php**: Funciones puente reemplazadas por llamadas directas a clientes ✅
+- [x] **Eliminar código duplicado de import.php**: `uploadFileToTikiWiki` y `getGalleryIdForTracker` reemplazadas por `TikiWikiClient` ✅
 - [ ] **Sistema de etiquetas**: Extraer hashtags de mensajes
 - [ ] **Mensajes estructurados con prefijos**: Detectar y parsear mensajes con prefijos especiales que contienen datos estructurados
   - Ejemplo: "📍GPS fabian.ciclista 34.051628,-118.240126,14.3" → extrae "fabian.ciclista" como nombre/usuario y coordenadas al campo ubicación

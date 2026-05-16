@@ -182,8 +182,6 @@ X-Telegram-Bot-Api-Secret-Token: <secret_token_configurado>
 | `telegrammessageMessageType` | `extractMessageData().type` | String |
 | `telegrammessageText` | `extractMessageData().text` | String |
 | `telegrammessageMedia` | `downloadAndUploadMedia().fileId` | File (vinculado a galería) |
-| `telegrammessageMediaUrl` | `extractMessageData().media_url` | String |
-| `telegrammessageFileUrl` | `extractMessageData().media_url` | String |
 | `telegrammessageMediaType` | `extractMessageData().media_type` | String |
 | `telegrammessageMediaSize` | `extractMessageData().media_size` | Integer |
 | `telegrammessageMediaCaption` | `extractMessageData().media_caption` | String |

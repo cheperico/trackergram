@@ -61,8 +61,6 @@ Importar exports ZIP → TikiWiki Tracker
    - `telegrammessageMessageType`
    - `telegrammessageText`
    - `telegrammessageMedia` (campo de tipo archivo vinculado a la galería)
-   - `telegrammessageMediaUrl`
-   - `telegrammessageFileUrl`
    - `telegrammessageMediaType`
    - `telegrammessageMediaSize`
    - `telegrammessageMediaCaption`
