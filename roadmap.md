@@ -19,6 +19,7 @@
   - Permitir definir patrones regex para diferentes tipos de mensajes
 
 #### Prioridad Media
+- [x] **debug.log**: Reemplazados todos los `error_log()` por `log_message()` en el código ✅
 - [ ] **Sistema de etiquetas**: Extraer hashtags de mensajes y almacenarlos como campos separados
 - [ ] **Mensajes editados/borrados**: Manejar updates de tipo `edited_message` y deleted
 - [ ] **Importación asíncrona**: Procesar exports grandes por FTP + CLI en vez de HTTP request

@@ -82,19 +82,16 @@ ini_set('display_errors', 0);
  */
 function log_message(string $message): void
 {
-    // Siempre escribir al error log del sistema
-    error_log('trackerGram: ' . $message);
+    error_log($message);
     
     if (DEBUG_MODE) {
         $logFile = __DIR__ . '/debug.log';
         $timestamp = date('[Y-m-d H:i:s] ');
         $logLine = $timestamp . $message . PHP_EOL;
         
-        // Intentar escribir directamente al archivo
-        if (@file_put_contents($logFile, $logLine, FILE_APPEND) === false) {
-            // Si falla, intentar en temp
+        if (@file_put_contents($logFile, $logLine, FILE_APPEND | LOCK_EX) === false) {
             $tempLog = sys_get_temp_dir() . '/trackergram_debug.log';
-            @file_put_contents($tempLog, $logLine, FILE_APPEND);
+            @file_put_contents($tempLog, $logLine, FILE_APPEND | LOCK_EX);
         }
     }
 }

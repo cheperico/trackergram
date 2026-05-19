@@ -32,7 +32,7 @@ class WebhookHandler
     {
         $fileUrl = TelegramClient::getFileUrl($fileId);
         if (!$fileUrl) {
-            error_log("trackerGram: Cannot get download URL for file: $fileId");
+            log_message("trackerGram: Cannot get download URL for file: $fileId");
             return null;
         }
 
@@ -46,7 +46,7 @@ class WebhookHandler
         curl_close($ch);
 
         if ($contentLength > MEDIA_DOWNLOAD_MAX_SIZE) {
-            error_log("trackerGram: File too large ($contentLength bytes) for file_id: $fileId");
+            log_message("trackerGram: File too large ($contentLength bytes) for file_id: $fileId");
             return null;
         }
 
@@ -62,7 +62,7 @@ class WebhookHandler
         curl_close($ch);
 
         if ($httpCode !== 200) {
-            error_log("trackerGram: Cannot download file from Telegram: $fileId (HTTP $httpCode)");
+            log_message("trackerGram: Cannot download file from Telegram: $fileId (HTTP $httpCode)");
             unlink($tempFile);
             return null;
         }
@@ -84,9 +84,9 @@ class WebhookHandler
         $uploadedFileId = null;
         if ($info['file_id']) {
             $logType = strtoupper($info['type']);
-            error_log("trackerGram: {$logType} - file_id: {$info['file_id']}" . ($info['media_size'] ? ", size: {$info['media_size']}" : ''));
+            log_message("trackerGram: {$logType} - file_id: {$info['file_id']}" . ($info['media_size'] ? ", size: {$info['media_size']}" : ''));
             $uploadedFileId = self::downloadAndUploadMedia($info['file_id'], $info['file_name'], $info['mime_type']);
-            error_log("trackerGram: {$logType} upload result: " . ($uploadedFileId ?? 'null'));
+            log_message("trackerGram: {$logType} upload result: " . ($uploadedFileId ?? 'null'));
         }
 
         $chatId = $message['chat']['id'] ?? 0;
@@ -128,7 +128,7 @@ class WebhookHandler
                 return true;
             }
             if ($i < $maxRetries - 1) {
-                error_log("Reintento " . ($i + 1) . " para message_id={$tikiData['message_id']}");
+                log_message("Reintento " . ($i + 1) . " para message_id={$tikiData['message_id']}");
                 usleep(RETRY_DELAY_MICROSECONDS);
             }
         }
@@ -143,7 +143,7 @@ class WebhookHandler
         $requiredFields = ['message_id', 'chat', 'from', 'date'];
         foreach ($requiredFields as $field) {
             if (!isset($message[$field])) {
-                error_log("ERROR: Campo requerido '$field' no encontrado en el mensaje");
+                log_message("ERROR: Campo requerido '$field' no encontrado en el mensaje");
                 return;
             }
         }
@@ -159,7 +159,7 @@ class WebhookHandler
             $value = $message;
             foreach ($keys as $key) {
                 if (!isset($value[$key])) {
-                    error_log("ERROR: Subcampo requerido '$fieldPath' no encontrado en el mensaje");
+                    log_message("ERROR: Subcampo requerido '$fieldPath' no encontrado en el mensaje");
                     return;
                 }
                 $value = $value[$key];
@@ -170,7 +170,7 @@ class WebhookHandler
         $chatTitle = $message['chat']['title'] ?? $message['chat']['username'] ?? 'Chat ' . $chatId;
 
         if (!empty(ALLOWED_CHAT_IDS) && !in_array($chatId, ALLOWED_CHAT_IDS)) {
-            error_log("Chat $chatId no está en la lista de permitidos");
+            log_message("Chat $chatId no está en la lista de permitidos");
             return;
         }
 
@@ -196,7 +196,7 @@ class WebhookHandler
         $messageData = self::extractMessageData($message);
 
         if (TikiWikiClient::messageExists(TIKIWIKI_TRACKER_ID, $message['message_id'], $chatId) > 0) {
-            error_log("trackerGram: SKIPPING duplicate message_id={$message['message_id']}");
+            log_message("trackerGram: SKIPPING duplicate message_id={$message['message_id']}");
             return;
         }
 
@@ -221,12 +221,12 @@ class WebhookHandler
         ];
 
         if (!self::sendToTikiWikiWithRetries($tikiData)) {
-            error_log("ERROR: No se pudo enviar mensaje a TikiWiki después de " . RETRY_MAX_ATTEMPTS . " intentos: message_id={$tikiData['message_id']}");
+            log_message("ERROR: No se pudo enviar mensaje a TikiWiki después de " . RETRY_MAX_ATTEMPTS . " intentos: message_id={$tikiData['message_id']}");
         } elseif (TikiWikiClient::messageExists(TIKIWIKI_TRACKER_ID, $message['message_id'], $chatId) > 1) {
-            error_log("WARNING: duplicado detectado post-insert para message_id={$message['message_id']} — posible race condition");
+            log_message("WARNING: duplicado detectado post-insert para message_id={$message['message_id']} — posible race condition");
         }
 
-        error_log("Mensaje procesado: Topic $topicId, User {$message['from']['first_name']}");
+        log_message("Mensaje procesado: Topic $topicId, User {$message['from']['first_name']}");
     }
 
     /**
@@ -238,7 +238,7 @@ class WebhookHandler
         $chatTitle = $reaction['chat']['title'] ?? $reaction['chat']['username'] ?? 'Chat ' . $chatId;
 
         if (!empty(ALLOWED_CHAT_IDS) && !in_array($chatId, ALLOWED_CHAT_IDS)) {
-            error_log("Chat $chatId no está en la lista de permitidos");
+            log_message("Chat $chatId no está en la lista de permitidos");
             return;
         }
 
@@ -278,7 +278,7 @@ class WebhookHandler
         ];
 
         if (!self::sendToTikiWikiWithRetries($tikiData)) {
-            error_log("ERROR: No se pudo enviar reacción a TikiWiki: message_id={$originalMessageId}");
+            log_message("ERROR: No se pudo enviar reacción a TikiWiki: message_id={$originalMessageId}");
         }
     }
 
@@ -291,7 +291,7 @@ class WebhookHandler
         $chatTitle = $reactionCount['chat']['title'] ?? $reactionCount['chat']['username'] ?? 'Chat ' . $chatId;
 
         if (!empty(ALLOWED_CHAT_IDS) && !in_array($chatId, ALLOWED_CHAT_IDS)) {
-            error_log("Chat $chatId no está en la lista de permitidos");
+            log_message("Chat $chatId no está en la lista de permitidos");
             return;
         }
 
@@ -327,7 +327,7 @@ class WebhookHandler
         ];
 
         if (!self::sendToTikiWikiWithRetries($tikiData)) {
-            error_log("ERROR: No se pudo enviar conteo de reacciones a TikiWiki: message_id={$originalMessageId}");
+            log_message("ERROR: No se pudo enviar conteo de reacciones a TikiWiki: message_id={$originalMessageId}");
         }
     }
 

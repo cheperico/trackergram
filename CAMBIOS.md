@@ -2,7 +2,8 @@
 
 ## v0.1.7
 - **Arquitectura**: `api.php` simplificado a entry point HTTP puro (61 líneas). Toda la lógica extraída a `WebhookHandler.php`.
-- **Arquitectura**: `bootstrap.php` creado con carga centralizada de dependencias. Todos los entry points lo usan.
+- **Architectura**: `bootstrap.php` creado con carga centralizada de dependencias. Todos los entry points lo usan.
+- **Fix**: `debug.log` ahora funciona correctamente — reemplazados todos los `error_log()` por `log_message()` en el código.
 - **Arquitectura**: `MessageMapper::fromWebhook()` unifica detección de tipo de mensaje en webhook.
 - **Seguridad**: `TELEGRAM_WEBHOOK_SECRET` ahora obligatorio — bloquea webhook si no está configurado.
 - **Seguridad**: ZIP import ahora valida cantidad de archivos (máx. 10000), tamaño descomprimido (200 MB) y profundidad de carpetas (10).

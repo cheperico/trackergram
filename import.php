@@ -14,7 +14,7 @@ session_start();
 // Manejo de errores para evitar HTML en respuesta
 
 function handleError($errno, $errstr, $errfile, $errline) {
-    error_log("import.php: ERROR $errno - $errstr in $errfile:$errline");
+    log_message("import.php: ERROR $errno - $errstr in $errfile:$errline");
     http_response_code(500);
     echo json_encode(['error' => "Error: $errstr"]);
     exit;
@@ -39,7 +39,7 @@ function rrmdir($dir) {
 }
 
 function handleException($exc) {
-    error_log("import.php: EXCEPTION " . $exc->getMessage() . " in " . $exc->getFile() . ":" . $exc->getLine());
+    log_message("import.php: EXCEPTION " . $exc->getMessage() . " in " . $exc->getFile() . ":" . $exc->getLine());
     http_response_code(500);
     echo json_encode(['error' => "Exception: " . $exc->getMessage()]);
     exit;
@@ -54,7 +54,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 if (!isset($_SESSION['authenticated']) || $_SESSION['authenticated'] !== true) {
-    error_log("import.php: NO AUTENTICADO");
+    log_message("import.php: NO AUTENTICADO");
     http_response_code(403);
     echo json_encode(['error' => 'No autenticado']);
     exit;
@@ -233,7 +233,7 @@ foreach ($messages as $i => $msg) {
 
     $processedCount++;
     if ($processedCount % 10 === 0) {
-        error_log("trackerGram: Importando mensaje $processedCount de $totalMessages...");
+        log_message("trackerGram: Importando mensaje $processedCount de $totalMessages...");
     }
 
     // Determinar topic

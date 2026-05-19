@@ -75,7 +75,7 @@ class TikiWikiClient
         $url = TIKIWIKI_API_URL . "galleries/upload";
 
         if (!file_exists($filePath)) {
-            error_log("TikiWikiClient: File not found for upload: $filePath");
+            log_message("TikiWikiClient: File not found for upload: $filePath");
             return null;
         }
 
@@ -106,12 +106,12 @@ class TikiWikiClient
         curl_close($ch);
 
         if ($curlError) {
-            error_log("TikiWikiClient: cURL error en uploadFile: $curlError");
+            log_message("TikiWikiClient: cURL error en uploadFile: $curlError");
             return null;
         }
 
         if ($httpCode !== 200 && $httpCode !== 201) {
-            error_log("TikiWikiClient: uploadFile HTTP $httpCode - Response: " . substr($response, 0, 200));
+            log_message("TikiWikiClient: uploadFile HTTP $httpCode - Response: " . substr($response, 0, 200));
             return null;
         }
 
@@ -121,7 +121,7 @@ class TikiWikiClient
             return (string) $fileId;
         }
 
-        error_log("TikiWikiClient: uploadFile respuesta sin fileId - Response: " . substr($response, 0, 200));
+        log_message("TikiWikiClient: uploadFile respuesta sin fileId - Response: " . substr($response, 0, 200));
         return null;
     }
 
@@ -152,12 +152,12 @@ class TikiWikiClient
         curl_close($ch);
 
         if ($error) {
-            error_log("TikiWikiClient: cURL error al crear item: $error");
+            log_message("TikiWikiClient: cURL error al crear item: $error");
             return false;
         }
 
         if ($httpCode !== 200 && $httpCode !== 201) {
-            error_log("TikiWikiClient: HTTP $httpCode al crear item - Response: $response");
+            log_message("TikiWikiClient: HTTP $httpCode al crear item - Response: $response");
             return false;
         }
 
@@ -165,11 +165,11 @@ class TikiWikiClient
         $responseData = json_decode($response, true);
         if (!$responseData || !isset($responseData['itemId'])) {
             $clean = str_replace(["\r", "\n"], ' ', strip_tags(substr($response, 0, 300)));
-            error_log("TikiWikiClient: Respuesta inválida (Status $httpCode): $clean");
+            log_message("TikiWikiClient: Respuesta inválida (Status $httpCode): $clean");
             return false;
         }
 
-        error_log("TikiWikiClient: Item creado - itemId={$responseData['itemId']}");
+        log_message("TikiWikiClient: Item creado - itemId={$responseData['itemId']}");
         return true;
     }
 
