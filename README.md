@@ -97,7 +97,7 @@ trackerGram incluye las siguientes medidas de seguridad:
 |---|---|
 | [INSTALL.md](INSTALL.md) | Cómo instalar paso a paso |
 | [TECHNICAL.md](TECHNICAL.md) | Cómo está construido (para desarrolladores) |
-| [CONTEXTO.md](CONTEXTO.md) | Visión general del proyecto (lectura obligatoria para colaboradores) |
+| [AGENTS.md](AGENTS.md) | Contexto para agentes de IA (lectura obligatoria) |
 | [roadmap.md](roadmap.md) | Qué falta por hacer |
 | [CAMBIOS.md](CAMBIOS.md) | Historial de cambios por versión |
 

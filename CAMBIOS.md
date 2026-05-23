@@ -16,7 +16,7 @@
 - **Docs**: PHP 7.4+ actualizado a 8.0+ en toda la documentación.
 - **Docs**: Eliminado `setup_webhook.php` (obsoleto, reemplazado por admin.php).
 - **Docs**: Reportes externos movidos a `reports/`.
-- **Docs**: CONTEXTO.md actualizado con nueva arquitectura (WebhookHandler, sin referencias a líneas obsoletas).
+- **Docs**: AGENTS.md actualizado con nueva arquitectura (WebhookHandler, sin referencias a líneas obsoletas).
 
 ## v0.1.6
 - **Seguridad**: Hash de contraseña admin con `password_hash()`/`password_verify()`. Migración automática desde texto plano.
@@ -36,7 +36,7 @@
 - **Fix**: Admin.php ya no pisa `CUSTOM_WEBHOOK_URL` al hacer "Actualizar Webhook"
 - **Fix**: Reorganizado admin panel en secciones lógicas: Configuración general (Telegram + TikiWiki), Importar, Tracker del webhook, Webhook, Crear Tracker. Cada formulario guarda solo sus campos.
 - **Docs**: Agregada sección "Resolución de Nombres de Topics" en TECHNICAL.md
-- **Docs**: Agregados links de referencia de APIs en CONTEXTO.md
+- **Docs**: Agregados links de referencia de APIs en AGENTS.md
 
 ## v0.1.4
 - Refactorización: Separación de responsabilidades en clientes (TikiWikiClient, TelegramClient, MessageMapper)

@@ -2,7 +2,7 @@
 
 Fecha de revisión: 2026-05-16  
 Proyecto revisado: `trackergram`  
-Archivo de entrada usado: `CONTEXTO.md`
+Archivo de entrada usado: `AGENTS.md`
 
 ## Resumen ejecutivo
 

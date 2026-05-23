@@ -13,6 +13,7 @@
 ### Funcionalidades
 
 #### Prioridad Alta
+- [ ] **Mini App para reportes estructurados**: Interfaz web dentro de Telegram para crear items en TikiWiki con texto + fotos + audio + ubicación en un solo envío. Reemplazaría el flujo de "múltiples mensajes sueltos" por un formulario único.
 - [ ] **Mensajes estructurados con prefijos**: Detectar y parsear mensajes con prefijos especiales que contienen datos estructurados
   - Ejemplo: "GPS fabian.ciclista 34.051628,-118.240126,14.3" → extrae coordenadas al campo ubicación
   - Implementar parser configurable en MessageMapper
