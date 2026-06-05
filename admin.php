@@ -433,6 +433,11 @@ if (!checkAuth()) {
     <style>
         .import-success { color: green; }
         .import-error { color: red; }
+        .collapsible h2 { cursor: pointer; user-select: none; }
+        .collapsible h2::before { content: '\25BC'; font-size: 0.7em; margin-right: 0.5em; display: inline-block; transition: transform 0.2s; }
+        .collapsible.collapsed h2::before { transform: rotate(-90deg); }
+        .collapsible-content { overflow: hidden; transition: max-height 0.3s ease; }
+        .collapsible.collapsed .collapsible-content { max-height: 0 !important; }
     </style>
 </head>
 <body>
@@ -455,7 +460,9 @@ if (!checkAuth()) {
         <li><a href="#crear-tracker">4. Crear Tracker en TikiWiki</a></li>
     </ul>
     
+    <div class="collapsible">
     <h2 id="config-general">1. Configuración general</h2>
+    <div class="collapsible-content">
     <p>Configuración básica del bot de Telegram y la instalación de TikiWiki.</p>
     <form method="post">
         <input type="hidden" name="action" value="save_general">
@@ -519,7 +526,12 @@ if (!checkAuth()) {
         <button type="submit">Actualizar Webhook</button>
     </form>
     
+    </div>
+    </div>
+    
+    <div class="collapsible">
     <h2 id="tracker-importar">2. Importar conversaciones</h2>
+    <div class="collapsible-content">
     <p>Importar conversaciones desde archivos ZIP exportados de Telegram. Los archivos (fotos, stickers, videos) se subirán a la file gallery del tracker.</p>
     <p><small>Límites: ZIP de hasta 50MB | Archivos multimedia individuales de hasta 20MB</small></p>
     
@@ -588,7 +600,12 @@ if (!checkAuth()) {
     }
     </script>
     
+    </div>
+    </div>
+    
+    <div class="collapsible">
     <h2 id="tracker-webhook">3. Tracker en directo (recibe el webhook)</h2>
+    <div class="collapsible-content">
     <p>ID del tracker de TikiWiki donde se enviarán los mensajes en vivo desde Telegram.</p>
     <form method="post">
         <input type="hidden" name="action" value="save_tracker">
@@ -603,7 +620,12 @@ if (!checkAuth()) {
     
     <!-- Sección de importación movida arriba -->
     
+    </div>
+    </div>
+    
+    <div class="collapsible">
     <h2 id="crear-tracker">4. Crear Tracker en TikiWiki</h2>
+    <div class="collapsible-content">
     
     <form method="post">
         <input type="hidden" name="action" value="create_tracker">
@@ -616,5 +638,15 @@ if (!checkAuth()) {
     </form>
     
     <p><small>El tracker creado puede usarse como tracker en directo o para importar mensajes.</small></p>
+    </div>
+    </div>
+
+    <script>
+    document.querySelectorAll('.collapsible h2').forEach(function(h2) {
+        h2.addEventListener('click', function() {
+            this.parentElement.classList.toggle('collapsed');
+        });
+    });
+    </script>
 </body>
 </html>
