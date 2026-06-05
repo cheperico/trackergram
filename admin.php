@@ -500,7 +500,7 @@ if (!checkAuth()) {
     </form>
     
     <h3>Webhook</h3>
-    <p>URL del webhook: 
+    <p>URL autodetectada del webhook: 
         <?php
         $displayUrl = $env['CUSTOM_WEBHOOK_URL'] ?? '';
         if (empty($displayUrl)) {
