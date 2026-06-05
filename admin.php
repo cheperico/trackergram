@@ -119,7 +119,11 @@ function generateWebhookUrl() {
     $prefix = rtrim($prefix, '/');
 
     $url = $protocol . '://' . $host . $prefix . $scriptPath;
-    return rtrim($url, '/');
+    $url = rtrim($url, '/');
+    if (!str_ends_with($url, '/api.php')) {
+        $url .= '/api.php';
+    }
+    return $url;
 }
 
 // Validación de inputs para prevenir inyección
