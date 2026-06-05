@@ -1,61 +1,400 @@
 <?php
 /**
  * MessageMapper - Transforma mensajes de Telegram al formato de TikiWiki
+ *
+ * Responsabilidades:
+ * - fromWebhook():  mensaje de webhook de Telegram → NormalizedMessage
+ * - fromExport():   mensaje de export ZIP de Telegram → NormalizedMessage
+ * - toWikiFields(): NormalizedMessage → array fields[permName] listo para POST
  */
-
-require_once 'config.php';
-
 class MessageMapper
 {
     /**
-     * Transformar mensaje de Telegram a campos para TikiWiki tracker
+     * Procesar mensaje de webhook de Telegram
+     * Sin efectos secundarios (no upload, no cache)
      */
-    public static function toTrackerFields(array $message, array $context = []): array
+    public function fromWebhook(array $message): NormalizedMessage
     {
-        $fields = [];
+        $msg = new NormalizedMessage();
+        $msg->text = $message['text'] ?? '';
 
-        // IDs básicos
-        $fields['telegrammessageTelegramMessageId'] = $message['message_id'] ?? $message['id'] ?? '';
-        $fields['telegrammessageChatId'] = $context['chat_id'] ?? '';
-        $fields['telegrammessageChatTitle'] = $context['chat_title'] ?? '';
+        if (isset($message['photo'])) {
+            $photo = end($message['photo']);
+            $msg->messageType = 'photo';
+            $msg->fileId = $photo['file_id'];
+            $msg->mimeType = 'image/jpeg';
+            $msg->fileName = 'telegram_photo_' . $photo['file_id'] . '.jpg';
+            $msg->mediaType = 'image/jpeg';
+            $msg->mediaSize = (string) ($photo['file_size'] ?? '');
+            $msg->mediaCaption = $message['caption'] ?? '';
+            $msg->text = 'Foto: image/jpeg';
+            if (isset($message['caption'])) {
+                $msg->text .= ' - ' . htmlspecialchars($message['caption']);
+            }
+            return $msg;
+        }
 
-        // Topic
-        $fields['telegrammessageTopicId'] = $context['topic_id'] ?? '';
-        $fields['telegrammessageTopicTitle'] = $context['topic_title'] ?? '';
+        if (isset($message['video'])) {
+            $video = $message['video'];
+            $msg->messageType = 'video';
+            $msg->fileId = $video['file_id'];
+            $mime = $video['mime_type'] ?? 'video/mp4';
+            $msg->mimeType = $mime;
+            $msg->mediaType = $mime;
+            $msg->mediaSize = (string) ($video['file_size'] ?? '');
+            $msg->mediaCaption = $message['caption'] ?? '';
+            $ext = pathinfo($video['file_name'] ?? $video['file_id'], PATHINFO_EXTENSION) ?: 'mp4';
+            $msg->fileName = 'telegram_video_' . $video['file_id'] . '.' . $ext;
+            $msg->text = 'Video: ' . $mime;
+            if (isset($message['caption'])) {
+                $msg->text .= ' - ' . htmlspecialchars($message['caption']);
+            }
+            return $msg;
+        }
 
-        // Usuario
-        $fromId = $message['from_id'] ?? '';
-        $fields['telegrammessageUserId'] = is_numeric($fromId) ? $fromId : str_replace('user', '', $fromId);
+        if (isset($message['audio'])) {
+            $audio = $message['audio'];
+            $msg->messageType = 'audio';
+            $msg->fileId = $audio['file_id'];
+            $mime = $audio['mime_type'] ?? 'audio/mpeg';
+            $msg->mimeType = $mime;
+            $msg->mediaType = $mime;
+            $msg->mediaSize = (string) ($audio['file_size'] ?? '');
+            $msg->fileName = 'telegram_audio_' . $audio['file_id'] . '.mp3';
+            $msg->text = 'Audio: ' . $mime;
+            if (isset($audio['title'])) {
+                $msg->text .= ' - ' . htmlspecialchars($audio['title']);
+            }
+            return $msg;
+        }
 
-        $from = $message['from'] ?? '';
+        if (isset($message['document'])) {
+            $doc = $message['document'];
+            $msg->messageType = 'document';
+            $msg->fileId = $doc['file_id'];
+            $msg->mimeType = $doc['mime_type'] ?? 'application/octet-stream';
+            $msg->mediaType = $doc['mime_type'] ?? 'application/octet-stream';
+            $msg->mediaSize = (string) ($doc['file_size'] ?? '');
+            $msg->mediaCaption = $message['caption'] ?? '';
+            $fn = $doc['file_name'] ?? 'Documento';
+            $msg->fileName = $fn;
+            $msg->text = 'Documento: ' . $msg->mediaType . ' - ' . htmlspecialchars($fn);
+            return $msg;
+        }
+
+        if (isset($message['sticker'])) {
+            $sticker = $message['sticker'];
+            $msg->messageType = 'sticker';
+            $msg->fileId = $sticker['file_id'];
+            $msg->mimeType = 'image/webp';
+            $msg->mediaType = 'image/webp';
+            $msg->fileName = 'telegram_sticker_' . $sticker['file_id'] . '.webp';
+            $msg->text = 'Sticker: image/webp';
+            return $msg;
+        }
+
+        if (isset($message['voice'])) {
+            $voice = $message['voice'];
+            $msg->messageType = 'voice';
+            $msg->fileId = $voice['file_id'];
+            $mime = $voice['mime_type'] ?? 'audio/ogg';
+            $msg->mimeType = $mime;
+            $msg->mediaType = $mime;
+            $msg->mediaSize = (string) ($voice['file_size'] ?? '');
+            $ext = '.ogg';
+            if ($mime === 'audio/mpeg' || $mime === 'audio/mp3') $ext = '.mp3';
+            elseif ($mime === 'audio/webm') $ext = '.webm';
+            elseif ($mime === 'audio/wav') $ext = '.wav';
+            $msg->fileName = 'telegram_voice_' . $voice['file_id'] . $ext;
+            $msg->text = 'Nota de voz: ' . $mime;
+            return $msg;
+        }
+
+        if (isset($message['video_note'])) {
+            $vn = $message['video_note'];
+            $msg->messageType = 'video_note';
+            $msg->fileId = $vn['file_id'];
+            $mime = $vn['mime_type'] ?? 'video/mp4';
+            $msg->mimeType = $mime;
+            $msg->mediaType = $mime;
+            $msg->mediaSize = (string) ($vn['file_size'] ?? '');
+            $msg->fileName = 'telegram_video_note_' . $vn['file_id'] . '.mp4';
+            $msg->text = 'Video circular: ' . $mime;
+            return $msg;
+        }
+
+        if (isset($message['forum_topic_created'])) {
+            $topicName = $message['forum_topic_created']['name'] ?? 'Nuevo Topic';
+            $msg->messageType = 'system';
+            $msg->systemMessage = 'Topic creado: ' . $topicName;
+            $msg->text = 'Topic creado: ' . $topicName;
+            $msg->topicName = $topicName;
+            return $msg;
+        }
+
+        if (isset($message['forum_topic_edited'])) {
+            $newName = $message['forum_topic_edited']['name'] ?? 'Desconocido';
+            $msg->messageType = 'system';
+            $msg->systemMessage = 'Topic renombrado: ' . $newName;
+            $msg->text = 'Topic renombrado a: ' . $newName;
+            $msg->topicName = $newName;
+            return $msg;
+        }
+
+        if (isset($message['forum_topic_closed'])) {
+            $msg->messageType = 'system';
+            $msg->systemMessage = 'Topic cerrado';
+            $msg->text = 'Topic cerrado';
+            return $msg;
+        }
+
+        if (isset($message['forum_topic_reopened'])) {
+            $msg->messageType = 'system';
+            $msg->systemMessage = 'Topic reabierto';
+            $msg->text = 'Topic reabierto';
+            return $msg;
+        }
+
+        if (isset($message['location'])) {
+            $loc = $message['location'];
+            $msg->messageType = 'location';
+            $msg->mediaType = 'location';
+            $zoom = 15;
+            $msg->location = $loc['longitude'] . ',' . $loc['latitude'] . ',' . $zoom;
+            $msg->text = '📍 Ubicación';
+            if (isset($loc['horizontal_accuracy'])) {
+                $msg->text .= ' (precisión: ' . $loc['horizontal_accuracy'] . 'm)';
+            }
+            return $msg;
+        }
+
+        if (isset($message['contact'])) {
+            $c = $message['contact'];
+            $msg->messageType = 'contact';
+            $msg->mediaType = 'contact';
+            $phone = $c['phone_number'] ?? '';
+            $fn = $c['first_name'] ?? '';
+            $ln = $c['last_name'] ?? '';
+            $msg->text = '👤 Contacto: ' . $fn . ' ' . $ln . ' (' . $phone . ')';
+            return $msg;
+        }
+
+        if (isset($message['poll'])) {
+            $poll = $message['poll'];
+            $msg->messageType = 'poll';
+            $msg->mediaType = 'poll';
+            $q = $poll['question'] ?? 'Sin pregunta';
+            $opts = count($poll['options'] ?? []);
+            $msg->text = '📊 Encuesta: ' . $q . ' (' . $opts . ' opciones)';
+            return $msg;
+        }
+
+        if (isset($message['animation'])) {
+            $msg->messageType = 'animation';
+            $msg->mediaType = $message['animation']['mime_type'] ?? 'animation/gif';
+            $msg->text = '🎬 Animation: ' . $msg->mediaType;
+            return $msg;
+        }
+
+        if (isset($message['new_chat_members'])) {
+            $names = array_map(fn($u) => $u['first_name'] . ' ' . ($u['last_name'] ?? ''), $message['new_chat_members']);
+            $msg->messageType = 'system';
+            $msg->text = '👤 Se unieron: ' . implode(', ', $names);
+            return $msg;
+        }
+
+        if (isset($message['left_chat_member'])) {
+            $u = $message['left_chat_member'];
+            $msg->messageType = 'system';
+            $msg->text = '🚪 ' . ($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '') . ' salió del grupo';
+            return $msg;
+        }
+
+        if (isset($message['pinned_message'])) {
+            $msg->messageType = 'system';
+            $msg->text = '📌 Mensaje fijado';
+            return $msg;
+        }
+
+        if (isset($message['group_chat_created']) || isset($message['supergroup_chat_created']) || isset($message['channel_chat_created'])) {
+            $msg->messageType = 'system';
+            $msg->text = '🆕 Grupo creado';
+            return $msg;
+        }
+
+        if (isset($message['new_chat_title'])) {
+            $msg->messageType = 'system';
+            $msg->text = '✏️ Título cambiado a: ' . htmlspecialchars($message['new_chat_title']);
+            return $msg;
+        }
+
+        if (isset($message['new_chat_photo'])) {
+            $msg->messageType = 'system';
+            $msg->text = '🖼️ Foto del grupo actualizada';
+            return $msg;
+        }
+
+        if (isset($message['delete_chat_photo'])) {
+            $msg->messageType = 'system';
+            $msg->text = '🗑️ Foto del grupo eliminada';
+            return $msg;
+        }
+
+        if (!isset($message['text'])) {
+            $messageKeys = array_keys($message);
+            $knownTypes = ['message_id', 'from', 'chat', 'date', 'text', 'photo', 'video', 'audio', 'document', 'sticker', 'voice', 'video_note', 'location', 'contact', 'poll', 'animation', 'forum_topic_edited', 'forum_topic_created', 'forum_topic_closed', 'forum_topic_reopened', 'caption', 'edit_date', 'entities', 'forward_from', 'forward_from_chat', 'reply_to_message', 'via_bot', 'new_chat_members', 'left_chat_member', 'pinned_message', 'group_chat_created', 'supergroup_chat_created', 'new_chat_title', 'new_chat_photo', 'delete_chat_photo'];
+            $unknownTypes = array_diff($messageKeys, $knownTypes);
+            if (!empty($unknownTypes)) {
+                $msg->messageType = 'other';
+                $msg->text = '[Tipo no soportado: ' . implode(', ', $unknownTypes) . ']';
+            } else {
+                $msg->messageType = 'other';
+                $msg->text = '[Mensaje sin texto]';
+            }
+        }
+
+        return $msg;
+    }
+
+    /**
+     * Procesar mensaje de export ZIP de Telegram
+     */
+    public function fromExport(array $message, array $context): NormalizedMessage
+    {
+        $msg = new NormalizedMessage();
+
+        $msg->messageId = (string) ($message['id'] ?? '');
+        $msg->chatId = (string) ($context['chat_id'] ?? '');
+        $msg->chatTitle = $context['chat_title'] ?? '';
+        $msg->topicId = (string) ($context['topic_id'] ?? '');
+        $msg->topicTitle = $context['topic_title'] ?? '';
+        $msg->uploadedFileId = $context['file_id'] ?? null;
+
+        $from = $message['from'] ?? $message['actor'] ?? '';
         $fromParts = explode(' ', $from, 2);
-        $fields['telegrammessageFirstName'] = $fromParts[0] ?? '';
-        $fields['telegrammessageLastName'] = $fromParts[1] ?? '';
-        $fields['telegrammessageUsername'] = $message['from_username'] ?? '';
+        $msg->firstName = $fromParts[0] ?? '';
+        $msg->lastName = $fromParts[1] ?? '';
 
-        // Tipo de mensaje y contenido
-        $typeInfo = self::detectMessageType($message);
-        $fields['telegrammessageMessageType'] = $typeInfo['type'];
-        $fields['telegrammessageText'] = self::extractText($message);
-        $fields['telegrammessageMediaCaption'] = $typeInfo['caption'] ?? '';
+        $msg->userId = str_replace('user', '', $message['from_id'] ?? $message['actor_id'] ?? '');
 
-        // Fecha (UNIX timestamp)
-        $fields['telegrammessageMessageDate'] = self::extractDate($message);
+        $rawDate = $message['date'] ?? '';
+        $msg->date = is_numeric($rawDate) ? (string) (int) $rawDate : (string) strtotime((string) $rawDate);
 
-        // Media
-        $fields['telegrammessageMedia'] = $context['file_id'] ?? '';
+        $msgType = $message['type'] ?? 'message';
+
+        if ($msgType === 'message') {
+            $rawText = $message['text'] ?? '';
+            $msg->text = is_array($rawText) ? json_encode($rawText, JSON_UNESCAPED_UNICODE) : (string) $rawText;
+
+            if (!empty($message['photo'])) {
+                $msg->messageType = 'photo';
+                $msg->mediaCaption = $message['photo_caption'] ?? '';
+            } elseif (!empty($message['file'])) {
+                $fileType = $message['media_type'] ?? '';
+                $fileName = $message['file_name'] ?? basename((string) $message['file']);
+                if ($fileType === 'sticker' || strpos($message['file'] ?? '', 'sticker') !== false) {
+                    $msg->messageType = 'sticker';
+                } elseif ($fileType === 'voice_message') {
+                    $msg->messageType = 'voice';
+                } elseif ($fileType === 'animation') {
+                    $msg->messageType = 'animation';
+                } elseif ($fileType === 'video_message' || $fileType === 'video_file' || strpos($message['file'] ?? '', 'video') !== false) {
+                    $msg->messageType = 'video';
+                } elseif ($fileType === 'audio' || $fileType === 'audio_file' || strpos($message['file'] ?? '', 'audio') !== false) {
+                    $msg->messageType = 'audio';
+                } else {
+                    $msg->messageType = 'document';
+                }
+            } else {
+                $msg->messageType = 'text';
+            }
+        } else {
+            $msg->messageType = 'system';
+            $action = $message['action'] ?? '';
+            $firstName = $msg->firstName;
+            $msg->text = match ($action) {
+                'topic_created' => '📌 Tema creado: ' . ($message['title'] ?? ''),
+                'topic_edit' => '✏️ Tema renombrado a: ' . ($message['new_title'] ?? ''),
+                'topic_closed' => '🔒 Tema cerrado',
+                'topic_reopened' => '🔓 Tema reabierto',
+                'pin_message', 'pinned_message' => '📌 Mensaje fijado por ' . $firstName,
+                'create_group' => '🆕 Grupo creado',
+                'invite_members', 'add_members' => '👤 ' . $firstName . ' agregó a: ' . implode(', ', $message['members'] ?? []),
+                'remove_members' => '🚫 ' . $firstName . ' eliminó a: ' . implode(', ', $message['members'] ?? []),
+                'joined' => '👤 ' . $firstName . ' se unió al grupo',
+                'left' => '🚪 ' . $firstName . ' salió del grupo',
+                'title_edit' => '✏️ Título cambiado a: ' . ($message['title'] ?? ''),
+                default => '🔔 ' . $action . (!empty($message['title']) ? ': ' . $message['title'] : '')
+            };
+        }
+
+        return $msg;
+    }
+
+    /**
+     * Transformar NormalizedMessage a campos para TikiWiki API
+     * Devuelve array fields[permName] listo para http_build_query
+     */
+    public function toWikiFields(NormalizedMessage $msg): array
+    {
+        $fields = [
+            'fields[telegrammessageTelegramMessageId]' => $msg->messageId,
+            'fields[telegrammessageChatId]' => $msg->chatId,
+            'fields[telegrammessageChatTitle]' => htmlspecialchars($msg->chatTitle, ENT_QUOTES, 'UTF-8'),
+            'fields[telegrammessageTopicId]' => $msg->topicId,
+            'fields[telegrammessageTopicTitle]' => htmlspecialchars($msg->topicTitle, ENT_QUOTES, 'UTF-8'),
+            'fields[telegrammessageUserId]' => $msg->userId,
+            'fields[telegrammessageUsername]' => htmlspecialchars($msg->username, ENT_QUOTES, 'UTF-8'),
+            'fields[telegrammessageFirstName]' => htmlspecialchars($msg->firstName, ENT_QUOTES, 'UTF-8'),
+            'fields[telegrammessageLastName]' => htmlspecialchars($msg->lastName, ENT_QUOTES, 'UTF-8'),
+            'fields[telegrammessageMessageType]' => $msg->messageType,
+            'fields[telegrammessageText]' => htmlspecialchars($msg->text, ENT_QUOTES, 'UTF-8'),
+            'fields[telegrammessageLocation]' => $msg->location,
+            'fields[telegrammessageMediaType]' => $msg->mediaType,
+            'fields[telegrammessageMediaSize]' => $msg->mediaSize,
+            'fields[telegrammessageMediaCaption]' => htmlspecialchars($msg->mediaCaption, ENT_QUOTES, 'UTF-8'),
+            'fields[telegrammessageMessageDate]' => $msg->date,
+        ];
+
+        if ($msg->uploadedFileId !== null && $msg->uploadedFileId !== '') {
+            $fields['fields[telegrammessageMedia]'] = $msg->uploadedFileId;
+        }
 
         return $fields;
     }
 
-    /**
-     * Detectar tipo de mensaje y extraer info de media
-     */
-    public static function detectMessageType(array $message): array
+    // --- Static helpers para casos donde el msg no tiene extractDate ---
+
+    public function extractText(array $message): string
+    {
+        if (isset($message['text']) && is_string($message['text'])) {
+            return $message['text'];
+        }
+        if (isset($message['text']) && is_array($message['text'])) {
+            return json_encode($message['text'], JSON_UNESCAPED_UNICODE);
+        }
+        if (!empty($message['caption']) && is_string($message['caption'])) {
+            return $message['caption'];
+        }
+        return '';
+    }
+
+    public function extractDate(array $message): int
+    {
+        $date = $message['date'] ?? '';
+        if (is_numeric($date)) {
+            return (int) $date;
+        }
+        if (is_string($date)) {
+            return (int) strtotime($date);
+        }
+        return time();
+    }
+
+    public function detectMessageType(array $message): array
     {
         $result = ['type' => 'text', 'caption' => '', 'file_id' => '', 'file_name' => ''];
 
-        // Fotos
         if (!empty($message['photo'])) {
             $result['type'] = 'photo';
             $result['caption'] = $message['photo_caption'] ?? '';
@@ -64,7 +403,6 @@ class MessageMapper
             return $result;
         }
 
-        // Videos
         if (!empty($message['video'])) {
             $result['type'] = 'video';
             $result['caption'] = $message['video_caption'] ?? '';
@@ -73,7 +411,6 @@ class MessageMapper
             return $result;
         }
 
-        // Videos округленные (video_message)
         if (($message['media_type'] ?? '') === 'video_message' || strpos($message['file'] ?? '', 'video') !== false) {
             $result['type'] = 'video';
             $result['file_id'] = $message['file'] ?? '';
@@ -81,7 +418,6 @@ class MessageMapper
             return $result;
         }
 
-        // Audio
         if (!empty($message['audio'])) {
             $result['type'] = 'audio';
             $result['caption'] = $message['audio_caption'] ?? '';
@@ -89,14 +425,12 @@ class MessageMapper
             return $result;
         }
 
-        // Notas de voz
         if (!empty($message['voice'])) {
             $result['type'] = 'voice';
             $result['file_id'] = $message['voice']['file_id'] ?? '';
             return $result;
         }
 
-        // Documentos
         if (!empty($message['document'])) {
             $doc = $message['document'];
             if (isset($doc['mime_type'])) {
@@ -118,56 +452,43 @@ class MessageMapper
             return $result;
         }
 
-        // Sticker
         if (!empty($message['sticker'])) {
             $result['type'] = 'sticker';
             $result['file_id'] = $message['sticker']['file_id'] ?? '';
             return $result;
         }
 
-        // Ubicación
         if (!empty($message['location'])) {
             $result['type'] = 'location';
-            $lat = $message['location']['latitude'] ?? 0;
-            $lon = $message['location']['longitude'] ?? 0;
-            $result['file_id'] = "$lon,$lat,15";
+            $result['file_id'] = ($message['location']['longitude'] ?? 0) . ',' . ($message['location']['latitude'] ?? 0) . ',15';
             return $result;
         }
 
-        // Contacto
         if (!empty($message['contact'])) {
             $result['type'] = 'contact';
-            $phone = $message['contact']['phone_number'] ?? '';
-            $first = $message['contact']['first_name'] ?? '';
-            $last = $message['contact']['last_name'] ?? '';
             $result['file_id'] = json_encode([
-                'phone' => $phone,
-                'first_name' => $first,
-                'last_name' => $last
-            ]);
+                'phone' => $message['contact']['phone_number'] ?? '',
+                'first_name' => $message['contact']['first_name'] ?? '',
+                'last_name' => $message['contact']['last_name'] ?? ''
+            ], JSON_UNESCAPED_UNICODE);
             return $result;
         }
 
-        // Encuesta
         if (!empty($message['poll'])) {
             $result['type'] = 'poll';
-            $question = $message['poll']['question'] ?? '';
-            $options = $message['poll']['options'] ?? [];
             $result['file_id'] = json_encode([
-                'question' => $question,
-                'options' => array_column($options, 'text')
-            ]);
+                'question' => $message['poll']['question'] ?? '',
+                'options' => array_column($message['poll']['options'] ?? [], 'text')
+            ], JSON_UNESCAPED_UNICODE);
             return $result;
         }
 
-        // Animation (GIF)
         if (!empty($message['animation'])) {
             $result['type'] = 'animation';
             $result['file_id'] = $message['animation']['file_id'] ?? '';
             return $result;
         }
 
-        // Servicio (topic creado, miembro unido, etc)
         if (($message['type'] ?? '') === 'service') {
             $result['type'] = 'system';
             return $result;
@@ -176,351 +497,15 @@ class MessageMapper
         return $result;
     }
 
-    /**
-     * Extraer texto del mensaje (maneja varios formatos)
-     */
-    public static function extractText(array $message): string
-    {
-        // Texto directo
-        if (isset($message['text']) && is_string($message['text'])) {
-            return $message['text'];
-        }
-
-        // Texto en array (formatos complejos de Telegram)
-        if (isset($message['text']) && is_array($message['text'])) {
-            return json_encode($message['text']);
-        }
-
-        // Caption (para medios)
-        if (!empty($message['caption']) && is_string($message['caption'])) {
-            return $message['caption'];
-        }
-
-        return '';
-    }
-
-    /**
-     * Extraer fecha como UNIX timestamp
-     */
-    public static function extractDate(array $message): int
-    {
-        $date = $message['date'] ?? '';
-
-        if (is_numeric($date)) {
-            return (int) $date;
-        }
-
-        if (is_string($date)) {
-            return (int) strtotime($date);
-        }
-
-        return time();
-    }
-
-    /**
-     * Extraer información de ubicación
-     */
-    public static function extractLocation(array $message): ?array
+    public function extractLocation(array $message): ?array
     {
         if (empty($message['location'])) {
             return null;
         }
-
         return [
             'lat' => $message['location']['latitude'] ?? 0,
             'lon' => $message['location']['longitude'] ?? 0,
             'zoom' => 15
         ];
-    }
-
-    /**
-     * Procesar mensaje de webhook de Telegram: detecta tipo y extrae datos
-     * Sin efectos secundarios (no upload, no cache). La llamadora hace eso.
-     */
-    public static function fromWebhook(array $message): array
-    {
-        $data = [
-            'type' => 'text',
-            'text' => $message['text'] ?? '',
-            'file_id' => null,
-            'file_name' => null,
-            'mime_type' => null,
-            'media_type' => null,
-            'media_size' => null,
-            'media_caption' => null,
-            'system_message' => null,
-            'location' => null,
-            'topic_name' => null,
-        ];
-
-        if (isset($message['photo'])) {
-            $photo = end($message['photo']);
-            $data['type'] = 'photo';
-            $data['file_id'] = $photo['file_id'];
-            $data['mime_type'] = 'image/jpeg';
-            $data['file_name'] = 'telegram_photo_' . $photo['file_id'] . '.jpg';
-            $data['media_type'] = 'image/jpeg';
-            $data['media_size'] = $photo['file_size'] ?? null;
-            $data['media_caption'] = $message['caption'] ?? null;
-            $data['text'] = 'Foto: image/jpeg';
-            if (isset($message['caption'])) {
-                $data['text'] .= ' - ' . htmlspecialchars($message['caption']);
-            }
-            return $data;
-        }
-
-        if (isset($message['video'])) {
-            $video = $message['video'];
-            $data['type'] = 'video';
-            $data['file_id'] = $video['file_id'];
-            $mime = $video['mime_type'] ?? 'video/mp4';
-            $data['mime_type'] = $mime;
-            $data['media_type'] = $mime;
-            $data['media_size'] = $video['file_size'] ?? null;
-            $data['media_caption'] = $message['caption'] ?? null;
-            $ext = pathinfo($video['file_id'], PATHINFO_EXTENSION);
-            $data['file_name'] = 'telegram_video_' . $video['file_id'] . '.' . $ext;
-            $data['text'] = 'Video: ' . $mime;
-            if (isset($message['caption'])) {
-                $data['text'] .= ' - ' . htmlspecialchars($message['caption']);
-            }
-            return $data;
-        }
-
-        if (isset($message['audio'])) {
-            $audio = $message['audio'];
-            $data['type'] = 'audio';
-            $data['file_id'] = $audio['file_id'];
-            $mime = $audio['mime_type'] ?? 'audio/mpeg';
-            $data['mime_type'] = $mime;
-            $data['media_type'] = $mime;
-            $data['media_size'] = $audio['file_size'] ?? null;
-            $data['file_name'] = 'telegram_audio_' . $audio['file_id'] . '.mp3';
-            $data['text'] = 'Audio: ' . $mime;
-            if (isset($audio['title'])) {
-                $data['text'] .= ' - ' . htmlspecialchars($audio['title']);
-            }
-            return $data;
-        }
-
-        if (isset($message['document'])) {
-            $doc = $message['document'];
-            $data['type'] = 'document';
-            $data['file_id'] = $doc['file_id'];
-            $data['mime_type'] = $doc['mime_type'] ?? 'application/octet-stream';
-            $data['media_type'] = $doc['mime_type'] ?? 'application/octet-stream';
-            $data['media_size'] = $doc['file_size'] ?? null;
-            $data['media_caption'] = $message['caption'] ?? null;
-            $fn = $doc['file_name'] ?? 'Documento';
-            $data['file_name'] = $fn;
-            $data['text'] = 'Documento: ' . $data['media_type'] . ' - ' . htmlspecialchars($fn);
-            return $data;
-        }
-
-        if (isset($message['sticker'])) {
-            $sticker = $message['sticker'];
-            $data['type'] = 'sticker';
-            $data['file_id'] = $sticker['file_id'];
-            $data['mime_type'] = 'image/webp';
-            $data['media_type'] = 'image/webp';
-            $data['file_name'] = 'telegram_sticker_' . $sticker['file_id'] . '.webp';
-            $data['text'] = 'Sticker: image/webp';
-            return $data;
-        }
-
-        if (isset($message['voice'])) {
-            $voice = $message['voice'];
-            $data['type'] = 'voice';
-            $data['file_id'] = $voice['file_id'];
-            $mime = $voice['mime_type'] ?? 'audio/ogg';
-            $data['mime_type'] = $mime;
-            $data['media_type'] = $mime;
-            $data['media_size'] = $voice['file_size'] ?? null;
-            $ext = '.ogg';
-            if ($mime === 'audio/mpeg' || $mime === 'audio/mp3') $ext = '.mp3';
-            elseif ($mime === 'audio/webm') $ext = '.webm';
-            elseif ($mime === 'audio/wav') $ext = '.wav';
-            $data['file_name'] = 'telegram_voice_' . $voice['file_id'] . $ext;
-            $data['text'] = 'Nota de voz: ' . $mime;
-            return $data;
-        }
-
-        if (isset($message['video_note'])) {
-            $vn = $message['video_note'];
-            $data['type'] = 'video_note';
-            $data['file_id'] = $vn['file_id'];
-            $mime = $vn['mime_type'] ?? 'video/mp4';
-            $data['mime_type'] = $mime;
-            $data['media_type'] = $mime;
-            $data['media_size'] = $vn['file_size'] ?? null;
-            $data['file_name'] = 'telegram_video_note_' . $vn['file_id'] . '.mp4';
-            $data['text'] = 'Video circular: ' . $mime;
-            return $data;
-        }
-
-        if (isset($message['forum_topic_created'])) {
-            $topicName = $message['forum_topic_created']['name'] ?? 'Nuevo Topic';
-            $data['type'] = 'system';
-            $data['system_message'] = 'Topic creado: ' . $topicName;
-            $data['text'] = 'Topic creado: ' . $topicName;
-            $data['topic_name'] = $topicName;
-            return $data;
-        }
-
-        if (isset($message['forum_topic_edited'])) {
-            $newName = $message['forum_topic_edited']['name'] ?? 'Desconocido';
-            $data['type'] = 'system';
-            $data['system_message'] = 'Topic renombrado: ' . $newName;
-            $data['text'] = 'Topic renombrado a: ' . $newName;
-            $data['topic_name'] = $newName;
-            return $data;
-        }
-
-        if (isset($message['forum_topic_closed'])) {
-            $data['type'] = 'system';
-            $data['system_message'] = 'Topic cerrado';
-            $data['text'] = 'Topic cerrado';
-            return $data;
-        }
-
-        if (isset($message['forum_topic_reopened'])) {
-            $data['type'] = 'system';
-            $data['system_message'] = 'Topic reabierto';
-            $data['text'] = 'Topic reabierto';
-            return $data;
-        }
-
-        if (isset($message['location'])) {
-            $loc = $message['location'];
-            $data['type'] = 'location';
-            $data['media_type'] = 'location';
-            $zoom = 15;
-            $data['location'] = $loc['longitude'] . ',' . $loc['latitude'] . ',' . $zoom;
-            $data['text'] = '📍 Ubicación';
-            if (isset($loc['horizontal_accuracy'])) {
-                $data['text'] .= ' (precisión: ' . $loc['horizontal_accuracy'] . 'm)';
-            }
-            return $data;
-        }
-
-        if (isset($message['contact'])) {
-            $c = $message['contact'];
-            $data['type'] = 'contact';
-            $data['media_type'] = 'contact';
-            $phone = $c['phone_number'] ?? '';
-            $fn = $c['first_name'] ?? '';
-            $ln = $c['last_name'] ?? '';
-            $data['text'] = '👤 Contacto: ' . $fn . ' ' . $ln . ' (' . $phone . ')';
-            return $data;
-        }
-
-        if (isset($message['poll'])) {
-            $poll = $message['poll'];
-            $data['type'] = 'poll';
-            $data['media_type'] = 'poll';
-            $q = $poll['question'] ?? 'Sin pregunta';
-            $opts = count($poll['options'] ?? []);
-            $data['text'] = '📊 Encuesta: ' . $q . ' (' . $opts . ' opciones)';
-            return $data;
-        }
-
-        if (isset($message['animation'])) {
-            $data['type'] = 'animation';
-            $data['media_type'] = $message['animation']['mime_type'] ?? 'animation/gif';
-            $data['text'] = '🎬 Animation: ' . $data['media_type'];
-            return $data;
-        }
-
-        if (isset($message['new_chat_members'])) {
-            $names = array_map(fn($u) => $u['first_name'] . ' ' . ($u['last_name'] ?? ''), $message['new_chat_members']);
-            $data['type'] = 'system';
-            $data['text'] = '👤 Se unieron: ' . implode(', ', $names);
-            return $data;
-        }
-
-        if (isset($message['left_chat_member'])) {
-            $u = $message['left_chat_member'];
-            $data['type'] = 'system';
-            $data['text'] = '🚪 ' . ($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '') . ' salió del grupo';
-            return $data;
-        }
-
-        if (isset($message['pinned_message'])) {
-            $data['type'] = 'system';
-            $data['text'] = '📌 Mensaje fijado';
-            return $data;
-        }
-
-        if (isset($message['group_chat_created']) || isset($message['supergroup_chat_created']) || isset($message['channel_chat_created'])) {
-            $data['type'] = 'system';
-            $data['text'] = '🆕 Grupo creado';
-            return $data;
-        }
-
-        if (isset($message['new_chat_title'])) {
-            $data['type'] = 'system';
-            $data['text'] = '✏️ Título cambiado a: ' . htmlspecialchars($message['new_chat_title']);
-            return $data;
-        }
-
-        if (isset($message['new_chat_photo'])) {
-            $data['type'] = 'system';
-            $data['text'] = '🖼️ Foto del grupo actualizada';
-            return $data;
-        }
-
-        if (isset($message['delete_chat_photo'])) {
-            $data['type'] = 'system';
-            $data['text'] = '🗑️ Foto del grupo eliminada';
-            return $data;
-        }
-
-        // Unknown types
-        if (!isset($message['text'])) {
-            $messageKeys = array_keys($message);
-            $knownTypes = ['message_id', 'from', 'chat', 'date', 'text', 'photo', 'video', 'audio', 'document', 'sticker', 'voice', 'video_note', 'location', 'contact', 'poll', 'animation', 'forum_topic_edited', 'forum_topic_created', 'forum_topic_closed', 'forum_topic_reopened', 'caption', 'edit_date', 'entities', 'forward_from', 'forward_from_chat', 'reply_to_message', 'via_bot', 'new_chat_members', 'left_chat_member', 'pinned_message', 'group_chat_created', 'supergroup_chat_created', 'new_chat_title', 'new_chat_photo', 'delete_chat_photo'];
-            $unknownTypes = array_diff($messageKeys, $knownTypes);
-            if (!empty($unknownTypes)) {
-                $data['type'] = 'other';
-                $data['text'] = '[Tipo no soportado: ' . implode(', ', $unknownTypes) . ']';
-            } else {
-                $data['type'] = 'other';
-                $data['text'] = '[Mensaje sin texto]';
-            }
-        }
-
-        return $data;
-    }
-
-    /**
-     * Transformar datos estructurados de un mensaje a campos con encoding para TikiWiki API
-     * Recibe el array $tikiData de processUpdate() y devuelve fields[permName] listo para POST
-     */
-    public static function toWikiFields(array $data): array
-    {
-        $fields = [
-            'fields[telegrammessageTelegramMessageId]' => $data['message_id'],
-            'fields[telegrammessageChatId]' => $data['chat_id'],
-            'fields[telegrammessageChatTitle]' => htmlspecialchars($data['chat_title'] ?? '', ENT_QUOTES, 'UTF-8'),
-            'fields[telegrammessageTopicId]' => $data['topic_id'],
-            'fields[telegrammessageTopicTitle]' => htmlspecialchars($data['topic_title'] ?? '', ENT_QUOTES, 'UTF-8'),
-            'fields[telegrammessageUserId]' => $data['user_id'],
-            'fields[telegrammessageUsername]' => htmlspecialchars($data['username'] ?? '', ENT_QUOTES, 'UTF-8'),
-            'fields[telegrammessageFirstName]' => htmlspecialchars($data['first_name'] ?? '', ENT_QUOTES, 'UTF-8'),
-            'fields[telegrammessageLastName]' => htmlspecialchars($data['last_name'] ?? '', ENT_QUOTES, 'UTF-8'),
-            'fields[telegrammessageMessageType]' => $data['message_type'],
-            'fields[telegrammessageText]' => htmlspecialchars($data['text'] ?? '', ENT_QUOTES, 'UTF-8'),
-            'fields[telegrammessageLocation]' => $data['location'] ?? '',
-            'fields[telegrammessageMediaType]' => $data['media_type'],
-            'fields[telegrammessageMediaSize]' => $data['media_size'],
-            'fields[telegrammessageMediaCaption]' => htmlspecialchars($data['media_caption'] ?? '', ENT_QUOTES, 'UTF-8'),
-            'fields[telegrammessageMessageDate]' => $data['date']
-        ];
-
-        if (!empty($data['uploaded_file_id'])) {
-            $fields['fields[telegrammessageMedia]'] = $data['uploaded_file_id'];
-        }
-
-        return $fields;
     }
 }

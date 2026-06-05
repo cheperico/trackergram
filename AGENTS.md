@@ -68,9 +68,18 @@ trackerGram no tiene base de datos propia. TikiWiki es el almacenamiento. La con
 
 No hay Laravel, Symfony ni Composer. Archivos PHP que se incluyen directamente. La deuda técnica (sin autoloading PSR-4, sin tests unitarios fáciles) está identificada en el roadmap.
 
-### Clases estáticas (trackerGram)
+### Inyección de dependencias (implementada ✅)
 
-`TikiWikiClient`, `TelegramClient`, `WebhookHandler` usan métodos estáticos. No hay inyección de dependencias. Esto dificulta el testing unitario y es la refactorización de mayor prioridad.
+`TikiWikiClient`, `TelegramClient`, `WebhookHandler` y `MessageMapper` son **instanciables** con dependencias inyectadas por constructor. Bootstrap define el wiring en `bootstrap.php`:
+
+```php
+$tikiWikiClient = new TikiWikiClient(TIKIWIKI_API_URL, TIKIWIKI_TOKEN);
+$telegramClient = new TelegramClient(TELEGRAM_BOT_TOKEN);
+$messageMapper = new MessageMapper();
+$webhookHandler = new WebhookHandler($tikiWikiClient, $telegramClient, $messageMapper, TIKIWIKI_TRACKER_ID);
+```
+
+Esto permite testear cada clase de forma aislada pasando mocks/stubs.
 
 ### TikiWiki como almacenamiento
 
@@ -109,9 +118,10 @@ Todos los archivos en la raíz. No hay subdirectorios de código.
 | Archivo | Responsabilidad |
 |---|---|
 | `config.php` | Carga `.env`, define constantes globales, `log_message()` |
+| `NormalizedMessage.php` | Modelo intermedio único entre parsers y TikiWiki |
 | `TikiWikiClient.php` | API de TikiWiki (crear items, subir archivos, crear trackers, deduplicación) |
 | `TelegramClient.php` | API de Telegram (descargar archivos, info de chats) |
-| `MessageMapper.php` | Transforma mensajes de Telegram → campos de TikiWiki |
+| `MessageMapper.php` | Transforma mensajes → NormalizedMessage → campos TikiWiki |
 | `WebhookHandler.php` | Orquesta: valida, resuelve topics, descarga media, envía a TikiWiki |
 
 #### Soporte
@@ -137,15 +147,16 @@ Todos los archivos en la raíz. No hay subdirectorios de código.
 
 ### Orden recomendado de lectura del código
 
-1. `bootstrap.php` — 10 líneas, entendés qué se carga
+1. `bootstrap.php` — wiring de DI, entendés cómo se conecta todo
 2. `config.php` — cómo se leen las credenciales y constantes
-3. `api.php` — entry point del webhook, delega en WebhookHandler
-4. `WebhookHandler.php` — el corazón: processUpdate → processMessage → sendToTikiWiki
-5. `MessageMapper.php` — cómo se transforman los datos
-6. `TikiWikiClient.php` — cómo se envían a TikiWiki
-7. `TelegramClient.php` — cómo se descargan archivos de Telegram
-8. `import.php` — flujo alternativo de importación
-9. `admin.php` — interfaz web de configuración
+3. `NormalizedMessage.php` — el modelo intermedio único
+4. `api.php` — entry point del webhook, delega en WebhookHandler
+5. `WebhookHandler.php` — el corazón: processUpdate → processMessage → sendToTikiWiki
+6. `MessageMapper.php` — fromWebhook / fromExport → NormalizedMessage → toWikiFields
+7. `TikiWikiClient.php` — cómo se envían a TikiWiki
+8. `TelegramClient.php` — cómo se descargan archivos de Telegram
+9. `import.php` — flujo alternativo de importación (usa fromExport)
+10. `admin.php` — interfaz web de configuración
 
 ---
 
@@ -154,14 +165,14 @@ Todos los archivos en la raíz. No hay subdirectorios de código.
 ### Webhook (tiempo real)
 
 ```
-Telegram → api.php → WebhookHandler::processUpdate()
-    → WebhookHandler::processMessage()
-        → MessageMapper::fromWebhook()        # detecta tipo, extrae datos
-        → TelegramClient::getFileUrl()        # si tiene media
-        → TikiWikiClient::uploadFile()        # sube a file gallery
-        → TikiWikiClient::messageExists()     # deduplicación
-        → MessageMapper::toWikiFields()       # formatea campos
-        → TikiWikiClient::createTrackerItem() # crea item en TikiWiki
+Telegram → api.php → $webhookHandler->processUpdate()
+    → $webhookHandler->processMessage()
+        → $messageMapper->fromWebhook()        # detecta tipo, extrae datos → NormalizedMessage
+        → $telegramClient->getFileUrl()        # si tiene media
+        → $tikiWikiClient->uploadFile()        # sube a file gallery
+        → $tikiWikiClient->messageExists()     # deduplicación
+        → $messageMapper->toWikiFields()       # NormalizedMessage → fields[permName]
+        → $tikiWikiClient->createTrackerItem() # crea item en TikiWiki
 ```
 
 ### Importación (ZIP export)
@@ -170,8 +181,9 @@ Telegram → api.php → WebhookHandler::processUpdate()
 admin.php → import.php
     → extraer ZIP, validar path traversal
     → parsear result.json
-    → MessageMapper::toTrackerFields() / toWikiFields()
-    → TikiWikiClient::createTrackerItem()
+    → $messageMapper->fromExport()            # export → NormalizedMessage
+    → $messageMapper->toWikiFields()          # NormalizedMessage → fields[permName]
+    → $tikiWikiClient->createTrackerItem()
 ```
 
 ---
@@ -307,7 +319,7 @@ ALLOWED_CHAT_IDS=...
 ### Convenciones de código
 
 - PHP 8.0+ (usa `match`, `str_starts_with()`, named arguments)
-- Clases estáticas — sin inyección de dependencias (ver roadmap)
+- Inyección de dependencias por constructor (clases instanciables)
 - Sin namespace, sin autoloading — `require_once` directo
 - Sin comentarios innecesarios — código autoexplicativo
 
@@ -323,7 +335,7 @@ ALLOWED_CHAT_IDS=...
 - **No usar `curl` directamente** — Usar `TelegramClient` y `TikiWikiClient`.
 - **No crear variables globales** — Usar `static` dentro de funciones o pasar por parámetros.
 - **No requerir archivos individuales** — Siempre usar `require_once 'bootstrap.php'` (en trackerGram).
-- **No duplicar lógica de parsing entre webhook e import** — Ambos deben converger en `MessageMapper::toWikiFields()`.
+- **No duplicar lógica de parsing entre webhook e import** — Ambos convergen en `MessageMapper::toWikiFields()` vía `NormalizedMessage`. Webhook usa `fromWebhook()`, import usa `fromExport()`.
 
 ### Telegram
 
@@ -354,8 +366,8 @@ ALLOWED_CHAT_IDS=...
 
 - [ ] **Mini App para reportes estructurados**: Interfaz web dentro de Telegram para crear items con texto + fotos + audio + ubicación en un solo envío
 - [ ] **Mensajes estructurados con prefijos**: Detectar y parsear mensajes con prefijos especiales (ej: GPS, alertas)
-- [ ] **Inyección de dependencias**: Refactorizar clases estáticas en instanciables
-- [ ] **Unificar parsers de mensajes**: Definir modelo intermedio único (NormalizedMessage)
+- [x] **Inyección de dependencias**: Refactorizar clases estáticas en instanciables ✅
+- [x] **Unificar parsers de mensajes**: Definir modelo intermedio único (NormalizedMessage) ✅
 - [ ] **Estandarizar manejo de errores**: Excepciones de dominio
 
 ### Prioridad Media

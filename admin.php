@@ -101,7 +101,6 @@ function resetFailedLogin() {
 
 // Función para generar URL de webhook automática del servidor actual
 function generateWebhookUrl() {
-    // Detectar HTTPS - considerar varios headers de proxy
     $protocol = 'http';
     if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
         $protocol = 'https';
@@ -110,10 +109,16 @@ function generateWebhookUrl() {
     } elseif (!empty($_SERVER['HTTP_X_FORWARDED_SSL']) && $_SERVER['HTTP_X_FORWARDED_SSL'] === 'on') {
         $protocol = 'https';
     }
-    $host = $_SERVER['HTTP_HOST'];
+
+    $host = $_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
+
     $scriptPath = dirname($_SERVER['SCRIPT_NAME']);
     $scriptPath = rtrim($scriptPath, '/');
-    return $protocol . '://' . $host . $scriptPath . '/api.php';
+
+    $prefix = $_SERVER['HTTP_X_FORWARDED_PREFIX'] ?? '';
+    $prefix = rtrim($prefix, '/');
+
+    return $protocol . '://' . $host . $prefix . $scriptPath . '/api.php';
 }
 
 // Validación de inputs para prevenir inyección
@@ -338,11 +343,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $env = loadEnvFromFile();
     $botToken = $env['TELEGRAM_BOT_TOKEN'] ?? '';
     $secretToken = $env['TELEGRAM_WEBHOOK_SECRET'] ?? '';
-    
-    // Usar CUSTOM_WEBHOOK_URL si está configurada, sino auto-detectar
-    $customUrl = $env['CUSTOM_WEBHOOK_URL'] ?? '';
-    $webhookUrl = !empty($customUrl) ? $customUrl : generateWebhookUrl();
-    
+
+    // Auto-detectar URL y guardarla en .env
+    $webhookUrl = generateWebhookUrl();
+    $env['CUSTOM_WEBHOOK_URL'] = $webhookUrl;
+    saveEnv($env);
+
     $apiUrl = "https://api.telegram.org/bot{$botToken}/setWebhook";
     $params = [
         'url' => $webhookUrl,
@@ -373,7 +379,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     
     $trackerName = trim($_POST['tracker_name'] ?? 'Telegram Messages');
     
-    $newTrackerId = TikiWikiClient::createTracker($trackerName);
+    $newTrackerId = $tikiWikiClient->createTracker($trackerName);
     
     if (is_array($newTrackerId) && isset($newTrackerId['error'])) {
         $error = $newTrackerId['error'];
@@ -495,13 +501,14 @@ if (!checkAuth()) {
     <h3>Webhook</h3>
     <p>URL del webhook: 
         <?php
-        $detectedUrl = generateWebhookUrl();
-        $customUrl = $env['CUSTOM_WEBHOOK_URL'] ?? '';
-        $webhookUrl = !empty($customUrl) ? $customUrl : $detectedUrl;
-        echo htmlspecialchars($webhookUrl);
+        $displayUrl = $env['CUSTOM_WEBHOOK_URL'] ?? '';
+        if (empty($displayUrl)) {
+            $displayUrl = generateWebhookUrl();
+        }
+        echo htmlspecialchars($displayUrl);
         ?>
-        <?php if (!empty($customUrl)): ?>
-            <br><small>(CUSTOM_WEBHOOK_URL en .env sobreescribe la auto-detectada: <?php echo htmlspecialchars($detectedUrl); ?>)</small>
+        <?php if (!empty($env['CUSTOM_WEBHOOK_URL'] ?? '')): ?>
+            <br><small>(guardada en .env)</small>
         <?php endif; ?>
     </p>
     <form method="post">

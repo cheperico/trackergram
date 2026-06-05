@@ -1,17 +1,42 @@
 <?php
 /**
- * trackerGram - WebhookHandler
- * 
- * Procesa actualizaciones de Telegram y las envía a TikiWiki.
+ * WebhookHandler - Procesa actualizaciones de Telegram y las envía a TikiWiki
+ *
  * Separa la lógica de negocio del manejo HTTP (api.php).
+ * Dependencias inyectadas: TikiWikiClient, TelegramClient, MessageMapper.
  */
-
 class WebhookHandler
 {
+    private TikiWikiClient $tikiWikiClient;
+    private TelegramClient $telegramClient;
+    private MessageMapper $messageMapper;
+    private int $trackerId;
+    private int $retryMaxAttempts;
+    private int $retryDelayMicroseconds;
+    private int $maxDownloadSize;
+
+    public function __construct(
+        TikiWikiClient $tikiWikiClient,
+        TelegramClient $telegramClient,
+        MessageMapper $messageMapper,
+        int $trackerId,
+        int $retryMaxAttempts = 2,
+        int $retryDelayMicroseconds = 100000,
+        int $maxDownloadSize = 20971520
+    ) {
+        $this->tikiWikiClient = $tikiWikiClient;
+        $this->telegramClient = $telegramClient;
+        $this->messageMapper = $messageMapper;
+        $this->trackerId = $trackerId;
+        $this->retryMaxAttempts = $retryMaxAttempts;
+        $this->retryDelayMicroseconds = $retryDelayMicroseconds;
+        $this->maxDownloadSize = $maxDownloadSize;
+    }
+
     /**
      * Obtener el nombre de un topic de Telegram desde cache local
      */
-    public static function getTopicName(int $chatId, int $messageThreadId): string
+    public function getTopicName(int $chatId, int $messageThreadId): string
     {
         $cacheFile = __DIR__ . '/topic_names.json';
         if (file_exists($cacheFile)) {
@@ -21,18 +46,21 @@ class WebhookHandler
                 return $topics[$key];
             }
         }
-
         return 'General';
     }
 
     /**
      * Descargar archivo de Telegram y subir a TikiWiki
      */
-    public static function downloadAndUploadMedia(string $fileId, ?string $fileName = null, ?string $mimeType = null): ?string
+    public function downloadAndUploadMedia(NormalizedMessage $msg): ?string
     {
-        $fileUrl = TelegramClient::getFileUrl($fileId);
+        if ($msg->fileId === null) {
+            return null;
+        }
+
+        $fileUrl = $this->telegramClient->getFileUrl($msg->fileId);
         if (!$fileUrl) {
-            log_message("trackerGram: Cannot get download URL for file: $fileId");
+            log_message("trackerGram: Cannot get download URL for file: {$msg->fileId}");
             return null;
         }
 
@@ -40,13 +68,13 @@ class WebhookHandler
         curl_setopt($ch, CURLOPT_URL, $fileUrl);
         curl_setopt($ch, CURLOPT_NOBODY, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TELEGRAM_API);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
         curl_exec($ch);
         $contentLength = curl_getinfo($ch, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
         curl_close($ch);
 
-        if ($contentLength > MEDIA_DOWNLOAD_MAX_SIZE) {
-            log_message("trackerGram: File too large ($contentLength bytes) for file_id: $fileId");
+        if ($contentLength > $this->maxDownloadSize) {
+            log_message("trackerGram: File too large ($contentLength bytes) for file_id: {$msg->fileId}");
             return null;
         }
 
@@ -56,80 +84,38 @@ class WebhookHandler
         curl_setopt($ch, CURLOPT_URL, $fileUrl);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_FILE, fopen($tempFile, 'wb'));
-        curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TELEGRAM_DOWNLOAD);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
         curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
         if ($httpCode !== 200) {
-            log_message("trackerGram: Cannot download file from Telegram: $fileId (HTTP $httpCode)");
+            log_message("trackerGram: Cannot download file from Telegram: {$msg->fileId} (HTTP $httpCode)");
             unlink($tempFile);
             return null;
         }
 
-        $galleryId = TikiWikiClient::getMediaGalleryId() ?? 29;
-        $result = TikiWikiClient::uploadFile($tempFile, $fileName, $galleryId);
+        $galleryId = $this->tikiWikiClient->getMediaGalleryId() ?? 29;
+        $fileName = $msg->fileName ?? 'file_' . $msg->fileId;
+        $result = $this->tikiWikiClient->uploadFile($tempFile, $fileName, $galleryId);
         unlink($tempFile);
 
         return $result;
     }
 
     /**
-     * Extraer datos de mensaje según el tipo
-     */
-    public static function extractMessageData(array $message): array
-    {
-        $info = MessageMapper::fromWebhook($message);
-
-        $uploadedFileId = null;
-        if ($info['file_id']) {
-            $logType = strtoupper($info['type']);
-            log_message("trackerGram: {$logType} - file_id: {$info['file_id']}" . ($info['media_size'] ? ", size: {$info['media_size']}" : ''));
-            $uploadedFileId = self::downloadAndUploadMedia($info['file_id'], $info['file_name'], $info['mime_type']);
-            log_message("trackerGram: {$logType} upload result: " . ($uploadedFileId ?? 'null'));
-        }
-
-        $chatId = $message['chat']['id'] ?? 0;
-        if (isset($message['forum_topic_created']) && isset($message['message_thread_id'])) {
-            $cacheFile = __DIR__ . '/topic_names.json';
-            $topics = file_exists($cacheFile) ? json_decode(file_get_contents($cacheFile), true) : [];
-            $topics[$chatId . ':' . $message['message_thread_id']] = $info['topic_name'];
-            file_put_contents($cacheFile, json_encode($topics), LOCK_EX);
-        }
-
-        if (isset($message['forum_topic_edited']) && isset($message['message_thread_id'])) {
-            $cacheFile = __DIR__ . '/topic_names.json';
-            $topics = file_exists($cacheFile) ? json_decode(file_get_contents($cacheFile), true) : [];
-            $topics[$chatId . ':' . $message['message_thread_id']] = $info['topic_name'];
-            file_put_contents($cacheFile, json_encode($topics), LOCK_EX);
-        }
-
-        return [
-            'type' => $info['type'],
-            'text' => $info['text'],
-            'media_type' => $info['media_type'],
-            'media_size' => $info['media_size'],
-            'media_caption' => $info['media_caption'],
-            'system_message' => $info['system_message'],
-            'location' => $info['location'] ?? '',
-            'uploaded_file_id' => $uploadedFileId,
-        ];
-    }
-
-    /**
      * Enviar datos a TikiWiki con reintentos
      */
-    public static function sendToTikiWikiWithRetries(array $tikiData): bool
+    public function sendToTikiWikiWithRetries(NormalizedMessage $msg): bool
     {
-        $maxRetries = RETRY_MAX_ATTEMPTS;
-        for ($i = 0; $i < $maxRetries; $i++) {
-            $fields = MessageMapper::toWikiFields($tikiData);
-            if (TikiWikiClient::createTrackerItem(TIKIWIKI_TRACKER_ID, $fields)) {
+        for ($i = 0; $i < $this->retryMaxAttempts; $i++) {
+            $fields = $this->messageMapper->toWikiFields($msg);
+            if ($this->tikiWikiClient->createTrackerItem($this->trackerId, $fields)) {
                 return true;
             }
-            if ($i < $maxRetries - 1) {
-                log_message("Reintento " . ($i + 1) . " para message_id={$tikiData['message_id']}");
-                usleep(RETRY_DELAY_MICROSECONDS);
+            if ($i < $this->retryMaxAttempts - 1) {
+                log_message("Reintento " . ($i + 1) . " para message_id={$msg->messageId}");
+                usleep($this->retryDelayMicroseconds);
             }
         }
         return false;
@@ -138,7 +124,7 @@ class WebhookHandler
     /**
      * Procesar mensaje regular de Telegram
      */
-    public static function processMessage(array $message): void
+    public function processMessage(array $message): void
     {
         $requiredFields = ['message_id', 'chat', 'from', 'date'];
         foreach ($requiredFields as $field) {
@@ -148,12 +134,7 @@ class WebhookHandler
             }
         }
 
-        $requiredSubFields = [
-            'chat.id',
-            'from.id',
-            'from.first_name'
-        ];
-
+        $requiredSubFields = ['chat.id', 'from.id', 'from.first_name'];
         foreach ($requiredSubFields as $fieldPath) {
             $keys = explode('.', $fieldPath);
             $value = $message;
@@ -184,45 +165,65 @@ class WebhookHandler
             $topics[$chatId . ':' . $topicId] = $topicName;
             file_put_contents($cacheFile, json_encode($topics), LOCK_EX);
         } elseif ($topicId > 0) {
-            $topicName = self::getTopicName($chatId, $topicId);
+            $topicName = $this->getTopicName($chatId, $topicId);
         }
 
         if ($topicId > 0 && $topicName === 'General') {
             $topicName = 'Topic-' . $topicId;
-        } elseif (!$topicName) {
+        } elseif ($topicName === null) {
             $topicName = 'General';
         }
 
-        $messageData = self::extractMessageData($message);
+        // Parsear mensaje via MessageMapper
+        $msg = $this->messageMapper->fromWebhook($message);
 
-        if (TikiWikiClient::messageExists(TIKIWIKI_TRACKER_ID, $message['message_id'], $chatId) > 0) {
+        // Completar contexto
+        $msg->messageId = (string) $message['message_id'];
+        $msg->chatId = (string) $chatId;
+        $msg->chatTitle = $chatTitle;
+        $msg->topicId = (string) $topicId;
+        $msg->topicTitle = $topicName;
+        $msg->userId = (string) $message['from']['id'];
+        $msg->username = $message['from']['username'] ?? '';
+        $msg->firstName = $message['from']['first_name'] ?? '';
+        $msg->lastName = $message['from']['last_name'] ?? '';
+        $msg->date = (string) $message['date'];
+
+
+        // Cachear topic names for forum_topic_created/edited
+        $chatIdInt = $chatId;
+        if (isset($message['forum_topic_created']) && isset($message['message_thread_id'])) {
+            $cacheFile = __DIR__ . '/topic_names.json';
+            $topics = file_exists($cacheFile) ? json_decode(file_get_contents($cacheFile), true) : [];
+            $topics[$chatIdInt . ':' . $message['message_thread_id']] = $msg->topicName ?? $topicName;
+            file_put_contents($cacheFile, json_encode($topics), LOCK_EX);
+        }
+        if (isset($message['forum_topic_edited']) && isset($message['message_thread_id'])) {
+            $cacheFile = __DIR__ . '/topic_names.json';
+            $topics = file_exists($cacheFile) ? json_decode(file_get_contents($cacheFile), true) : [];
+            $topics[$chatIdInt . ':' . $message['message_thread_id']] = $msg->topicName ?? $topicName;
+            file_put_contents($cacheFile, json_encode($topics), LOCK_EX);
+        }
+
+        // Deduplicación
+        if ($this->tikiWikiClient->messageExists($this->trackerId, $message['message_id'], $chatId) > 0) {
             log_message("trackerGram: SKIPPING duplicate message_id={$message['message_id']}");
             return;
         }
 
-        $tikiData = [
-            'message_id' => $message['message_id'],
-            'chat_id' => $chatId,
-            'chat_title' => $chatTitle,
-            'topic_id' => $topicId,
-            'topic_title' => $topicName,
-            'user_id' => $message['from']['id'],
-            'username' => $message['from']['username'] ?? null,
-            'first_name' => $message['from']['first_name'] ?? '',
-            'last_name' => $message['from']['last_name'] ?? '',
-            'message_type' => $messageData['type'],
-            'text' => $messageData['text'],
-            'media_type' => $messageData['media_type'],
-            'media_size' => $messageData['media_size'],
-            'media_caption' => $messageData['media_caption'],
-            'location' => $messageData['location'] ?? '',
-            'uploaded_file_id' => $messageData['uploaded_file_id'] ?? null,
-            'date' => $message['date']
-        ];
+        // Descargar y subir media
+        if ($msg->fileId !== null) {
+            $logType = strtoupper($msg->messageType);
+            log_message("trackerGram: {$logType} - file_id: {$msg->fileId}" . ($msg->mediaSize ? ", size: {$msg->mediaSize}" : ''));
+            $uploadedFileId = $this->downloadAndUploadMedia($msg);
+            log_message("trackerGram: {$logType} upload result: " . ($uploadedFileId ?? 'null'));
+            $msg->uploadedFileId = $uploadedFileId;
+        }
 
-        if (!self::sendToTikiWikiWithRetries($tikiData)) {
-            log_message("ERROR: No se pudo enviar mensaje a TikiWiki después de " . RETRY_MAX_ATTEMPTS . " intentos: message_id={$tikiData['message_id']}");
-        } elseif (TikiWikiClient::messageExists(TIKIWIKI_TRACKER_ID, $message['message_id'], $chatId) > 1) {
+        // Enviar a TikiWiki
+        if (!$this->sendToTikiWikiWithRetries($msg)) {
+            log_message("ERROR: No se pudo enviar mensaje a TikiWiki después de {$this->retryMaxAttempts} intentos: message_id={$msg->messageId}");
+        } elseif ($this->tikiWikiClient->messageExists($this->trackerId, $message['message_id'], $chatId) > 1) {
             log_message("WARNING: duplicado detectado post-insert para message_id={$message['message_id']} — posible race condition");
         }
 
@@ -232,7 +233,7 @@ class WebhookHandler
     /**
      * Procesar reacción a mensaje (message_reaction)
      */
-    public static function processMessageReaction(array $reaction): void
+    public function processMessageReaction(array $reaction): void
     {
         $chatId = $reaction['chat']['id'];
         $chatTitle = $reaction['chat']['title'] ?? $reaction['chat']['username'] ?? 'Chat ' . $chatId;
@@ -257,27 +258,20 @@ class WebhookHandler
 
         $reactionId = 'reaction_' . $chatId . '_' . $originalMessageId . '_' . $userId . '_' . ($reaction['date'] ?? time());
 
-        $tikiData = [
-            'message_id' => $reactionId,
-            'chat_id' => $chatId,
-            'chat_title' => $chatTitle,
-            'topic_id' => 0,
-            'topic_title' => 'General',
-            'user_id' => $userId,
-            'username' => $user['username'] ?? '',
-            'first_name' => $firstName,
-            'last_name' => $lastName,
-            'message_type' => 'system',
-            'text' => $text,
-            'media_type' => '',
-            'media_size' => '',
-            'media_caption' => '',
-            'location' => '',
-            'uploaded_file_id' => null,
-            'date' => $reaction['date'] ?? time()
-        ];
+        $msg = new NormalizedMessage();
+        $msg->messageId = $reactionId;
+        $msg->chatId = (string) $chatId;
+        $msg->chatTitle = $chatTitle;
+        $msg->topicTitle = 'General';
+        $msg->userId = (string) $userId;
+        $msg->username = $user['username'] ?? '';
+        $msg->firstName = $firstName;
+        $msg->lastName = $lastName;
+        $msg->messageType = 'system';
+        $msg->text = $text;
+        $msg->date = (string) ($reaction['date'] ?? time());
 
-        if (!self::sendToTikiWikiWithRetries($tikiData)) {
+        if (!$this->sendToTikiWikiWithRetries($msg)) {
             log_message("ERROR: No se pudo enviar reacción a TikiWiki: message_id={$originalMessageId}");
         }
     }
@@ -285,7 +279,7 @@ class WebhookHandler
     /**
      * Procesar conteo de reacciones (message_reaction_count)
      */
-    public static function processMessageReactionCount(array $reactionCount): void
+    public function processMessageReactionCount(array $reactionCount): void
     {
         $chatId = $reactionCount['chat']['id'];
         $chatTitle = $reactionCount['chat']['title'] ?? $reactionCount['chat']['username'] ?? 'Chat ' . $chatId;
@@ -306,27 +300,17 @@ class WebhookHandler
 
         $reactionCountId = 'reaction_count_' . $chatId . '_' . $originalMessageId . '_' . ($reactionCount['date'] ?? time());
 
-        $tikiData = [
-            'message_id' => $reactionCountId,
-            'chat_id' => $chatId,
-            'chat_title' => $chatTitle,
-            'topic_id' => 0,
-            'topic_title' => 'General',
-            'user_id' => 0,
-            'username' => '',
-            'first_name' => 'System',
-            'last_name' => '',
-            'message_type' => 'system',
-            'text' => $text,
-            'media_type' => '',
-            'media_size' => '',
-            'media_caption' => '',
-            'location' => '',
-            'uploaded_file_id' => null,
-            'date' => $reactionCount['date'] ?? time()
-        ];
+        $msg = new NormalizedMessage();
+        $msg->messageId = $reactionCountId;
+        $msg->chatId = (string) $chatId;
+        $msg->chatTitle = $chatTitle;
+        $msg->topicTitle = 'General';
+        $msg->firstName = 'System';
+        $msg->messageType = 'system';
+        $msg->text = $text;
+        $msg->date = (string) ($reactionCount['date'] ?? time());
 
-        if (!self::sendToTikiWikiWithRetries($tikiData)) {
+        if (!$this->sendToTikiWikiWithRetries($msg)) {
             log_message("ERROR: No se pudo enviar conteo de reacciones a TikiWiki: message_id={$originalMessageId}");
         }
     }
@@ -334,14 +318,14 @@ class WebhookHandler
     /**
      * Procesar actualización de Telegram (dispatcher)
      */
-    public static function processUpdate(array $update): void
+    public function processUpdate(array $update): void
     {
         if (isset($update['message'])) {
-            self::processMessage($update['message']);
+            $this->processMessage($update['message']);
         } elseif (isset($update['message_reaction'])) {
-            self::processMessageReaction($update['message_reaction']);
+            $this->processMessageReaction($update['message_reaction']);
         } elseif (isset($update['message_reaction_count'])) {
-            self::processMessageReactionCount($update['message_reaction_count']);
+            $this->processMessageReactionCount($update['message_reaction_count']);
         }
     }
 }

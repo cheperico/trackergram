@@ -12,6 +12,53 @@ Puente entre Telegram y TikiWiki. Recibe mensajes de un grupo de Telegram y los 
 - **Importa historial**: Podés exportar conversaciones existentes desde Telegram e importarlas
 - **Crea trackers automáticamente**: No necesitás configurar los campos a mano
 
+## Tipos de Mensaje Soportados
+
+### Contenido de mensajes
+
+| Tipo | Webhook | Import | Descripción |
+|---|---|---|---|
+| `text` | ✅ | ✅ | Texto plano |
+| `photo` | ✅ | ✅ | Foto |
+| `video` | ✅ | ✅ | Video |
+| `audio` | ✅ | ✅ | Archivo de audio |
+| `document` | ✅ | ✅ | Documento (PDF, Word, etc.) |
+| `sticker` | ✅ | ✅ | Sticker |
+| `voice` | ✅ | ✅ | Nota de voz |
+| `video_note` | ✅ | ✅ | Video circular |
+| `location` | ✅ | ✅ | Ubicación con coordenadas |
+| `contact` | ✅ | ✅ | Contacto compartido |
+| `poll` | ✅ | ✅ | Encuesta |
+| `animation` | ✅ | ✅ | GIF/animación |
+
+### Eventos del grupo (service messages)
+
+| Evento | Webhook | Import | Descripción |
+|---|---|---|---|
+| `forum_topic_created` | ✅ | ✅ | Topic creado |
+| `forum_topic_edited` | ✅ | ✅ | Topic renombrado |
+| `forum_topic_closed` | ✅ | ✅ | Topic cerrado |
+| `forum_topic_reopened` | ✅ | ✅ | Topic reabierto |
+| `group_chat_created` | ✅ | ✅ | Grupo creado |
+| `new_chat_title` | ✅ | ✅ | Título del grupo cambiado |
+| `new_chat_photo` | ✅ | ✅ | Foto del grupo actualizada |
+| `delete_chat_photo` | ✅ | ✅ | Foto del grupo eliminada |
+| `new_chat_members` | ✅ | ✅ | Miembros que se unen |
+| `left_chat_member` | ✅ | ✅ | Miembro que se va |
+| `pinned_message` | ✅ | ✅ | Mensaje fijado |
+| `invite_members` / `add_members` | ✅ | ✅ | Miembros invitados |
+| `remove_members` | ⬜ | ✅ | Miembros removidos |
+| `joined` | ⬜ | ✅ | Miembro se unió (formato export) |
+
+### Reacciones
+
+| Tipo | Webhook | Import | Descripción |
+|---|---|---|---|
+| `message_reaction` | ✅ | ⬜ | Reacción a mensaje |
+| `message_reaction_count` | ✅ | ⬜ | Conteo de reacciones |
+
+Los tipos marcados como ⬜ son funcionalidades que están identificadas como pendientes en el roadmap.
+
 ## Qué Necesitás Antes de Empezar
 
 1. **Un bot de Telegram** — Se crea gratis hablando con [@BotFather](https://t.me/BotFather)

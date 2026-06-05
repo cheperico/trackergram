@@ -54,6 +54,6 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
         die(json_encode(['error' => 'Too Many Requests']));
     }
 
-    WebhookHandler::processUpdate($update);
+    $webhookHandler->processUpdate($update);
     echo json_encode(['status' => 'ok']);
 }

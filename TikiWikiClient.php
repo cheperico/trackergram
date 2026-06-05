@@ -3,34 +3,44 @@
  * TikiWikiClient - Cliente para comunicarse con la API de TikiWiki
  * Encapsula toda la lógica de comunicación con TikiWiki: trackers, galleries, items
  */
-
-require_once 'config.php';
-
 class TikiWikiClient
 {
-    private static array $mediaGalleryIdCache = [];
+    private string $apiUrl;
+    private string $token;
+    private int $timeout;
+    private int $uploadTimeout;
+    private array $mediaGalleryIdCache = [];
 
-    /**
-     * Obtener el ID de la galería de medios del tracker configurado
-     */
-    public static function getMediaGalleryId(?int $trackerId = null): ?int
+    public function __construct(
+        string $apiUrl,
+        string $token,
+        int $timeout = 30,
+        int $uploadTimeout = 30
+    ) {
+        $this->apiUrl = rtrim($apiUrl, '/') . '/';
+        $this->token = $token;
+        $this->timeout = $timeout;
+        $this->uploadTimeout = $uploadTimeout;
+    }
+
+    public function getMediaGalleryId(?int $trackerId = null): ?int
     {
-        $trackerId = $trackerId ?? TIKIWIKI_TRACKER_ID;
+        $trackerId ??= (int) getenv('TIKIWIKI_TRACKER_ID') ?: 12;
 
-        if (isset(self::$mediaGalleryIdCache[$trackerId])) {
-            return self::$mediaGalleryIdCache[$trackerId];
+        if (isset($this->mediaGalleryIdCache[$trackerId])) {
+            return $this->mediaGalleryIdCache[$trackerId];
         }
 
-        $url = TIKIWIKI_API_URL . "trackers/$trackerId";
+        $url = $this->apiUrl . "trackers/$trackerId";
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Authorization: Bearer " . TIKIWIKI_TOKEN,
+            "Authorization: Bearer " . $this->token,
             "User-Agent: Mozilla/5.0"
         ]);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TIKIWIKI_API);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -44,8 +54,8 @@ class TikiWikiClient
                         $options = $field['options'] ?? [];
                         foreach ($options as $opt) {
                             if (isset($opt['value'])) {
-                                self::$mediaGalleryIdCache[$trackerId] = (int) $opt['value'];
-                                return self::$mediaGalleryIdCache[$trackerId];
+                                $this->mediaGalleryIdCache[$trackerId] = (int) $opt['value'];
+                                return $this->mediaGalleryIdCache[$trackerId];
                             }
                         }
                     }
@@ -56,30 +66,18 @@ class TikiWikiClient
         return null;
     }
 
-    /**
-     * Establecer cache de gallery ID para un tracker (para testing)
-     */
-    public static function setMediaGalleryId(?int $galleryId, ?int $trackerId = null): void
+    public function uploadFile(string $filePath, string $fileName, ?int $galleryId = null): ?string
     {
-        $trackerId = $trackerId ?? TIKIWIKI_TRACKER_ID;
-        self::$mediaGalleryIdCache[$trackerId] = $galleryId;
-    }
+        $galleryId ??= $this->getMediaGalleryId() ?? 29;
 
-    /**
-     * Subir archivo a TikiWiki file gallery
-     */
-    public static function uploadFile(string $filePath, string $fileName, ?int $galleryId = null): ?string
-    {
-        $galleryId = $galleryId ?? self::getMediaGalleryId() ?? 29;
-
-        $url = TIKIWIKI_API_URL . "galleries/upload";
+        $url = $this->apiUrl . "galleries/upload";
 
         if (!file_exists($filePath)) {
             log_message("TikiWikiClient: File not found for upload: $filePath");
             return null;
         }
 
-        $mimeType = self::getMimeType($filePath);
+        $mimeType = $this->getMimeType($filePath);
 
         $postFields = [
             'galleryId' => $galleryId,
@@ -94,11 +92,11 @@ class TikiWikiClient
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Authorization: Bearer " . TIKIWIKI_TOKEN,
+            "Authorization: Bearer " . $this->token,
             "User-Agent: Mozilla/5.0"
         ]);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TIKIWIKI_API);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->uploadTimeout);
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -125,26 +123,21 @@ class TikiWikiClient
         return null;
     }
 
-    /**
-     * Crear item en TikiWiki tracker
-     * @param int $trackerId ID del tracker
-     * @param array $postFields Campos formateados como fields[permName] => valor (listo para http_build_query)
-     */
-    public static function createTrackerItem(int $trackerId, array $postFields): bool
+    public function createTrackerItem(int $trackerId, array $postFields): bool
     {
-        $url = TIKIWIKI_API_URL . "trackers/$trackerId/items";
+        $url = $this->apiUrl . "trackers/$trackerId/items";
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postFields));
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Authorization: Bearer " . TIKIWIKI_TOKEN,
+            "Authorization: Bearer " . $this->token,
             "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         ]);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TIKIWIKI_API);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -161,7 +154,6 @@ class TikiWikiClient
             return false;
         }
 
-        // Validar respuesta JSON con itemId (detecta errores PHP que devuelven 200)
         $responseData = json_decode($response, true);
         if (!$responseData || !isset($responseData['itemId'])) {
             $clean = str_replace(["\r", "\n"], ' ', strip_tags(substr($response, 0, 300)));
@@ -173,14 +165,10 @@ class TikiWikiClient
         return true;
     }
 
-    /**
-     * Verificar si un mensaje ya existe en el tracker (deduplicación)
-     */
-    public static function messageExists(int $trackerId, int $messageId, ?int $chatId = null): int
+    public function messageExists(int $trackerId, int $messageId, ?int $chatId = null): int
     {
-        $url = TIKIWIKI_API_URL . "trackers/$trackerId/items?filter[fields][telegrammessageTelegramMessageId]=$messageId";
-        
-        // Si tenemos chat_id, filtrar también por chat para mayor precisión
+        $url = $this->apiUrl . "trackers/$trackerId/items?filter[fields][telegrammessageTelegramMessageId]=$messageId";
+
         if ($chatId !== null) {
             $url .= "&filter[fields][telegrammessageChatId]=$chatId";
         }
@@ -188,11 +176,11 @@ class TikiWikiClient
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Authorization: Bearer " . TIKIWIKI_TOKEN,
+            "Authorization: Bearer " . $this->token,
             "User-Agent: Mozilla/5.0"
         ]);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TIKIWIKI_API);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -206,12 +194,9 @@ class TikiWikiClient
         return 0;
     }
 
-    /**
-     * Crear tracker automáticamente con campos
-     */
-    public static function createTracker(string $trackerName): ?int
+    public function createTracker(string $trackerName): ?int
     {
-        $url = TIKIWIKI_API_URL . "trackers";
+        $url = $this->apiUrl . "trackers";
 
         $fields = [
             'name' => $trackerName,
@@ -242,12 +227,12 @@ class TikiWikiClient
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($fields));
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Authorization: Bearer " . TIKIWIKI_TOKEN,
+            "Authorization: Bearer " . $this->token,
             "Content-Type: application/json",
             "User-Agent: Mozilla/5.0"
         ]);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, TIMEOUT_TIKIWIKI_API);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -261,10 +246,7 @@ class TikiWikiClient
         return null;
     }
 
-    /**
-     * Obtener tipo MIME de un archivo
-     */
-    private static function getMimeType(string $filePath): string
+    private function getMimeType(string $filePath): string
     {
         $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
         $mimeTypes = [
