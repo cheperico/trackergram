@@ -25,6 +25,8 @@ class NormalizedMessage
     public string $mediaCaption = '';
     public string $date = '';
     public ?string $uploadedFileId = null;
+    public string $mediaUrl = '';
+    public string $fileUrl = '';
 
     // --- Transientes (usan durante el procesamiento, no persisten) ---
     public ?string $fileId = null;

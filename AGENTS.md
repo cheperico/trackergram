@@ -211,6 +211,8 @@ El tracker por defecto tiene estos campos (permNames):
 | `telegrammessageMediaCaption` | t (text) | Caption del media |
 | `telegrammessageMessageDate` | t (text) | Unix timestamp |
 | `telegrammessageMedia` | FG (file gallery) | Referencia al archivo subido |
+| `telegrammessageMediaUrl` | t (text) | URL pública del archivo en TikiWiki |
+| `telegrammessageFileUrl` | t (text) | URL del archivo original en Telegram |
 
 ### Tipos de campo en TikiWiki
 

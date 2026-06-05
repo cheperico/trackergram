@@ -218,7 +218,9 @@ class TikiWikiClient
                 ['name' => 'telegrammessageMediaSize', 'type' => 't', 'permName' => 'telegrammessageMediaSize'],
                 ['name' => 'telegrammessageMediaCaption', 'type' => 't', 'permName' => 'telegrammessageMediaCaption'],
                 ['name' => 'telegrammessageMessageDate', 'type' => 't', 'permName' => 'telegrammessageMessageDate'],
-                ['name' => 'telegrammessageMedia', 'type' => 'FG', 'permName' => 'telegrammessageMedia']
+                ['name' => 'telegrammessageMedia', 'type' => 'FG', 'permName' => 'telegrammessageMedia'],
+                ['name' => 'telegrammessageMediaUrl', 'type' => 't', 'permName' => 'telegrammessageMediaUrl'],
+                ['name' => 'telegrammessageFileUrl', 'type' => 't', 'permName' => 'telegrammessageFileUrl']
             ]
         ];
 

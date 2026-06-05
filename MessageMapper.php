@@ -360,6 +360,14 @@ class MessageMapper
             $fields['fields[telegrammessageMedia]'] = $msg->uploadedFileId;
         }
 
+        if ($msg->mediaUrl !== '') {
+            $fields['fields[telegrammessageMediaUrl]'] = $msg->mediaUrl;
+        }
+
+        if ($msg->fileUrl !== '') {
+            $fields['fields[telegrammessageFileUrl]'] = $msg->fileUrl;
+        }
+
         return $fields;
     }
 

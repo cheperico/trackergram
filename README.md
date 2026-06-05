@@ -59,6 +59,129 @@ Puente entre Telegram y TikiWiki. Recibe mensajes de un grupo de Telegram y los 
 
 Los tipos marcados como ⬜ son funcionalidades que están identificadas como pendientes en el roadmap.
 
+## Campos del Tracker
+
+Si querés crear el tracker manualmente en TikiWiki (sin usar el botón "Crear Tracker" del panel), los campos que necesitás son:
+
+```ini
+[FIELD1]
+name = telegram_message_id
+permName = telegrammessageTelegramMessageId
+type = t
+isMain = y
+isMandatory = y
+isTblVisible = y
+isSearchable = y
+isPublic = y
+
+[FIELD2]
+name = chat_id
+permName = telegrammessageChatId
+type = t
+
+[FIELD3]
+name = chat_title
+permName = telegrammessageChatTitle
+type = t
+isTblVisible = y
+isSearchable = y
+
+[FIELD4]
+name = topic_id
+permName = telegrammessageTopicId
+type = t
+
+[FIELD5]
+name = topic_title
+permName = telegrammessageTopicTitle
+type = t
+isTblVisible = y
+isSearchable = y
+
+[FIELD6]
+name = message_date
+permName = telegrammessageMessageDate
+type = f
+isTblVisible = y
+isSearchable = y
+
+[FIELD7]
+name = user_id
+permName = telegrammessageUserId
+type = t
+
+[FIELD8]
+name = username
+permName = telegrammessageUsername
+type = t
+isTblVisible = y
+isSearchable = y
+
+[FIELD9]
+name = first_name
+permName = telegrammessageFirstName
+type = t
+
+[FIELD10]
+name = last_name
+permName = telegrammessageLastName
+type = t
+
+[FIELD11]
+name = message_type
+permName = telegrammessageMessageType
+type = D
+options = {"options":["text","photo","video","audio","document","sticker","voice","video_note","system","animation","contact","poll","location","other"]}
+
+[FIELD12]
+name = text
+permName = telegrammessageText
+type = a
+isTblVisible = y
+isSearchable = y
+
+[FIELD13]
+name = media
+permName = telegrammessageMedia
+type = FG
+options = {"galleryId":36}
+isTblVisible = y
+
+[FIELD14]
+name = media_url
+permName = telegrammessageMediaUrl
+type = t
+
+[FIELD15]
+name = file_url
+permName = telegrammessageFileUrl
+type = t
+
+[FIELD16]
+name = media_type
+permName = telegrammessageMediaType
+type = t
+
+[FIELD17]
+name = media_size
+permName = telegrammessageMediaSize
+type = n
+isSearchable = y
+
+[FIELD18]
+name = media_caption
+permName = telegrammessageMediaCaption
+type = t
+
+[FIELD19]
+name = message_Location
+permName = telegrammessageLocation
+type = G
+isTblVisible = y
+```
+
+Podés copiar todo este bloque y pegarlo en **Admin → Trackers → Importar campos** al crear o editar un tracker.
+
 ## Qué Necesitás Antes de Empezar
 
 1. **Un bot de Telegram** — Se crea gratis hablando con [@BotFather](https://t.me/BotFather)
