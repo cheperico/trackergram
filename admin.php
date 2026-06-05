@@ -118,7 +118,8 @@ function generateWebhookUrl() {
     $prefix = $_SERVER['HTTP_X_FORWARDED_PREFIX'] ?? '';
     $prefix = rtrim($prefix, '/');
 
-    return $protocol . '://' . $host . $prefix . $scriptPath . '/api.php';
+    $url = $protocol . '://' . $host . $prefix . $scriptPath;
+    return rtrim($url, '/');
 }
 
 // Validación de inputs para prevenir inyección
