@@ -78,21 +78,29 @@ ini_set('display_errors', 0);
 
 /**
  * Función de logging - única función de logging del proyecto
- * Usa error_log() que está disponible en todos los entornos
+ * 
+ * Siempre escribe a error_log() del sistema y al archivo debug.log.
+ * DEBUG_MODE=true activa logs adicionales en los puntos que llaman a esta función.
+ * El archivo debug.log se rota automáticamente al superar 10MB.
  */
 function log_message(string $message): void
 {
-    error_log($message);
-    
-    if (DEBUG_MODE) {
-        $logFile = __DIR__ . '/debug.log';
-        $timestamp = date('[Y-m-d H:i:s] ');
-        $logLine = $timestamp . $message . PHP_EOL;
-        
-        if (@file_put_contents($logFile, $logLine, FILE_APPEND | LOCK_EX) === false) {
-            $tempLog = sys_get_temp_dir() . '/trackergram_debug.log';
-            @file_put_contents($tempLog, $logLine, FILE_APPEND | LOCK_EX);
-        }
+    $timestamp = date('[Y-m-d H:i:s] ');
+    $logLine = $timestamp . $message . PHP_EOL;
+
+    // Siempre al sistema
+    error_log($logLine);
+
+    // Siempre al archivo (con rotación si supera 10MB)
+    $logFile = __DIR__ . '/debug.log';
+    if (file_exists($logFile) && filesize($logFile) > 10 * 1024 * 1024) {
+        $rotated = __DIR__ . '/debug.log.old';
+        @rename($logFile, $rotated);
+    }
+
+    if (@file_put_contents($logFile, $logLine, FILE_APPEND | LOCK_EX) === false) {
+        $tempLog = sys_get_temp_dir() . '/trackergram_debug.log';
+        @file_put_contents($tempLog, $logLine, FILE_APPEND | LOCK_EX);
     }
 }
 ?>

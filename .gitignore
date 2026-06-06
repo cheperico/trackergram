@@ -19,3 +19,9 @@ ChatExport_*/
 
 # Import temp
 import_temp/
+
+# OpenCode agents config (no subir a GitHub)
+.opencode/
+
+# Reportes externos (no subir a GitHub)
+reports/

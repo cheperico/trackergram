@@ -17,6 +17,8 @@ class MessageMapper
     {
         $msg = new NormalizedMessage();
         $msg->text = $message['text'] ?? '';
+        $msg->editedDate = (string) ($message['edit_date'] ?? '');
+        $msg->replyToId = (string) ($message['reply_to_message']['message_id'] ?? '');
 
         if (isset($message['photo'])) {
             $photo = end($message['photo']);
@@ -28,6 +30,8 @@ class MessageMapper
             $msg->mediaSize = (string) ($photo['file_size'] ?? '');
             $msg->mediaCaption = $message['caption'] ?? '';
             $msg->text = 'Foto: image/jpeg';
+            $msg->width = (string) ($photo['width'] ?? '');
+            $msg->height = (string) ($photo['height'] ?? '');
             if (isset($message['caption'])) {
                 $msg->text .= ' - ' . htmlspecialchars($message['caption']);
             }
@@ -46,6 +50,9 @@ class MessageMapper
             $ext = pathinfo($video['file_name'] ?? $video['file_id'], PATHINFO_EXTENSION) ?: 'mp4';
             $msg->fileName = 'telegram_video_' . $video['file_id'] . '.' . $ext;
             $msg->text = 'Video: ' . $mime;
+            $msg->width = (string) ($video['width'] ?? '');
+            $msg->height = (string) ($video['height'] ?? '');
+            $msg->duration = (string) ($video['duration'] ?? '');
             if (isset($message['caption'])) {
                 $msg->text .= ' - ' . htmlspecialchars($message['caption']);
             }
@@ -62,6 +69,7 @@ class MessageMapper
             $msg->mediaSize = (string) ($audio['file_size'] ?? '');
             $msg->fileName = 'telegram_audio_' . $audio['file_id'] . '.mp3';
             $msg->text = 'Audio: ' . $mime;
+            $msg->duration = (string) ($audio['duration'] ?? '');
             if (isset($audio['title'])) {
                 $msg->text .= ' - ' . htmlspecialchars($audio['title']);
             }
@@ -90,6 +98,8 @@ class MessageMapper
             $msg->mediaType = 'image/webp';
             $msg->fileName = 'telegram_sticker_' . $sticker['file_id'] . '.webp';
             $msg->text = 'Sticker: image/webp';
+            $msg->width = (string) ($sticker['width'] ?? '');
+            $msg->height = (string) ($sticker['height'] ?? '');
             return $msg;
         }
 
@@ -107,6 +117,7 @@ class MessageMapper
             elseif ($mime === 'audio/wav') $ext = '.wav';
             $msg->fileName = 'telegram_voice_' . $voice['file_id'] . $ext;
             $msg->text = 'Nota de voz: ' . $mime;
+            $msg->duration = (string) ($voice['duration'] ?? '');
             return $msg;
         }
 
@@ -120,6 +131,9 @@ class MessageMapper
             $msg->mediaSize = (string) ($vn['file_size'] ?? '');
             $msg->fileName = 'telegram_video_note_' . $vn['file_id'] . '.mp4';
             $msg->text = 'Video circular: ' . $mime;
+            $msg->width = (string) ($vn['width'] ?? '');
+            $msg->height = (string) ($vn['height'] ?? '');
+            $msg->duration = (string) ($vn['duration'] ?? '');
             return $msg;
         }
 
@@ -190,8 +204,14 @@ class MessageMapper
         }
 
         if (isset($message['animation'])) {
+            $anim = $message['animation'];
             $msg->messageType = 'animation';
-            $msg->mediaType = $message['animation']['mime_type'] ?? 'animation/gif';
+            $msg->mediaType = $anim['mime_type'] ?? 'animation/gif';
+            $msg->fileId = $anim['file_id'] ?? '';
+            $msg->mediaSize = (string) ($anim['file_size'] ?? '');
+            $msg->width = (string) ($anim['width'] ?? '');
+            $msg->height = (string) ($anim['height'] ?? '');
+            $msg->duration = (string) ($anim['duration'] ?? '');
             $msg->text = '🎬 Animation: ' . $msg->mediaType;
             return $msg;
         }
@@ -308,6 +328,15 @@ class MessageMapper
             } else {
                 $msg->messageType = 'text';
             }
+
+            $msg->width = (string) ($message['width'] ?? '');
+            $msg->height = (string) ($message['height'] ?? '');
+            $msg->duration = (string) ($message['duration_seconds'] ?? '');
+            $msg->mediaType = $message['mime_type'] ?? $message['media_type'] ?? '';
+            $msg->mediaSize = (string) ($message['file_size'] ?? '');
+            if (empty($msg->mediaCaption) && isset($message['file'])) {
+                $msg->mediaCaption = $message['file_caption'] ?? ($message['caption'] ?? '');
+            }
         } else {
             $msg->messageType = 'system';
             $action = $message['action'] ?? '';
@@ -326,6 +355,12 @@ class MessageMapper
                 'title_edit' => '✏️ Título cambiado a: ' . ($message['title'] ?? ''),
                 default => '🔔 ' . $action . (!empty($message['title']) ? ': ' . $message['title'] : '')
             };
+        }
+
+        $msg->editedDate = (string) ($message['edited_unixtime'] ?? '');
+        $msg->replyToId = (string) ($message['reply_to_message_id'] ?? '');
+        if (!empty($message['reactions'])) {
+            $msg->reactions = json_encode($message['reactions'], JSON_UNESCAPED_UNICODE);
         }
 
         return $msg;
@@ -352,8 +387,14 @@ class MessageMapper
             'fields[telegrammessageLocation]' => $msg->location,
             'fields[telegrammessageMediaType]' => $msg->mediaType,
             'fields[telegrammessageMediaSize]' => $msg->mediaSize,
+            'fields[telegrammessageMediaWidth]' => $msg->width,
+            'fields[telegrammessageMediaHeight]' => $msg->height,
+            'fields[telegrammessageMediaDuration]' => $msg->duration,
             'fields[telegrammessageMediaCaption]' => htmlspecialchars($msg->mediaCaption, ENT_QUOTES, 'UTF-8'),
             'fields[telegrammessageMessageDate]' => $msg->date,
+            'fields[telegrammessageEditedDate]' => $msg->editedDate,
+            'fields[telegrammessageReplyToId]' => $msg->replyToId,
+            'fields[telegrammessageReactions]' => htmlspecialchars($msg->reactions, ENT_QUOTES, 'UTF-8'),
         ];
 
         if ($msg->uploadedFileId !== null && $msg->uploadedFileId !== '') {

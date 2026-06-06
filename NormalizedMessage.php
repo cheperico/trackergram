@@ -27,6 +27,12 @@ class NormalizedMessage
     public ?string $uploadedFileId = null;
     public string $mediaUrl = '';
     public string $fileUrl = '';
+    public string $width = '';
+    public string $height = '';
+    public string $duration = '';
+    public string $editedDate = '';
+    public string $replyToId = '';
+    public string $reactions = '';
 
     // --- Transientes (usan durante el procesamiento, no persisten) ---
     public ?string $fileId = null;

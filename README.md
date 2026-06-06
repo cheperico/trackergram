@@ -178,6 +178,37 @@ name = message_Location
 permName = telegrammessageLocation
 type = G
 isTblVisible = y
+
+[FIELD20]
+name = media_width
+permName = telegrammessageMediaWidth
+type = n
+
+[FIELD21]
+name = media_height
+permName = telegrammessageMediaHeight
+type = n
+
+[FIELD22]
+name = media_duration
+permName = telegrammessageMediaDuration
+type = DUR
+
+[FIELD23]
+name = edited_date
+permName = telegrammessageEditedDate
+type = t
+
+[FIELD24]
+name = reply_to_id
+permName = telegrammessageReplyToId
+type = t
+
+[FIELD25]
+name = reactions
+permName = telegrammessageReactions
+type = a
+isTblVisible = y
 ```
 
 Podés copiar todo este bloque y pegarlo en **Admin → Trackers → Importar campos** al crear o editar un tracker.

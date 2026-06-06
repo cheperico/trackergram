@@ -207,12 +207,18 @@ El tracker por defecto tiene estos campos (permNames):
 | `telegrammessageText` | a (textarea) | Contenido del mensaje |
 | `telegrammessageLocation` | G (geolocation) | Coordenadas GPS (lon,lat,zoom) |
 | `telegrammessageMediaType` | t (text) | MIME type del media |
-| `telegrammessageMediaSize` | t (text) | Tamaño del archivo |
+| `telegrammessageMediaSize` | n (number) | Tamaño del archivo en bytes |
 | `telegrammessageMediaCaption` | t (text) | Caption del media |
 | `telegrammessageMessageDate` | t (text) | Unix timestamp |
 | `telegrammessageMedia` | FG (file gallery) | Referencia al archivo subido |
 | `telegrammessageMediaUrl` | t (text) | URL pública del archivo en TikiWiki |
 | `telegrammessageFileUrl` | t (text) | URL del archivo original en Telegram |
+| `telegrammessageMediaWidth` | n (number) | Ancho del media en píxeles |
+| `telegrammessageMediaHeight` | n (number) | Alto del media en píxeles |
+| `telegrammessageMediaDuration` | DUR (duration) | Duración en segundos (audio/video/voice), se muestra como hh:mm:ss |
+| `telegrammessageEditedDate` | t (text) | Unix timestamp de última edición |
+| `telegrammessageReplyToId` | t (text) | ID del mensaje al que responde |
+| `telegrammessageReactions` | a (textarea) | Reacciones en formato JSON |
 
 ### Tipos de campo en TikiWiki
 

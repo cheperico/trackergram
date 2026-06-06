@@ -215,12 +215,18 @@ class TikiWikiClient
                 ['name' => 'telegrammessageText', 'type' => 'a', 'permName' => 'telegrammessageText'],
                 ['name' => 'telegrammessageLocation', 'type' => 'G', 'permName' => 'telegrammessageLocation'],
                 ['name' => 'telegrammessageMediaType', 'type' => 't', 'permName' => 'telegrammessageMediaType'],
-                ['name' => 'telegrammessageMediaSize', 'type' => 't', 'permName' => 'telegrammessageMediaSize'],
+                ['name' => 'telegrammessageMediaSize', 'type' => 'n', 'permName' => 'telegrammessageMediaSize'],
                 ['name' => 'telegrammessageMediaCaption', 'type' => 't', 'permName' => 'telegrammessageMediaCaption'],
                 ['name' => 'telegrammessageMessageDate', 'type' => 't', 'permName' => 'telegrammessageMessageDate'],
                 ['name' => 'telegrammessageMedia', 'type' => 'FG', 'permName' => 'telegrammessageMedia'],
                 ['name' => 'telegrammessageMediaUrl', 'type' => 't', 'permName' => 'telegrammessageMediaUrl'],
-                ['name' => 'telegrammessageFileUrl', 'type' => 't', 'permName' => 'telegrammessageFileUrl']
+                ['name' => 'telegrammessageFileUrl', 'type' => 't', 'permName' => 'telegrammessageFileUrl'],
+                ['name' => 'telegrammessageMediaWidth', 'type' => 'n', 'permName' => 'telegrammessageMediaWidth'],
+                ['name' => 'telegrammessageMediaHeight', 'type' => 'n', 'permName' => 'telegrammessageMediaHeight'],
+                ['name' => 'telegrammessageMediaDuration', 'type' => 'DUR', 'permName' => 'telegrammessageMediaDuration'],
+                ['name' => 'telegrammessageEditedDate', 'type' => 't', 'permName' => 'telegrammessageEditedDate'],
+                ['name' => 'telegrammessageReplyToId', 'type' => 't', 'permName' => 'telegrammessageReplyToId'],
+                ['name' => 'telegrammessageReactions', 'type' => 'a', 'permName' => 'telegrammessageReactions']
             ]
         ];
 
