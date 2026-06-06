@@ -50,8 +50,10 @@ Guía para activar la visualización personalizada de los mensajes de Telegram e
    | Campo | Valor |
    |---|---|
    | **Section format** | `Configured` (en el dropdown) |
-   | **Template to display an item** | `wiki:TrackerGramMessageView` |
+   | **Template to display an item** | `tplwiki:TrackerGramMessageView` |
    | **Template to edit an item** | (dejalo vacío) |
+
+   > ⚠️ Usá **`tplwiki:`** (no `wiki:`). El prefijo `tplwiki:` evita que el wiki parser modifique el template (escapa `&&`, agrega `<br />`, etc.) y lo pasa directo a Smarty.
 
 4. **Guardá.**
 
@@ -77,11 +79,11 @@ https://wiki.chela.org.ar/tiki-view_tracker_item.php?itemId=ID_DEL_ITEM&trackerI
 Copiá TODO desde aquí 👇
 
 ```
-{~if $f_telegrammessageTopicTitle && $f_telegrammessageTopicTitle != 'General'~}
+{if $f_telegrammessageTopicTitle && $f_telegrammessageTopicTitle != 'General'}
 <div style="background:#f0f4ff; border-left:4px solid #4a76a8; padding:4px 10px; margin-bottom:8px; font-size:0.9em;">
   📂 Topic: {$f_telegrammessageTopicTitle|escape}
 </div>
-{~/if~}
+{/if}
 
 <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
   <strong style="font-size:1.1em;">{$f_telegrammessageFirstName|escape} {$f_telegrammessageLastName|escape}</strong>
@@ -93,28 +95,28 @@ Copiá TODO desde aquí 👇
   </span>
 </div>
 
-{~if $f_telegrammessageEditedDate~}
+{if $f_telegrammessageEditedDate}
 <div style="color:#b8860b; font-size:0.85em; margin-bottom:4px;">
   ✏️ Editado {$f_telegrammessageEditedDate|tiki_short_datetime}
 </div>
-{~/if~}
+{/if}
 
-{~if $f_telegrammessageReplyToId~}
+{if $f_telegrammessageReplyToId}
 <div style="background:#f9f9f9; border-left:3px solid #ccc; padding:4px 10px; margin:6px 0; font-size:0.9em;">
   💬 En respuesta al mensaje
   <a href="tiki-view_tracker.php?trackerId=12&amp;filterfield=telegrammessageTelegramMessageId&amp;exactvalue={$f_telegrammessageReplyToId|escape:url}">
     #{$f_telegrammessageReplyToId|escape}
   </a>
 </div>
-{~/if~}
+{/if}
 
-{~if $f_telegrammessageText~}
+{if $f_telegrammessageText}
 <div style="margin:8px 0; line-height:1.5;">
   {$f_telegrammessageText}
 </div>
-{~/if~}
+{/if}
 
-{~if $f_telegrammessageMessageType === 'photo' || $f_telegrammessageMessageType === 'sticker'~}
+{if $f_telegrammessageMessageType === 'photo' || $f_telegrammessageMessageType === 'sticker'}
 <div style="margin:8px 0;">
   <img src="{$f_telegrammessageMediaUrl|escape}" alt="{$f_telegrammessageMessageType|escape}"
        style="max-width:100%; max-height:400px; border-radius:4px;">
@@ -124,26 +126,25 @@ Copiá TODO desde aquí 👇
     </div>
   {/if}
 </div>
-{~elseif $f_telegrammessageMessageType === 'video' || $f_telegrammessageMessageType === 'animation'~}
+{elseif $f_telegrammessageMessageType === 'video' || $f_telegrammessageMessageType === 'animation'}
 <div style="margin:8px 0;">
-  <video controls style="max-width:100%; max-height:400px; border-radius:4px;"
-         poster="{if $f_telegrammessageMediaUrl}{$f_telegrammessageMediaUrl|escape}{/if}">
+  <video controls style="max-width:100%; max-height:400px; border-radius:4px;">
     <source src="{$f_telegrammessageMediaUrl|escape}">
   </video>
-  {if $f_telegrammessageDuration}
+  {if $f_telegrammessageMediaDuration}
     <div style="color:#888; font-size:0.85em;">⏱ Duración: {$f_telegrammessageMediaDuration}</div>
   {/if}
 </div>
-{~elseif $f_telegrammessageMessageType === 'audio' || $f_telegrammessageMessageType === 'voice'~}
+{elseif $f_telegrammessageMessageType === 'audio' || $f_telegrammessageMessageType === 'voice'}
 <div style="margin:8px 0;">
   <audio controls style="width:100%;">
     <source src="{$f_telegrammessageMediaUrl|escape}">
   </audio>
-  {if $f_telegrammessageDuration}
+  {if $f_telegrammessageMediaDuration}
     <div style="color:#888; font-size:0.85em;">⏱ Duración: {$f_telegrammessageMediaDuration}</div>
   {/if}
 </div>
-{~elseif $f_telegrammessageMessageType === 'document'~}
+{elseif $f_telegrammessageMessageType === 'document'}
 <div style="margin:8px 0; padding:8px; background:#f5f5f5; border:1px solid #ddd; border-radius:4px;">
   📎 Documento:
   <a href="{$f_telegrammessageMediaUrl|escape}" target="_blank">
@@ -153,23 +154,23 @@ Copiá TODO desde aquí 👇
     <span style="color:#888; font-size:0.85em;">({$f_telegrammessageMediaSize} bytes)</span>
   {/if}
 </div>
-{~elseif $f_telegrammessageMessageType === 'location'~}
+{elseif $f_telegrammessageMessageType === 'location'}
 <div style="margin:8px 0;">
   📍 Ubicación: {$f_telegrammessageLocation}
 </div>
-{~/if~}
+{/if}
 
-{~if $f_telegrammessageReactions~}
+{if $f_telegrammessageReactions}
 <div style="margin:8px 0; padding:6px 10px; background:#fff5f5; border-radius:4px; display:inline-block;">
   {$f_telegrammessageReactions}
 </div>
-{~/if~}
+{/if}
 
-{~if $f_telegrammessageMessageType === 'system'~}
+{if $f_telegrammessageMessageType === 'system'}
 <div style="margin:8px 0; padding:6px 10px; background:#f0f0f0; border-radius:4px; font-style:italic; color:#666;">
   {$f_telegrammessageText}
 </div>
-{~/if~}
+{/if}
 
 <div style="margin-top:12px; padding-top:8px; border-top:1px solid #eee; font-size:0.8em; color:#aaa;">
   ID: {$f_telegrammessageTelegramMessageId} · Tipo: {$f_telegrammessageMessageType}
@@ -186,10 +187,20 @@ Copiá TODO desde aquí 👇
 | Síntoma | Causa | Solución |
 |---|---|---|
 | Se ve `{$f_...}` crudo | Falta permiso `tiki_p_use_as_template` | Asignarlo a Anonymous (Paso 2) |
-| "Template not found" | Nombre mal escrito en la config | Verificar `wiki:TrackerGramMessageView` exacto |
+| "Template not found" | Nombre mal escrito en la config | Verificar `tplwiki:TrackerGramMessageView` exacto |
 | El template se ve sin datos | El permName no coincide | Revisar nombres de campos en el tracker |
-| Error 500 | Error de sintaxis en el template | Revisar `{~if~}` / `{~/if~}` balanceados |
+| Error de sintaxis Smarty | Error en el template | Verificar que no haya `{~` `~}` ni `{# #}` |
 | Link de reply no funciona | trackerId incorrecto | Cambiar `trackerId=12` por el ID real |
+
+### Errores comunes al pegar el template
+
+**Error: `{# ... #}` → Smarty syntax error**
+La causa: el template anterior tenía comentarios `{# #}` que no son válidos en Smarty.
+La solución: usá la versión actual del template (sin `{# #}`).
+
+**Error: `{~if~}` → Unexpected "~"**
+La causa: el wiki parser no procesa `{~` desde Tiki 6 (hace 15 años).
+La solución: el template actual usa `{if}` (sin tilde) y el tracker configurado con `tplwiki:`.
 
 ---
 
@@ -197,4 +208,4 @@ Copiá TODO desde aquí 👇
 
 - [Documentación oficial de Pretty Tracker](https://doc.tiki.org/Pretty-Tracker)
 - [Pretty Tracker How-To](https://doc.tiki.org/Pretty-Tracker-HowTo)
-- Template original en el proyecto: `tracker-pretty-template.wiki`
+- `tplwiki:` vs `wiki:`: `lib/smarty_tiki/resource.tplwiki.php` (pasa raw a Smarty)
