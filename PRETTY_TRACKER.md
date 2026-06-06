@@ -1,5 +1,83 @@
+# Pretty Tracker para trackerGram
+
+Guía para activar la visualización personalizada de los mensajes de Telegram en TikiWiki.
+
+---
+
+## ¿Qué cambia?
+
+| Sin Pretty Tracker | Con Pretty Tracker |
+|---|---|
+| Tabla genérica con campos uno abajo del otro | Diseño tipo chat: autor, fecha, contenido, multimedia |
+| `telegrammessageMessageDate: 1770488323` | `Federico · 04 Jun 2026 14:30` |
+| `telegrammessageReactions: [{"emoji":"👍","count":1}]` | `👍 1` |
+| `telegrammessageEditedDate: 1770488548` | `✏️ Editado 04 Jun 2026 14:35` (solo si fue editado) |
+
+---
+
+## Instalación (3 pasos)
+
+### Paso 1: Crear la Wiki Page del template
+
+1. Andá a tu TikiWiki y creá una página nueva:
+   ```
+   https://wiki.chela.org.ar/tiki-editpage.php?page=TrackerGramMessageView
+   ```
+
+2. **Copiá TODO el contenido** del bloque "Template para copiar" más abajo.
+
+3. **Pegalo** en el editor y **guardá** la página.
+
+### Paso 2: Darle permiso a la página
+
+> ⚠️ **Sin esto el template no funciona** — se ve el código crudo (`{$f_variable}`).
+
+1. Andá a la página que creaste → **Actions (engranaje) → Permissions**
+2. Agregá el permiso **`tiki_p_use_as_template`** a **Anonymous**
+3. Opcional: sacá `tiki_p_edit` a Anonymous para que nadie la modifique
+
+### Paso 3: Configurar el tracker
+
+1. Andá al admin del tracker:
+   ```
+   https://wiki.chela.org.ar/tiki-admin_trackers.php?trackerId=12
+   ```
+
+2. Buscá la sección **Format** (puede estar colapsada, clickeala para expandirla).
+
+3. Completá los campos:
+
+   | Campo | Valor |
+   |---|---|
+   | **Section format** | `Configured` (en el dropdown) |
+   | **Template to display an item** | `wiki:TrackerGramMessageView` |
+   | **Template to edit an item** | (dejalo vacío) |
+
+4. **Guardá.**
+
+---
+
+## Verificar
+
+Andá a cualquier item del tracker:
+```
+https://wiki.chela.org.ar/tiki-view_tracker_item.php?itemId=ID_DEL_ITEM&trackerId=12
+```
+
+✅ **Funciona** → ves el mensaje con diseño lindo (autor, fecha, contenido, reacciones)
+
+❌ **No funciona** → ves `{$f_telegrammessageText}` crudo → revisá permisos del Paso 2
+
+---
+
+## Template para copiar
+
+> 📌 Este template ya tiene el tracker ID **12** configurado. Si tu tracker usa otro ID, cambiá `trackerId=12` por el número correspondiente en el link de reply.
+
+Copiá TODO desde aquí 👇
+
+```
 {# trackerGram — Pretty Tracker Template #}
-{# Copiar este contenido completo en: Admin → Trackers → (tracker) → Pretty Tracker #}
 
 {~if $f_telegrammessageTopicTitle && $f_telegrammessageTopicTitle != 'General'~}
 <div style="background:#f0f4ff; border-left:4px solid #4a76a8; padding:4px 10px; margin-bottom:8px; font-size:0.9em;">
@@ -26,7 +104,6 @@
 {~if $f_telegrammessageReplyToId~}
 <div style="background:#f9f9f9; border-left:3px solid #ccc; padding:4px 10px; margin:6px 0; font-size:0.9em;">
   💬 En respuesta al mensaje
-  {* Link a vista filtrada por message_id — cambiar 12 si tu tracker tiene otro ID *}
   <a href="tiki-view_tracker.php?trackerId=12&amp;filterfield=telegrammessageTelegramMessageId&amp;exactvalue={$f_telegrammessageReplyToId|escape:url}">
     #{$f_telegrammessageReplyToId|escape}
   </a>
@@ -102,3 +179,24 @@
      · {$f_telegrammessageChatTitle|escape}
   {/if}
 </div>
+```
+
+---
+
+## Solución de problemas
+
+| Síntoma | Causa | Solución |
+|---|---|---|
+| Se ve `{$f_...}` crudo | Falta permiso `tiki_p_use_as_template` | Asignarlo a Anonymous (Paso 2) |
+| "Template not found" | Nombre mal escrito en la config | Verificar `wiki:TrackerGramMessageView` exacto |
+| El template se ve sin datos | El permName no coincide | Revisar nombres de campos en el tracker |
+| Error 500 | Error de sintaxis en el template | Revisar `{~if~}` / `{~/if~}` balanceados |
+| Link de reply no funciona | trackerId incorrecto | Cambiar `trackerId=12` por el ID real |
+
+---
+
+## Referencias
+
+- [Documentación oficial de Pretty Tracker](https://doc.tiki.org/Pretty-Tracker)
+- [Pretty Tracker How-To](https://doc.tiki.org/Pretty-Tracker-HowTo)
+- Template original en el proyecto: `tracker-pretty-template.wiki`
