@@ -277,6 +277,38 @@ class MessageMapper
     }
 
     /**
+     * Formatear texto del export de Telegram convirtiendo entidades a texto plano
+     * con links en sintaxis wiki [url texto]
+     */
+    private function formatExportText(array|string $text): string
+    {
+        if (is_string($text)) {
+            return $text;
+        }
+
+        $result = '';
+        foreach ($text as $part) {
+            $partText = $part['text'] ?? '';
+            $partType = $part['type'] ?? 'plain';
+
+            if ($partType === 'text_link' && !empty($part['href'])) {
+                // Link clickeable en sintaxis wiki
+                $result .= '[' . $part['href'] . ' ' . $partText . ']';
+            } elseif ($partType === 'url' && !empty($part['href'])) {
+                // URL directa
+                $result .= '[' . $part['href'] . ']';
+            } elseif ($partType === 'mention' && !empty($part['href'])) {
+                // Mención a usuario (href tipo tg://user?id=xxx)
+                $result .= $partText;
+            } else {
+                // plain, bold, italic, etc → solo texto (formato wiki es estudio pendiente)
+                $result .= $partText;
+            }
+        }
+        return $result;
+    }
+
+    /**
      * Procesar mensaje de export ZIP de Telegram
      */
     public function fromExport(array $message, array $context): NormalizedMessage
@@ -303,8 +335,9 @@ class MessageMapper
         $msgType = $message['type'] ?? 'message';
 
         if ($msgType === 'message') {
+            // Texto: si es array (con entidades), formatear links a sintaxis wiki
             $rawText = $message['text'] ?? '';
-            $msg->text = is_array($rawText) ? json_encode($rawText, JSON_UNESCAPED_UNICODE) : (string) $rawText;
+            $msg->text = is_array($rawText) ? $this->formatExportText($rawText) : (string) $rawText;
 
             if (!empty($message['photo'])) {
                 $msg->messageType = 'photo';
@@ -337,6 +370,17 @@ class MessageMapper
             if (empty($msg->mediaCaption) && isset($message['file'])) {
                 $msg->mediaCaption = $message['file_caption'] ?? ($message['caption'] ?? '');
             }
+
+            // Reacciones: formatear como texto legible en vez de JSON crudo
+            if (!empty($message['reactions'])) {
+                $parts = [];
+                foreach ($message['reactions'] as $r) {
+                    $emoji = $r['emoji'] ?? ($r['type'] === 'custom_emoji' ? '⭐' : '❓');
+                    $count = $r['count'] ?? 1;
+                    $parts[] = $emoji . ' ' . $count;
+                }
+                $msg->reactions = implode(' · ', $parts);
+            }
         } else {
             $msg->messageType = 'system';
             $action = $message['action'] ?? '';
@@ -359,9 +403,6 @@ class MessageMapper
 
         $msg->editedDate = (string) ($message['edited_unixtime'] ?? '');
         $msg->replyToId = (string) ($message['reply_to_message_id'] ?? '');
-        if (!empty($message['reactions'])) {
-            $msg->reactions = json_encode($message['reactions'], JSON_UNESCAPED_UNICODE);
-        }
 
         return $msg;
     }

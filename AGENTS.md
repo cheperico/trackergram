@@ -209,28 +209,29 @@ El tracker por defecto tiene estos campos (permNames):
 | `telegrammessageMediaType` | t (text) | MIME type del media |
 | `telegrammessageMediaSize` | n (number) | Tamaño del archivo en bytes |
 | `telegrammessageMediaCaption` | t (text) | Caption del media |
-| `telegrammessageMessageDate` | t (text) | Unix timestamp |
+| `telegrammessageMessageDate` | f (datetime) | Fecha/hora del mensaje (timestamp UNIX) |
 | `telegrammessageMedia` | FG (file gallery) | Referencia al archivo subido |
 | `telegrammessageMediaUrl` | t (text) | URL pública del archivo en TikiWiki |
 | `telegrammessageFileUrl` | t (text) | URL del archivo original en Telegram |
 | `telegrammessageMediaWidth` | n (number) | Ancho del media en píxeles |
 | `telegrammessageMediaHeight` | n (number) | Alto del media en píxeles |
 | `telegrammessageMediaDuration` | DUR (duration) | Duración en segundos (audio/video/voice), se muestra como hh:mm:ss |
-| `telegrammessageEditedDate` | t (text) | Unix timestamp de última edición |
-| `telegrammessageReplyToId` | t (text) | ID del mensaje al que responde |
-| `telegrammessageReactions` | a (textarea) | Reacciones en formato JSON |
+| `telegrammessageEditedDate` | t (text) | Unix timestamp de última edición (se muestra condicionalmente via Pretty Tracker) |
+| `telegrammessageReplyToId` | t (text) | ID del mensaje al que responde (con link a vista filtrada via Pretty Tracker) |
+| `telegrammessageReactions` | t (text) | Reacciones formateadas como texto legible (👍 3 · ❤️ 1) |
 
 ### Tipos de campo en TikiWiki
 
 | Código | Tipo | Uso |
-|---|---|---|
+|---|---|---|---|
 | `t` | Text | Texto corto |
 | `a` | Textarea | Texto largo |
 | `n` | Number | Número |
-| `f` | Float | Decimal |
-| `D` | Date | Fecha |
+| `f` | Date and Time | Fecha/hora (timestamp UNIX) |
+| `D` | Date | Fecha (sin hora) |
 | `G` | Geolocation | Coordenadas |
 | `FG` | File Gallery | Archivo adjunto |
+| `DUR` | Duration | Duración en segundos (se muestra como hh:mm:ss) |
 
 ---
 
