@@ -39,7 +39,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 | | |
 |---|---|
-| **Versión** | v0.1.7 |
+| **Versión** | v0.1.8 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
 
@@ -55,6 +55,10 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 - ✅ Panel de administración web
 - ✅ Deduplicación de mensajes
 - ✅ Seguridad: CSRF, rate limiting, hash de contraseñas, path traversal protection
+- ✅ Reacciones formateadas como texto legible (👍 3 · ❤️ 1)
+- ✅ Links clickeables en text_entities (importación de exports)
+- ✅ log_message() siempre escribe a debug.log con rotación automática
+- ✅ Pretty Tracker template (PRETTY_TRACKER.md)
 
 ---
 
@@ -132,7 +136,7 @@ Todos los archivos en la raíz. No hay subdirectorios de código.
 | `.env.example` | Plantilla de variables de entorno |
 | `.htaccess` | Apache: seguridad, rewrite, límites PHP |
 | `topic_names.json` | Cache local de nombres de topics (auto-generado) |
-| `debug.log` | Logs de debug (si `DEBUG_MODE=true`) |
+| `debug.log` | Logs de debug (rotación automática a 10MB, siempre escribe) |
 
 #### Documentación
 
@@ -144,6 +148,7 @@ Todos los archivos en la raíz. No hay subdirectorios de código.
 | `AGENTS.md` | **Este archivo** — contexto para agentes de IA |
 | `roadmap.md` | Pendientes, prioridades, bugs conocidos |
 | `CAMBIOS.md` | Historial de cambios por versión |
+| `PRETTY_TRACKER.md` | Guía de instalación y template para Pretty Tracker en TikiWiki |
 
 ### Orden recomendado de lectura del código
 
@@ -403,7 +408,8 @@ Ver [CAMBIOS.md](CAMBIOS.md) para el detalle completo por versión.
 ### Resumen
 
 | Versión | Cambio principal |
-|---|---|
+|---|---|---|
+| v0.1.8 | Reactions formateadas, links clickeables en imports, messageDate tipo Date, log_message() siempre escribe, Pretty Tracker template |
 | v0.1.7 | `api.php` → entry point puro, `WebhookHandler` creado, `bootstrap.php`, seguridad ZIP |
 | v0.1.6 | Hash contraseñas, path traversal, chunked downloads, rate limiting, refactor `toWikiFields()` |
 | v0.1.5 | Fix TypeError PHP 8.5, eliminado `getForumTopic`, reorganizado admin panel |
