@@ -77,8 +77,6 @@ https://wiki.chela.org.ar/tiki-view_tracker_item.php?itemId=ID_DEL_ITEM&trackerI
 Copiá TODO desde aquí 👇
 
 ```
-{# trackerGram — Pretty Tracker Template #}
-
 {~if $f_telegrammessageTopicTitle && $f_telegrammessageTopicTitle != 'General'~}
 <div style="background:#f0f4ff; border-left:4px solid #4a76a8; padding:4px 10px; margin-bottom:8px; font-size:0.9em;">
   📂 Topic: {$f_telegrammessageTopicTitle|escape}
