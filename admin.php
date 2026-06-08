@@ -406,6 +406,13 @@ $config = [
     'custom_webhook_url' => $env['CUSTOM_WEBHOOK_URL'] ?? ''
 ];
 
+// UI Mode: classic o modern
+$uiMode = $_GET['ui'] ?? $_COOKIE['tg_ui'] ?? 'classic';
+if (!in_array($uiMode, ['classic', 'modern'])) $uiMode = 'classic';
+if (isset($_GET['ui'])) {
+    setcookie('tg_ui', $uiMode, time() + 365 * 86400, '/', '', !empty($_SERVER['HTTPS']), true);
+}
+
 // Mostrar login si no está autenticado
 if (!checkAuth()) {
     ?>
@@ -433,7 +440,110 @@ if (!checkAuth()) {
 <!DOCTYPE html>
 <html>
 <head>
-    <title>trackerGram - Administración</title>
+    <title>trackerGram - Administración<?php echo $uiMode === 'modern' ? ' (Modern)' : ''; ?></title>
+    <?php if ($uiMode === 'modern'): ?>
+    <style>
+        :root {
+            --primary: #4a76a8;
+            --primary-dark: #345583;
+            --bg: #f0f2f5;
+            --card-bg: #ffffff;
+            --text: #1c1e21;
+            --text-secondary: #65676b;
+            --border: #dddfe2;
+            --success: #42b72a;
+            --error: #e74c3c;
+            --radius: 12px;
+            --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+            --shadow-lg: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; padding: 0; }
+        
+        /* Navbar */
+        .navbar { background: var(--primary); color: white; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 56px; box-shadow: var(--shadow-lg); position: sticky; top: 0; z-index: 100; }
+        .navbar-brand { font-size: 1.2em; font-weight: 700; letter-spacing: -0.3px; }
+        .navbar-brand span { opacity: 0.85; font-weight: 400; }
+        .navbar-actions { display: flex; align-items: center; gap: 12px; }
+        .navbar a { color: white; text-decoration: none; font-size: 0.9em; padding: 6px 12px; border-radius: 6px; transition: background 0.2s; }
+        .navbar a:hover { background: rgba(255,255,255,0.15); }
+        
+        /* UI Toggle */
+        .ui-toggle { display: flex; background: rgba(255,255,255,0.15); border-radius: 8px; overflow: hidden; }
+        .ui-toggle a { padding: 6px 14px; font-size: 0.85em; border-radius: 0; font-weight: 500; }
+        .ui-toggle a.active { background: white; color: var(--primary); }
+        
+        /* Container */
+        .container { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
+        
+        /* Alert banners */
+        .alert { padding: 14px 18px; border-radius: var(--radius); margin-bottom: 20px; font-size: 0.95em; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+        .alert-success { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+        .alert-error { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+        .alert-icon { font-size: 1.2em; }
+        
+        /* Cards grid */
+        .cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px; }
+        .card { background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; transition: box-shadow 0.2s, transform 0.2s; cursor: pointer; border: 1px solid var(--border); }
+        .card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+        .card-icon { font-size: 1.8em; margin-bottom: 8px; }
+        .card-title { font-weight: 600; font-size: 1em; color: var(--text); }
+        .card-desc { font-size: 0.85em; color: var(--text-secondary); margin-top: 4px; }
+        
+        /* Section cards */
+        .section { background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 20px; overflow: hidden; border: 1px solid var(--border); }
+        .section-header { padding: 16px 20px; font-weight: 600; font-size: 1.05em; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+        .section-header:hover { background: #f7f8fa; }
+        .section-header .arrow { margin-left: auto; transition: transform 0.2s; font-size: 0.8em; }
+        .section.collapsed .section-header .arrow { transform: rotate(-90deg); }
+        .section-content { padding: 20px; }
+        .section.collapsed .section-content { display: none; }
+        
+        /* Forms */
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-weight: 500; font-size: 0.9em; color: var(--text); margin-bottom: 4px; }
+        .form-group .hint { font-size: 0.8em; color: var(--text-secondary); margin-top: 2px; }
+        .input-wrapper { display: flex; gap: 6px; align-items: stretch; }
+        .input-wrapper input { flex: 1; }
+        input[type="text"], input[type="password"], input[type="number"] { padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95em; width: 100%; transition: border-color 0.2s, box-shadow 0.2s; background: #fff; }
+        input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(74,118,168,0.12); }
+        .btn { padding: 10px 22px; border: none; border-radius: 8px; font-size: 0.95em; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s; display: inline-flex; align-items: center; gap: 6px; }
+        .btn:active { transform: scale(0.97); }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-outline { background: transparent; color: var(--primary); border: 1px solid var(--primary); }
+        .btn-outline:hover { background: rgba(74,118,168,0.06); }
+        .btn-danger { background: var(--error); color: white; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-sm { padding: 6px 12px; font-size: 0.85em; }
+        .icon-btn { padding: 10px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 1em; transition: background 0.2s; }
+        .icon-btn:hover { background: #e4e6e9; }
+        
+        /* Webhook URL display */
+        .webhook-url { background: var(--bg); padding: 12px 16px; border-radius: 8px; font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.9em; word-break: break-all; margin-bottom: 12px; border: 1px solid var(--border); }
+        .webhook-url .label { font-family: -apple-system, sans-serif; color: var(--text-secondary); font-size: 0.85em; margin-bottom: 4px; }
+        
+        /* File input styling */
+        input[type="file"] { font-size: 0.9em; padding: 8px 0; }
+        
+        /* Status badges */
+        .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.8em; font-weight: 500; }
+        .badge-active { background: #e8f5e9; color: #2e7d32; }
+        .badge-inactive { background: #fff3e0; color: #e65100; }
+        
+        /* Responsive */
+        @media (max-width: 600px) {
+            .navbar { padding: 0 12px; }
+            .navbar-brand { font-size: 1em; }
+            .container { padding: 16px 12px; }
+            .cards-grid { grid-template-columns: 1fr 1fr; }
+            .section-content { padding: 16px; }
+        }
+        @media (max-width: 400px) {
+            .cards-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+    <?php else: ?>
     <style>
         .import-success { color: green; }
         .import-error { color: red; }
@@ -442,11 +552,281 @@ if (!checkAuth()) {
         .collapsible.collapsed h2::before { transform: rotate(-90deg); }
         .collapsible-content { overflow: hidden; transition: max-height 0.3s ease; }
         .collapsible.collapsed .collapsible-content { max-height: 0 !important; }
+        .ui-toggle-classic { margin: 10px 0; padding: 6px 12px; background: #f0f0f0; border-radius: 6px; display: inline-block; }
+        .ui-toggle-classic a { padding: 4px 10px; text-decoration: none; }
+        .ui-toggle-classic a.active { font-weight: bold; }
     </style>
+    <?php endif; ?>
 </head>
 <body>
+
+<?php if ($uiMode === 'modern'): ?>
+
+<!-- ===== MODERN UI ===== -->
+
+<nav class="navbar">
+    <div class="navbar-brand">🎛 trackerGram <span>Admin</span></div>
+    <div class="navbar-actions">
+        <div class="ui-toggle">
+            <a href="?ui=classic" <?php echo $uiMode === 'classic' ? 'class="active"' : ''; ?>>Classic</a>
+            <a href="?ui=modern" <?php echo $uiMode === 'modern' ? 'class="active"' : ''; ?>>Modern</a>
+        </div>
+        <a href="?action=logout">🚪 Cerrar sesión</a>
+    </div>
+</nav>
+
+<div class="container">
+
+    <?php if (isset($success)): ?>
+        <div class="alert alert-success"><span class="alert-icon">✅</span> <?php echo htmlspecialchars($success); ?></div>
+    <?php endif; ?>
+    <?php if (isset($error)): ?>
+        <div class="alert alert-error"><span class="alert-icon">❌</span> <?php echo htmlspecialchars($error); ?></div>
+    <?php endif; ?>
+
+    <!-- Quick Actions -->
+    <div class="cards-grid">
+        <a href="#section-config" style="text-decoration:none;color:inherit;">
+            <div class="card"><div class="card-icon">⚙️</div><div class="card-title">Configuración</div><div class="card-desc">Bot, TikiWiki, webhook</div></div>
+        </a>
+        <a href="#section-import" style="text-decoration:none;color:inherit;">
+            <div class="card"><div class="card-icon">📥</div><div class="card-title">Importar</div><div class="card-desc">Subir export ZIP</div></div>
+        </a>
+        <a href="#section-webhook" style="text-decoration:none;color:inherit;">
+            <div class="card"><div class="card-icon">🔗</div><div class="card-title">Webhook</div><div class="card-desc">Estado y actualización</div></div>
+        </a>
+        <a href="#section-tracker" style="text-decoration:none;color:inherit;">
+            <div class="card"><div class="card-icon">➕</div><div class="card-title">Tracker</div><div class="card-desc">Crear tracker nuevo</div></div>
+        </a>
+    </div>
+
+    <!-- 1. Configuración General -->
+    <div class="section" id="section-config">
+        <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            ⚙️ Configuración General <span class="arrow">▼</span>
+        </div>
+        <div class="section-content">
+            <form method="post">
+                <input type="hidden" name="action" value="save_general">
+                <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+                
+                <h4 style="margin-bottom:12px;color:var(--primary);">Telegram</h4>
+                
+                <div class="form-group">
+                    <label>Bot Token</label>
+                    <div class="input-wrapper">
+                        <input type="password" name="telegram_bot_token" value="<?php echo htmlspecialchars($config['telegram_bot_token']); ?>" placeholder="Token de @BotFather">
+                        <button type="button" class="icon-btn" onclick="this.previousElementSibling.type = this.previousElementSibling.type === 'password' ? 'text' : 'password'" title="Mostrar/Ocultar">👁</button>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Webhook Secret</label>
+                    <div class="input-wrapper">
+                        <input type="password" name="telegram_webhook_secret" value="<?php echo htmlspecialchars($config['telegram_webhook_secret']); ?>" placeholder="Secret token para webhook">
+                        <button type="button" class="icon-btn" onclick="this.previousElementSibling.type = this.previousElementSibling.type === 'password' ? 'text' : 'password'" title="Mostrar/Ocultar">👁</button>
+                    </div>
+                    <div class="hint">Se envía como header X-Telegram-Bot-Api-Secret-Token</div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Custom Webhook URL</label>
+                    <input type="text" name="custom_webhook_url" value="<?php echo htmlspecialchars($config['custom_webhook_url'] ?? ''); ?>" placeholder="https://ejemplo.com/api.php">
+                    <div class="hint">Solo si la URL auto-detectada no funciona</div>
+                </div>
+                
+                <h4 style="margin:20px 0 12px;color:var(--primary);">TikiWiki</h4>
+                
+                <div class="form-group">
+                    <label>API URL</label>
+                    <input type="text" name="tikiwiki_api_url" value="<?php echo htmlspecialchars($config['tikiwiki_api_url']); ?>" placeholder="https://wiki.ejemplo.org/api/">
+                </div>
+                
+                <div class="form-group">
+                    <label>Token de API</label>
+                    <div class="input-wrapper">
+                        <input type="password" name="tikiwiki_token" value="<?php echo htmlspecialchars($config['tikiwiki_token']); ?>" placeholder="Token de TikiWiki">
+                        <button type="button" class="icon-btn" onclick="this.previousElementSibling.type = this.previousElementSibling.type === 'password' ? 'text' : 'password'" title="Mostrar/Ocultar">👁</button>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">💾 Guardar Configuración</button>
+            </form>
+            
+            <hr style="margin:24px 0;border:none;border-top:1px solid var(--border);">
+            
+            <h4 style="margin-bottom:12px;">🔑 Contraseña de Admin</h4>
+            <form method="post">
+                <input type="hidden" name="action" value="change_password">
+                <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+                
+                <div class="form-group">
+                    <label>Nueva contraseña</label>
+                    <input type="password" name="admin_password" required minlength="8" placeholder="Mínimo 8 caracteres">
+                </div>
+                
+                <button type="submit" class="btn btn-outline">🔑 Cambiar Contraseña</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 2. Importar -->
+    <div class="section" id="section-import">
+        <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            📥 Importar Conversaciones <span class="arrow">▼</span>
+        </div>
+        <div class="section-content">
+            <p style="margin-bottom:12px;">Importar conversaciones desde archivos ZIP exportados de Telegram. Los archivos multimedia se subirán a la file gallery del tracker.</p>
+            <p style="font-size:0.85em;color:var(--text-secondary);margin-bottom:16px;">Límites: ZIP de hasta 50MB • Archivos multimedia individuales de hasta 20MB</p>
+            
+            <form id="import-form-modern" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="import">
+                <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+                
+                <div class="form-group">
+                    <label>Tracker destino</label>
+                    <input type="text" name="tracker_id" value="<?php echo htmlspecialchars($config['tikiwiki_tracker_id']); ?>" style="width:100px;">
+                    <div class="hint">ID del tracker donde se importarán los mensajes</div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Archivo export (ZIP)</label>
+                    <input type="file" name="export_file" accept=".zip" required>
+                </div>
+                
+                <button type="button" class="btn btn-primary" onclick="importExportModern()">📥 Importar</button>
+            </form>
+            
+            <div id="import-result-modern" style="margin-top:12px;"></div>
+            
+            <script>
+            function importExportModern() {
+                var form = document.getElementById('import-form-modern');
+                var formData = new FormData(form);
+                var resultDiv = document.getElementById('import-result-modern');
+                
+                resultDiv.innerHTML = '<span style="color:var(--text-secondary);">⏳ Importando... Esto puede tomar varios minutos.</span>';
+                
+                fetch('import.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('HTTP ' + response.status);
+                    return response.text();
+                })
+                .then(text => {
+                    try { return JSON.parse(text); }
+                    catch (e) {
+                        resultDiv.innerHTML = '<span style="color:var(--error);">❌ Respuesta no válida: ' + text.substring(0, 200) + '</span>';
+                        return null;
+                    }
+                })
+                .then(data => {
+                    if (!data) return;
+                    if (data.error) {
+                        resultDiv.innerHTML = '<span style="color:var(--error);">❌ Error: ' + data.error + '</span>';
+                    } else {
+                        resultDiv.innerHTML = '<div style="background:#e8f5e9;padding:14px;border-radius:8px;color:#2e7d32;">✅ Importación completada:<br>' +
+                            '📨 ' + data.imported + ' mensajes importados<br>' +
+                            '⚠️ ' + data.skipped + ' errores<br>' +
+                            '📎 ' + data.media_processed + ' archivos subidos<br>' +
+                            '📂 ' + data.topics_found + ' topics encontrados</div>';
+                    }
+                })
+                .catch(error => {
+                    resultDiv.innerHTML = '<span style="color:var(--error);">❌ Error: ' + error.message + '</span>';
+                });
+            }
+            </script>
+        </div>
+    </div>
+
+    <!-- 3. Webhook / Tracker en directo -->
+    <div class="section" id="section-webhook">
+        <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            🔗 Tracker en Directo <span class="arrow">▼</span>
+        </div>
+        <div class="section-content">
+            <p style="margin-bottom:16px;">ID del tracker de TikiWiki donde se enviarán los mensajes en vivo desde Telegram.</p>
+            
+            <form method="post" style="margin-bottom:20px;">
+                <input type="hidden" name="action" value="save_tracker">
+                <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+                
+                <div class="form-group">
+                    <label>TikiWiki Tracker ID</label>
+                    <input type="text" name="tikiwiki_tracker_id" value="<?php echo htmlspecialchars($config['tikiwiki_tracker_id']); ?>" style="width:100px;">
+                </div>
+                
+                <button type="submit" class="btn btn-primary">💾 Guardar Tracker</button>
+            </form>
+            
+            <hr style="margin:20px 0;border:none;border-top:1px solid var(--border);">
+            
+            <h4 style="margin-bottom:8px;">🌐 Webhook</h4>
+            <div class="webhook-url">
+                <div class="label">URL actual del webhook</div>
+                <?php
+                $displayUrl = $env['CUSTOM_WEBHOOK_URL'] ?? '';
+                if (empty($displayUrl)) {
+                    $displayUrl = generateWebhookUrl();
+                }
+                echo htmlspecialchars($displayUrl);
+                ?>
+                <?php if (!empty($env['CUSTOM_WEBHOOK_URL'] ?? '')): ?>
+                    <div style="font-family:-apple-system,sans-serif;font-size:0.85em;color:var(--text-secondary);margin-top:4px;">📌 Guardada en .env</div>
+                <?php endif; ?>
+            </div>
+            
+            <form method="post">
+                <input type="hidden" name="action" value="update_webhook">
+                <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+                
+                <button type="submit" class="btn btn-outline">🔄 Actualizar Webhook</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 4. Crear Tracker -->
+    <div class="section" id="section-tracker">
+        <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            ➕ Crear Tracker en TikiWiki <span class="arrow">▼</span>
+        </div>
+        <div class="section-content">
+            <p style="margin-bottom:16px;">Creá un tracker nuevo en TikiWiki con todos los campos necesarios para trackerGram.</p>
+            
+            <form method="post">
+                <input type="hidden" name="action" value="create_tracker">
+                <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+                
+                <div class="form-group">
+                    <label>Nombre del tracker</label>
+                    <input type="text" name="tracker_name" value="Telegram Messages" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">➕ Crear Tracker</button>
+            </form>
+            
+            <div class="hint" style="margin-top:8px;">El tracker creado puede usarse como tracker en directo o para importar mensajes.</div>
+        </div>
+    </div>
+
+</div>
+
+<?php else: ?>
+
+<!-- ===== CLASSIC UI ===== -->
+
+<div style="max-width:900px;margin:0 auto;padding:20px;">
     <h1>trackerGram - Administración</h1>
-    <p><a href="?action=logout">Cerrar sesión</a></p>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div class="ui-toggle-classic">
+            <a href="?ui=classic" class="<?php echo $uiMode === 'classic' ? 'active' : ''; ?>">Classic</a> |
+            <a href="?ui=modern" class="<?php echo $uiMode === 'modern' ? 'active' : ''; ?>">Modern</a>
+        </div>
+        <a href="?action=logout">Cerrar sesión</a>
+    </div>
     
     <?php if (isset($success)): ?>
         <p style="color: green;"><?php echo htmlspecialchars($success); ?></p>
@@ -652,5 +1032,9 @@ if (!checkAuth()) {
         });
     });
     </script>
+</div>
+
+<?php endif; ?>
+
 </body>
 </html>
