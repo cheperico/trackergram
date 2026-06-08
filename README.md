@@ -73,11 +73,30 @@ isMandatory = y
 isTblVisible = y
 isSearchable = y
 isPublic = y
+isHidden = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD2]
 name = chat_id
 permName = telegrammessageChatId
 type = t
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD3]
 name = chat_title
@@ -85,11 +104,33 @@ permName = telegrammessageChatTitle
 type = t
 isTblVisible = y
 isSearchable = y
+isMain = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD4]
 name = topic_id
 permName = telegrammessageTopicId
 type = t
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD5]
 name = topic_title
@@ -97,6 +138,16 @@ permName = telegrammessageTopicTitle
 type = t
 isTblVisible = y
 isSearchable = y
+isMain = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD6]
 name = message_date
@@ -104,11 +155,33 @@ permName = telegrammessageMessageDate
 type = f
 isTblVisible = y
 isSearchable = y
+isMain = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD7]
 name = user_id
 permName = telegrammessageUserId
 type = t
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD8]
 name = username
@@ -116,22 +189,68 @@ permName = telegrammessageUsername
 type = t
 isTblVisible = y
 isSearchable = y
+isMain = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD9]
 name = first_name
 permName = telegrammessageFirstName
 type = t
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD10]
 name = last_name
 permName = telegrammessageLastName
 type = t
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD11]
 name = message_type
 permName = telegrammessageMessageType
 type = D
 options = {"options":["text","photo","video","audio","document","sticker","voice","video_note","system","animation","contact","poll","location","other"]}
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD12]
 name = text
@@ -139,6 +258,16 @@ permName = telegrammessageText
 type = a
 isTblVisible = y
 isSearchable = y
+isMain = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD13]
 name = media
@@ -146,69 +275,221 @@ permName = telegrammessageMedia
 type = FG
 options = {"galleryId":36}
 isTblVisible = y
+isMain = n
+isSearchable = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD14]
 name = media_url
 permName = telegrammessageMediaUrl
 type = t
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD15]
 name = file_url
 permName = telegrammessageFileUrl
 type = t
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD16]
 name = media_type
 permName = telegrammessageMediaType
 type = t
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD17]
 name = media_size
 permName = telegrammessageMediaSize
 type = n
 isSearchable = y
+isMain = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD18]
 name = media_caption
 permName = telegrammessageMediaCaption
 type = t
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD19]
 name = message_Location
 permName = telegrammessageLocation
 type = G
 isTblVisible = y
+isMain = n
+isSearchable = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD20]
 name = media_width
 permName = telegrammessageMediaWidth
 type = n
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD21]
 name = media_height
 permName = telegrammessageMediaHeight
 type = n
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD22]
 name = media_duration
 permName = telegrammessageMediaDuration
 type = DUR
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD23]
 name = edited_date
 permName = telegrammessageEditedDate
 type = t
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD24]
 name = reply_to_id
 permName = telegrammessageReplyToId
 type = t
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 
 [FIELD25]
 name = reactions
 permName = telegrammessageReactions
 type = a
 isTblVisible = y
+isMain = n
+isSearchable = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 ```
 
 Podés copiar todo este bloque y pegarlo en **Admin → Trackers → Importar campos** al crear o editar un tracker.
