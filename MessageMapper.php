@@ -320,14 +320,23 @@ class MessageMapper
         $msg->chatTitle = $context['chat_title'] ?? '';
         $msg->topicId = (string) ($context['topic_id'] ?? '');
         $msg->topicTitle = $context['topic_title'] ?? '';
-        $msg->uploadedFileId = $context['file_id'] ?? null;
+        $msg->uploadedFileIds = $context['file_ids'] ?? [];
 
+        // En el export de Telegram, 'from' es un string con el display name completo
+        // (no hay first_name/last_name separados ni username).
+        // Usamos el string completo como firstName para consistencia con webhook.
         $from = $message['from'] ?? $message['actor'] ?? '';
-        $fromParts = explode(' ', $from, 2);
-        $msg->firstName = $fromParts[0] ?? '';
-        $msg->lastName = $fromParts[1] ?? '';
+        $msg->firstName = $from;
+        // lastName se deja vacío — el export no tiene este campo separado.
+        // username se deja vacío — el export no tiene @handle.
 
-        $msg->userId = str_replace('user', '', $message['from_id'] ?? $message['actor_id'] ?? '');
+        // from_id puede ser "user12345", "chat987654" o "channel456789"
+        $fromId = $message['from_id'] ?? $message['actor_id'] ?? '';
+        if (preg_match('/^(?:user|chat|channel)(\d+)$/', $fromId, $matches)) {
+            $msg->userId = $matches[1];
+        } else {
+            $msg->userId = preg_replace('/[^0-9]/', '', $fromId) ?: $fromId;
+        }
 
         $rawDate = $message['date'] ?? '';
         $msg->date = is_numeric($rawDate) ? (string) (int) $rawDate : (string) strtotime((string) $rawDate);
@@ -438,8 +447,8 @@ class MessageMapper
             'fields[telegrammessageReactions]' => htmlspecialchars($msg->reactions, ENT_QUOTES, 'UTF-8'),
         ];
 
-        if ($msg->uploadedFileId !== null && $msg->uploadedFileId !== '') {
-            $fields['fields[telegrammessageMedia]'] = $msg->uploadedFileId;
+        if (!empty($msg->uploadedFileIds)) {
+            $fields['fields[telegrammessageMedia]'] = implode(',', $msg->uploadedFileIds);
         }
 
         if ($msg->mediaUrl !== '') {

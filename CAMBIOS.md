@@ -1,5 +1,15 @@
 # Cambios - Changelog
 
+## v0.1.9
+- **Fix**: Galería equivocada en import/webhook — `getMediaGalleryId()` ahora parsea todos los formatos de options que devuelve la API (array asociativo, array legacy, JSON string). Nueva `extractGalleryIdFromOptions()`.
+- **Fix**: WebhookHandler ahora pasa `trackerId` a `getMediaGalleryId()` en vez de depender del default del `.env`.
+- **Fix**: Import — `fromExport()` ya no parte el nombre con `explode()`. Usa el display name completo como `firstName` para consistencia con webhook.
+- **Fix**: Import — `userId` ahora usa regex para extraer el ID numérico de prefijos `user/chat/channel` en vez del frágil `str_replace('user', ...)`.
+- **Feat**: `uploadedFileIds` ahora es `array` en vez de `?string`. Mensajes con múltiples archivos se pasan al campo FG como comma-separated.
+- **Feat**: `createTracker()` ahora crea una file gallery via `POST /api/galleries` y configura el campo FG con `count=0` (ilimitado) y `galleryId`.
+- **Feat**: Nuevos métodos `createGallery()` y `updateFgFieldOptions()` en `TikiWikiClient.php`.
+- **Docs**: AGENTS.md actualizado con nuevos features y schema de campos.
+
 ## v0.1.7
 - **Arquitectura**: `api.php` simplificado a entry point HTTP puro (61 líneas). Toda la lógica extraída a `WebhookHandler.php`.
 - **Architectura**: `bootstrap.php` creado con carga centralizada de dependencias. Todos los entry points lo usan.

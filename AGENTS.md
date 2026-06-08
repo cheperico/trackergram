@@ -39,7 +39,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 | | |
 |---|---|
-| **Versión** | v0.1.8 |
+| **Versión** | v0.1.9 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
 
@@ -59,6 +59,12 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 - ✅ Links clickeables en text_entities (importación de exports)
 - ✅ log_message() siempre escribe a debug.log con rotación automática
 - ✅ Pretty Tracker template (PRETTY_TRACKER.md)
+- ✅ Parseo robusto de galleryId desde options del campo FG (múltiples formatos API)
+- ✅ `fromExport()` usa display name completo como firstName (consistente con webhook)
+- ✅ `userId` extraído con regex (soporta prefijos user/chat/channel)
+- ✅ Soporte para múltiples archivos por item (comma-separated en campo FG)
+- ✅ Creación automática de file gallery al crear tracker + FG con count=0
+- ✅ `uploadedFileIds` como array en NormalizedMessage
 
 ---
 
@@ -409,6 +415,7 @@ Ver [CAMBIOS.md](CAMBIOS.md) para el detalle completo por versión.
 
 | Versión | Cambio principal |
 |---|---|---|
+| v0.1.9 | Fix galería (parseo multi-formato de options FG), fix usuario import (firstName completo, userId por regex), uploadedFileIds como array, createTracker() con galería + count=0 |
 | v0.1.8 | Reactions formateadas, links clickeables en imports, messageDate tipo Date, log_message() siempre escribe, Pretty Tracker template |
 | v0.1.7 | `api.php` → entry point puro, `WebhookHandler` creado, `bootstrap.php`, seguridad ZIP |
 | v0.1.6 | Hash contraseñas, path traversal, chunked downloads, rate limiting, refactor `toWikiFields()` |

@@ -24,7 +24,8 @@ class NormalizedMessage
     public string $mediaSize = '';
     public string $mediaCaption = '';
     public string $date = '';
-    public ?string $uploadedFileId = null;
+    /** @var string[] File IDs subidos a TikiWiki (array para soportar múltiples archivos por item) */
+    public array $uploadedFileIds = [];
     public string $mediaUrl = '';
     public string $fileUrl = '';
     public string $width = '';

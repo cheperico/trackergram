@@ -226,9 +226,7 @@ foreach ($messages as $i => $msg) {
         $topicTitle = $topics[$replyTo];
     }
 
-    $filePath = '';
-    $fileName = '';
-    $fileId = '';
+    $uploadedFileIds = [];
 
     if ($msgType === 'message') {
         if (!empty($msg['photo'])) {
@@ -242,6 +240,7 @@ foreach ($messages as $i => $msg) {
         if ($filePath && file_exists($filePath)) {
             $fileId = $tikiWikiClient->uploadFile($filePath, $fileName, $galleryId);
             if ($fileId) {
+                $uploadedFileIds[] = $fileId;
                 $mediaProcessed++;
             }
         }
@@ -252,7 +251,7 @@ foreach ($messages as $i => $msg) {
         'chat_title' => $chatTitle,
         'topic_id' => $topicId,
         'topic_title' => $topicTitle,
-        'file_id' => $fileId ?: null,
+        'file_ids' => $uploadedFileIds,
     ];
 
     $normalized = $messageMapper->fromExport($msg, $context);

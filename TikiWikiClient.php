@@ -51,15 +51,75 @@ class TikiWikiClient
             if (isset($data['configuration']['fieldDefinitions'])) {
                 foreach ($data['configuration']['fieldDefinitions'] as $field) {
                     if (($field['name'] ?? '') === 'telegrammessageMedia' && ($field['type'] ?? '') === 'FG') {
-                        $options = $field['options'] ?? [];
-                        foreach ($options as $opt) {
-                            if (isset($opt['value'])) {
-                                $this->mediaGalleryIdCache[$trackerId] = (int) $opt['value'];
-                                return $this->mediaGalleryIdCache[$trackerId];
-                            }
+                        $galleryId = $this->extractGalleryIdFromOptions($field['options'] ?? null);
+                        if ($galleryId !== null) {
+                            $this->mediaGalleryIdCache[$trackerId] = $galleryId;
+                            log_message("TikiWikiClient: Gallery ID {$galleryId} resuelto para tracker {$trackerId}");
+                            return $galleryId;
                         }
+                        log_message("TikiWikiClient: No se pudo extraer galleryId de options del campo FG en tracker {$trackerId}");
                     }
                 }
+            }
+        } else {
+            log_message("TikiWikiClient: Error HTTP {$httpCode} al obtener tracker {$trackerId}");
+        }
+
+        return null;
+    }
+
+    /**
+     * Extrae el galleryId de las options de un campo FG en distintos formatos
+     *
+     * La API de TikiWiki puede devolver options en estos formatos:
+     *   1. [{"name": "galleryId", "value": "36"}]   — array de objetos (esperado por código legacy)
+     *   2. {"galleryId": 36}                         — array asociativo (TikiWiki 27+)
+     *   3. "{\"galleryId\":36}"                      — JSON string (API raw)
+     *   4. [36]                                       — array plano (fallback)
+     */
+    private function extractGalleryIdFromOptions($options): ?int
+    {
+        if ($options === null || $options === '' || $options === []) {
+            return null;
+        }
+
+        // Si es string, intentar decodificar JSON
+        if (is_string($options)) {
+            $decoded = json_decode($options, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                return null;
+            }
+            $options = $decoded;
+        }
+
+        if (!is_array($options)) {
+            return null;
+        }
+
+        // Formato 1: [{"name": "galleryId", "value": "36"}]
+        // Buscar primer elemento con 'value'
+        foreach ($options as $opt) {
+            if (is_array($opt) && isset($opt['value'])) {
+                return (int) $opt['value'];
+            }
+        }
+
+        // Formato 2: {"galleryId": 36} (array asociativo)
+        foreach (['galleryId', 'gallery_id', 'gal_id', 'id'] as $key) {
+            if (isset($options[$key]) && is_numeric($options[$key])) {
+                return (int) $options[$key];
+            }
+        }
+
+        // Formato 4: Array plano [36]
+        if (isset($options[0]) && is_numeric($options[0])) {
+            return (int) $options[0];
+        }
+
+        // Buscar cualquier valor numérico como último recurso
+        foreach ($options as $val) {
+            if (is_numeric($val)) {
+                return (int) $val;
             }
         }
 
@@ -194,9 +254,144 @@ class TikiWikiClient
         return 0;
     }
 
+    /**
+     * Crear una file gallery en TikiWiki
+     */
+    public function createGallery(string $name, string $description = ''): ?int
+    {
+        $url = $this->apiUrl . "galleries";
+
+        $payload = json_encode([
+            'name' => $name,
+            'description' => $description ?: 'Galería creada por trackerGram',
+            'parentId' => 0,
+        ]);
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Authorization: Bearer " . $this->token,
+            "Content-Type: application/json",
+            "User-Agent: Mozilla/5.0"
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode === 200 || $httpCode === 201) {
+            $data = json_decode($response, true);
+            $galleryId = $data['galleryId'] ?? $data['id'] ?? null;
+            if ($galleryId) {
+                log_message("TikiWikiClient: Galería '{$name}' creada con ID {$galleryId}");
+                return (int) $galleryId;
+            }
+        }
+
+        log_message("TikiWikiClient: Error al crear galería '{$name}' (HTTP {$httpCode})");
+        return null;
+    }
+
+    /**
+     * Actualizar las options de un campo FG (File Gallery) en un tracker existente.
+     * Usado para asignar galería y configurar count=0 (ilimitado).
+     */
+    public function updateFgFieldOptions(int $trackerId, int $galleryId, string $excessBehavior = 'discard'): bool
+    {
+        // Primero obtener la definición del tracker para encontrar el fieldId del FG
+        $url = $this->apiUrl . "trackers/{$trackerId}";
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Authorization: Bearer " . $this->token,
+            "User-Agent: Mozilla/5.0"
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200) {
+            log_message("TikiWikiClient: Error HTTP {$httpCode} al obtener tracker {$trackerId}");
+            return false;
+        }
+
+        $data = json_decode($response, true);
+        $fieldId = null;
+        if (isset($data['configuration']['fieldDefinitions'])) {
+            foreach ($data['configuration']['fieldDefinitions'] as $field) {
+                if (($field['permName'] ?? '') === 'telegrammessageMedia') {
+                    $fieldId = $field['fieldId'] ?? $field['id'] ?? null;
+                    break;
+                }
+            }
+        }
+
+        if ($fieldId === null) {
+            log_message("TikiWikiClient: No se encontró el campo telegrammessageMedia en tracker {$trackerId}");
+            return false;
+        }
+
+        // Actualizar las options del field
+        $updateUrl = $this->apiUrl . "trackers/{$trackerId}/fields/{$fieldId}";
+        $postData = http_build_query([
+            'option[galleryId]' => $galleryId,
+            'option[count]' => 0,
+            'option[excessBehavior]' => $excessBehavior,
+        ]);
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $updateUrl);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Authorization: Bearer " . $this->token,
+            "Content-Type: application/x-www-form-urlencoded",
+            "User-Agent: Mozilla/5.0"
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode === 200) {
+            log_message("TikiWikiClient: FG field options actualizadas en tracker {$trackerId}: galleryId={$galleryId}, count=0");
+            return true;
+        }
+
+        log_message("TikiWikiClient: Error HTTP {$httpCode} al actualizar FG field en tracker {$trackerId}");
+        return false;
+    }
+
     public function createTracker(string $trackerName): ?int
     {
         $url = $this->apiUrl . "trackers";
+
+        // 1. Crear galería de medios asociada
+        $galleryId = $this->createGallery($trackerName . ' Media');
+
+        // 2. Armar definición del campo FG con options si tenemos galería
+        $fgField = [
+            'name' => 'telegrammessageMedia',
+            'type' => 'FG',
+            'permName' => 'telegrammessageMedia',
+        ];
+        if ($galleryId !== null) {
+            $fgField['options'] = [
+                'galleryId' => $galleryId,
+                'count' => 0,
+                'excessBehavior' => 'discard',
+            ];
+        }
 
         $fields = [
             'name' => $trackerName,
@@ -218,7 +413,7 @@ class TikiWikiClient
                 ['name' => 'telegrammessageMediaSize', 'type' => 'n', 'permName' => 'telegrammessageMediaSize'],
                 ['name' => 'telegrammessageMediaCaption', 'type' => 't', 'permName' => 'telegrammessageMediaCaption'],
                 ['name' => 'telegrammessageMessageDate', 'type' => 'f', 'permName' => 'telegrammessageMessageDate'],
-                ['name' => 'telegrammessageMedia', 'type' => 'FG', 'permName' => 'telegrammessageMedia'],
+                $fgField,
                 ['name' => 'telegrammessageMediaUrl', 'type' => 't', 'permName' => 'telegrammessageMediaUrl'],
                 ['name' => 'telegrammessageFileUrl', 'type' => 't', 'permName' => 'telegrammessageFileUrl'],
                 ['name' => 'telegrammessageMediaWidth', 'type' => 'n', 'permName' => 'telegrammessageMediaWidth'],
@@ -248,7 +443,15 @@ class TikiWikiClient
 
         if ($httpCode === 200) {
             $data = json_decode($response, true);
-            return $data['id'] ?? null;
+            $trackerId = $data['id'] ?? null;
+            if ($trackerId) {
+                // 3. Si la galería se creó pero el FG field inline no tomó las options,
+                //    hacemos un update explícito
+                if ($galleryId !== null) {
+                    $this->updateFgFieldOptions((int) $trackerId, $galleryId);
+                }
+                return (int) $trackerId;
+            }
         }
 
         return null;

@@ -95,7 +95,7 @@ class WebhookHandler
             return null;
         }
 
-        $galleryId = $this->tikiWikiClient->getMediaGalleryId() ?? 29;
+        $galleryId = $this->tikiWikiClient->getMediaGalleryId($this->trackerId) ?? 29;
         $fileName = $msg->fileName ?? 'file_' . $msg->fileId;
         $result = $this->tikiWikiClient->uploadFile($tempFile, $fileName, $galleryId);
         unlink($tempFile);
@@ -217,7 +217,7 @@ class WebhookHandler
             log_message("trackerGram: {$logType} - file_id: {$msg->fileId}" . ($msg->mediaSize ? ", size: {$msg->mediaSize}" : ''));
             $uploadedFileId = $this->downloadAndUploadMedia($msg);
             log_message("trackerGram: {$logType} upload result: " . ($uploadedFileId ?? 'null'));
-            $msg->uploadedFileId = $uploadedFileId;
+            $msg->uploadedFileIds = $uploadedFileId ? [$uploadedFileId] : [];
         }
 
         // Enviar a TikiWiki
