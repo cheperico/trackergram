@@ -65,7 +65,7 @@ define('DEBUG_MODE', getenv('DEBUG_MODE') === 'true' ? true : false);
 define('TIMEOUT_TELEGRAM_API', 5);
 define('TIMEOUT_TELEGRAM_DOWNLOAD', 10);
 define('TIMEOUT_TIKIWIKI_API', 30);
-define('TIMEOUT_TIKIWIKI_UPLOAD', 30);
+define('TIMEOUT_TIKIWIKI_UPLOAD', 60);
 
 // Configuración de reintentos
 define('RETRY_MAX_ATTEMPTS', 2);
