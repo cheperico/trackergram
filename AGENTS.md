@@ -39,7 +39,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 | | |
 |---|---|
-| **Versión** | v0.2.0 |
+| **Versión** | v0.2.1 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
 
@@ -59,6 +59,8 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 - ✅ Links clickeables en text_entities (importación de exports)
 - ✅ log_message() siempre escribe a debug.log con rotación automática
 - ✅ Pretty Tracker template (PRETTY_TRACKER.md)
+- ✅ Vista wiki tipo feed con TRACKERLIST + template Smarty personalizado (burbujas de chat)
+- ✅ MediaUrl poblado automáticamente en webhook e import
 - ✅ Parseo robusto de galleryId desde options del campo FG (múltiples formatos API)
 - ✅ `fromExport()` usa display name completo como firstName (consistente con webhook)
 - ✅ `userId` extraído con regex (soporta prefijos user/chat/channel)

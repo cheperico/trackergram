@@ -1,5 +1,15 @@
 # Cambios - Changelog
 
+## v0.2.1
+- **Feat**: Vista wiki tipo feed para tracker 22 — implementado con `{TRACKERLIST(tplwiki="plantillaTrackergram")}` más template Smarty personalizado con diseño tipo burbuja de chat.
+- **Feat**: Multimedia con HTML5 directo — imágenes ocupan 100% del ancho, videos y audios con reproductores `<video controls>` y `<audio controls>` nativos del browser.
+- **Fix**: `mediaUrl` (`telegrammessageMediaUrl`) ahora se popula automáticamente tanto en webhook como en import — antes nunca se guardaba.
+  - WebhookHandler: construye URL `tiki-download_file.php?fileId=X` tras cada upload exitoso
+  - Import (handleProcess y handleFull): mismo tratamiento con `media_url` en contexto
+  - MessageMapper::fromExport(): toma `media_url` del contexto y lo pasa a `NormalizedMessage`
+- **Docs**: PRETTY_TRACKER.md actualizado — la solución TRACKERLIST + tplwiki está implementada y operativa.
+- **Chore**: Documentación de la sesión de diseño de template wiki en `reports/template-wiki-feed.md`
+
 ## v0.2.0
 - **Feat**: Nuevo campo `telegrammessageDisplayName` — nombre para mostrar unificado entre webhook e import.
   - Webhook: concatena `firstName + " " + lastName`

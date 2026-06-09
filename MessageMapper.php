@@ -321,6 +321,7 @@ class MessageMapper
         $msg->topicId = (string) ($context['topic_id'] ?? '');
         $msg->topicTitle = $context['topic_title'] ?? '';
         $msg->uploadedFileIds = $context['file_ids'] ?? [];
+        $msg->mediaUrl = $context['media_url'] ?? '';
 
         // En el export de Telegram, 'from' es un string con el display name completo
         // (no hay first_name/last_name separados ni username).

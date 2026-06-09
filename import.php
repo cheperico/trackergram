@@ -398,12 +398,18 @@ function handleProcess(): void
         }
 
         // Crear item en TikiWiki
+        $mediaUrl = '';
+        if (!empty($uploadedFileIds)) {
+            $baseUrl = rtrim(str_replace('/api/', '', TIKIWIKI_API_URL), '/');
+            $mediaUrl = $baseUrl . '/tiki-download_file.php?fileId=' . $uploadedFileIds[0];
+        }
         $context = [
             'chat_id' => $chatId,
             'chat_title' => $chatTitle,
             'topic_id' => $topicId,
             'topic_title' => $topicTitle,
             'file_ids' => $uploadedFileIds,
+            'media_url' => $mediaUrl,
         ];
 
         $normalized = $messageMapper->fromExport($msg, $context);
@@ -622,12 +628,18 @@ function handleFull(): void
             }
         }
 
+        $mediaUrl = '';
+        if (!empty($uploadedFileIds)) {
+            $baseUrl = rtrim(str_replace('/api/', '', TIKIWIKI_API_URL), '/');
+            $mediaUrl = $baseUrl . '/tiki-download_file.php?fileId=' . $uploadedFileIds[0];
+        }
         $context = [
             'chat_id' => $chatId,
             'chat_title' => $chatTitle,
             'topic_id' => $topicId,
             'topic_title' => $topicTitle,
             'file_ids' => $uploadedFileIds,
+            'media_url' => $mediaUrl,
         ];
 
         $normalized = $messageMapper->fromExport($msg, $context);

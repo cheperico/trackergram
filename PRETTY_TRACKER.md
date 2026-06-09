@@ -56,7 +56,34 @@ Esto permite:
 - ✅ Control total del HTML/CSS
 - ✅ No depende de la tabla nativa del tracker
 
-**Cuando se implemente**: crear una wiki page con el plugin, un template Smarty para cada "burbuja" de mensaje, y enlazarla desde el menú o desde donde se necesite ver el chat.
+---
+## ✅ Implementado (v0.2.1)
+
+La solución está **implementada y funcionando**:
+
+- **Plugin elegido**: `{TRACKERLIST}` (PluginTrackerList) — consulta directa a BD, no requiere Unified Search
+- **Template**: `plantillaTrackergram` (wiki page con `tplwiki:`) con Smarty para renderizar cada burbuja de chat
+- **Página principal**: `ChatTelegram` (o la página wiki que contiene el `{TRACKERLIST(...)}`)
+- **Multimedia**: HTML5 directo — `<img>`, `<video controls>`, `<audio controls>` según el tipo de mensaje
+- **CSS**: Via `{HTML()}<style>...</style>{HTML}` en la misma página (requiere plugin HTML habilitado y aprobado)
+- **Datos**: `mediaUrl` (`$f_184`) se popula automáticamente desde webhook e import
+
+### Detalles de implementación
+
+| Componente | Ubicación | Descripción |
+|---|---|---|
+| Plugin | `{TRACKERLIST(trackerId="22", tplwiki="plantillaTrackergram", sort_mode="f_176_desc")}` | Lista items del tracker 22 ordenados por fecha descendente |
+| Template | Página wiki `plantillaTrackergram` | Smarty con burbujas de chat, multimedia condicional, reacciones |
+| CSS | En la página principal via `{HTML()}` | Estilos de burbuja, header, multimedia, reacciones |
+| `mediaUrl` | `WebhookHandler.php`, `import.php`, `MessageMapper.php` | Se popula tras cada upload exitoso |
+
+### Lecciones aprendidas
+
+1. `{CSS()}` **no existe** como plugin en TikiWiki 27.x — usar `{HTML()}<style>` en su lugar (con plugin HTML habilitado)
+2. `{$f_XX|wiki}` no es un modifier Smarty válido en tplwiki — usar `{wiki}{$f_XX}{/wiki}` o mostrar texto plano
+3. Los templates `tplwiki` reciben los fieldIds numéricos del tracker como `{$f_XX}`
+4. El plugin `img` de TikiWiki espera un **fileId numérico**, no el display del campo FG
+5. Es más confiable poblar `mediaUrl` desde el código PHP y usar HTML5 directo que depender de los plugins de TikiWiki para multimedia
 
 ---
 
