@@ -119,11 +119,13 @@ function handleExtract(): void
 
     // Validar seguridad del ZIP
     $safeExtract = true;
+    $badEntry = '';
     $totalUncompressedSize = 0;
     for ($i = 0; $i < $zip->numFiles; $i++) {
         $entryName = $zip->getNameIndex($i);
         if (strpos($entryName, '..') !== false || str_starts_with($entryName, '/')) {
             $safeExtract = false;
+            $badEntry = $entryName;
             break;
         }
         $stat = $zip->statIndex($i);
@@ -131,6 +133,7 @@ function handleExtract(): void
     }
 
     if (!$safeExtract) {
+        log_message("trackerGram import: ZIP entry inválido: '{$badEntry}'");
         $zip->close(); rrmdir($tempDir);
         jsonError('El archivo ZIP contiene rutas no válidas');
     }
@@ -485,12 +488,14 @@ function handleFull(): void
     }
 
     $safeExtract = true;
+    $badEntry = '';
     $totalUncompressedSize = 0;
     $maxDepth = 10;
     for ($i = 0; $i < $zip->numFiles; $i++) {
         $entryName = $zip->getNameIndex($i);
         if (strpos($entryName, '..') !== false || str_starts_with($entryName, '/')) {
             $safeExtract = false;
+            $badEntry = $entryName;
             break;
         }
         $stat = $zip->statIndex($i);
@@ -498,6 +503,7 @@ function handleFull(): void
     }
 
     if (!$safeExtract) {
+        log_message("trackerGram import: ZIP entry inválido (full): '{$badEntry}'");
         $zip->close(); rrmdir($tempDir);
         jsonError('El archivo ZIP contiene rutas no válidas');
     }
