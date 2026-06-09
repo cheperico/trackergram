@@ -132,7 +132,12 @@ class WebhookHandler
             return null;
         }
 
-        $galleryId = $this->tikiWikiClient->getMediaGalleryId($this->trackerId) ?? 29;
+        $galleryId = $this->tikiWikiClient->getMediaGalleryId($this->trackerId);
+        if ($galleryId === null) {
+            log_message("trackerGram: NO HAY galleryId para tracker {$this->trackerId} — no se puede subir media");
+            unlink($tempFile);
+            return null;
+        }
         $fileName = $msg->fileName ?? 'file_' . $msg->fileId;
         $result = $this->tikiWikiClient->uploadFile($tempFile, $fileName, $galleryId);
         unlink($tempFile);

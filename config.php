@@ -12,6 +12,11 @@ function loadEnv($file = __DIR__ . '/.env') {
 
     $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
+        // Eliminar BOM UTF-8 si existe (EF BB BF al inicio del string)
+        if (strlen($line) > 2 && ord($line[0]) === 0xEF && ord($line[1]) === 0xBB && ord($line[2]) === 0xBF) {
+            $line = substr($line, 3);
+        }
+
         // Ignorar comentarios
         if (strpos(trim($line), '#') === 0) {
             continue;
@@ -69,6 +74,9 @@ define('RETRY_DELAY_MICROSECONDS', 100000); // 0.1 segundos
 // Límite de descarga de media (20 MB)
 define('MEDIA_DOWNLOAD_MAX_SIZE', 20 * 1024 * 1024);
 
+// Límite de tamaño total descomprimido del ZIP importado (500 MB)
+define('MAX_ZIP_UNCOMPRESSED_SIZE', 500 * 1024 * 1024);
+
 // Configuración de caché
 define('CACHE_ENABLED', true);
 
@@ -91,20 +99,35 @@ function log_message(string $message): void
     // Siempre al sistema (Apache error_log, stderr en CLI, syslog en Docker)
     error_log($logLine);
 
-    // Intentar escribir en debug.log local (con rotación si supera 10MB)
     $logFile = __DIR__ . '/debug.log';
-    $rotated = false;
+
+    // ── Verificar encoding del archivo existente ──
+    // Si el archivo tiene BOM UTF-16 (FF FE o FE FF) está corrupto.
+    // Lo respaldamos y empezamos de nuevo.
+    $fileOk = true;
+    if (file_exists($logFile) && filesize($logFile) > 0) {
+        $firstBytes = @file_get_contents($logFile, false, null, 0, 2);
+        if ($firstBytes === "\xFF\xFE" || $firstBytes === "\xFE\xFF") {
+            $backup = __DIR__ . '/debug.log.corrupted.' . date('Ymd_His');
+            if (@rename($logFile, $backup)) {
+                error_log("trackerGram: debug.log corrupto (BOM UTF-16) respaldado a " . basename($backup));
+            } else {
+                // No se pudo renombrar — truncar
+                @file_put_contents($logFile, '');
+            }
+        }
+    }
+
+    // ── Rotación si supera 10MB ──
     if (file_exists($logFile) && filesize($logFile) > 10 * 1024 * 1024) {
         $rotatedName = __DIR__ . '/debug.log.old';
-        if (@rename($logFile, $rotatedName)) {
-            $rotated = true;
-        }
-        // Si falla rename, truncamos el archivo (mejor que perder logs)
+        $rotated = @rename($logFile, $rotatedName);
         if (!$rotated) {
             @file_put_contents($logFile, '');
         }
     }
 
+    // ── Escribir ──
     $written = @file_put_contents($logFile, $logLine, FILE_APPEND | LOCK_EX);
     if ($written === false) {
         // Fallback 1: temp del sistema
@@ -115,5 +138,19 @@ function log_message(string $message): void
         // Fallback 2: último recurso, log al sistema con alerta
         error_log("trackerGram CRITICAL: No se pudo escribir log en {$logFile} ni en temp");
     }
+}
+
+/**
+ * Convertir bytes a formato humano legible (ej: 20MB, 500MB)
+ */
+function formatBytes(int $bytes): string {
+    if ($bytes >= 1024 * 1024 * 1024) {
+        return round($bytes / (1024 * 1024 * 1024), 1) . 'GB';
+    } elseif ($bytes >= 1024 * 1024) {
+        return round($bytes / (1024 * 1024)) . 'MB';
+    } elseif ($bytes >= 1024) {
+        return round($bytes / 1024) . 'KB';
+    }
+    return $bytes . 'B';
 }
 ?>

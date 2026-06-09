@@ -33,7 +33,8 @@ class TikiWikiClient
             return $this->mediaGalleryIdCache[$trackerId];
         }
 
-        $url = $this->apiUrl . "trackers/$trackerId";
+        // Usar el endpoint de fields, NO trackers/{id} (que lista items en TikiWiki 27+)
+        $url = $this->apiUrl . "trackers/$trackerId/fields";
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
@@ -50,11 +51,9 @@ class TikiWikiClient
 
         if ($httpCode === 200) {
             $data = json_decode($response, true);
-            if (isset($data['configuration']['fieldDefinitions'])) {
-                foreach ($data['configuration']['fieldDefinitions'] as $field) {
-                    // Buscar por name o por permName (algunas APIs devuelven solo uno)
-                    $fieldName = $field['name'] ?? $field['permName'] ?? '';
-                    if (($field['type'] ?? '') === 'FG' && ($fieldName === 'telegrammessageMedia' || $field['permName'] === 'telegrammessageMedia')) {
+            if (isset($data['fields'])) {
+                foreach ($data['fields'] as $field) {
+                    if (($field['type'] ?? '') === 'FG' && ($field['permName'] ?? '') === 'telegrammessageMedia') {
                         $options = $field['options'] ?? null;
                         $galleryId = $this->extractGalleryIdFromOptions($options);
                         if ($galleryId !== null) {
@@ -81,9 +80,11 @@ class TikiWikiClient
                         }
                     }
                 }
+            } else {
+                log_message("TikiWikiClient: GET trackers/{$trackerId}/fields sin clave 'fields'. Keys: " . implode(', ', array_keys($data)));
             }
         } else {
-            log_message("TikiWikiClient: Error HTTP {$httpCode} al obtener tracker {$trackerId}");
+            log_message("TikiWikiClient: Error HTTP {$httpCode} al obtener fields de tracker {$trackerId}");
         }
 
         return null;
@@ -147,9 +148,11 @@ class TikiWikiClient
         return null;
     }
 
+    // extractTrackerData eliminado — ahora usamos GET /api/trackers/{id}/fields directamente
+
     public function uploadFile(string $filePath, string $fileName, ?int $galleryId = null): ?string
     {
-        $galleryId ??= $this->getMediaGalleryId() ?? 29;
+        $galleryId ??= $this->getMediaGalleryId();
 
         $url = $this->apiUrl . "galleries/upload";
 
@@ -323,8 +326,8 @@ class TikiWikiClient
      */
     public function updateFgFieldOptions(int $trackerId, int $galleryId, string $excessBehavior = 'discard'): bool
     {
-        // Primero obtener la definición del tracker para encontrar el fieldId del FG
-        $url = $this->apiUrl . "trackers/{$trackerId}";
+        // Obtener fieldId del campo FG desde GET /api/trackers/{id}/fields
+        $url = $this->apiUrl . "trackers/{$trackerId}/fields";
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
@@ -340,14 +343,15 @@ class TikiWikiClient
         curl_close($ch);
 
         if ($httpCode !== 200) {
-            log_message("TikiWikiClient: Error HTTP {$httpCode} al obtener tracker {$trackerId}");
+            log_message("TikiWikiClient: Error HTTP {$httpCode} al obtener fields de tracker {$trackerId}");
             return false;
         }
 
         $data = json_decode($response, true);
+
         $fieldId = null;
-        if (isset($data['configuration']['fieldDefinitions'])) {
-            foreach ($data['configuration']['fieldDefinitions'] as $field) {
+        if (isset($data['fields'])) {
+            foreach ($data['fields'] as $field) {
                 if (($field['permName'] ?? '') === 'telegrammessageMedia') {
                     $fieldId = $field['fieldId'] ?? $field['id'] ?? null;
                     break;
@@ -400,25 +404,6 @@ class TikiWikiClient
     private function repairFgGallery(int $trackerId): ?int
     {
         $trackerName = 'Tracker ' . $trackerId;
-        // Intentar obtener el nombre del tracker desde la API
-        $url = $this->apiUrl . "trackers/$trackerId";
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Authorization: Bearer " . $this->token,
-            "User-Agent: Mozilla/5.0"
-        ]);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        if ($httpCode === 200) {
-            $data = json_decode($response, true);
-            if (!empty($data['name'])) {
-                $trackerName = $data['name'];
-            }
-        }
 
         // Crear galería
         $galleryId = $this->createGallery($trackerName . ' Media');

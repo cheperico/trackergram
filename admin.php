@@ -677,7 +677,7 @@ if (!checkAuth()) {
         </div>
         <div class="section-content">
             <p style="margin-bottom:12px;">Importar conversaciones desde archivos ZIP exportados de Telegram. Los archivos multimedia se subirán a la file gallery del tracker.</p>
-            <p style="font-size:0.85em;color:var(--text-secondary);margin-bottom:16px;">Límites: ZIP de hasta 50MB • Archivos multimedia individuales de hasta 20MB</p>
+            <p style="font-size:0.85em;color:var(--text-secondary);margin-bottom:16px;">Límites: ZIP de hasta <?php echo ini_get('upload_max_filesize'); ?> (<?php echo formatBytes(MAX_ZIP_UNCOMPRESSED_SIZE); ?> descomprimido) • Archivos multimedia individuales de hasta <?php echo formatBytes(MEDIA_DOWNLOAD_MAX_SIZE); ?></p>
             
             <form id="import-form-modern" enctype="multipart/form-data">
                 <input type="hidden" name="action" value="import">
@@ -812,7 +812,7 @@ if (!checkAuth()) {
             
             function processChunks(extractId, total, chatTitle, topicsFound) {
                 var offset = 0;
-                var batchSize = 100;
+                var batchSize = 50;
                 var accumulated = { imported: 0, skipped: 0, media_processed: 0, topics: topicsFound || 0 };
                 
                 function nextChunk() {
@@ -1046,7 +1046,7 @@ if (!checkAuth()) {
     <h2 id="tracker-importar">2. Importar conversaciones</h2>
     <div class="collapsible-content">
     <p>Importar conversaciones desde archivos ZIP exportados de Telegram. Los archivos (fotos, stickers, videos) se subirán a la file gallery del tracker.</p>
-    <p><small>Límites: ZIP de hasta 50MB | Archivos multimedia individuales de hasta 20MB</small></p>
+    <p><small>Límites: ZIP de hasta <?php echo ini_get('upload_max_filesize'); ?> (<?php echo formatBytes(MAX_ZIP_UNCOMPRESSED_SIZE); ?> descomprimido) • Archivos multimedia individuales de hasta <?php echo formatBytes(MEDIA_DOWNLOAD_MAX_SIZE); ?></small></p>
     
     <form id="import-form" enctype="multipart/form-data">
         <input type="hidden" name="action" value="import">
@@ -1068,47 +1068,126 @@ if (!checkAuth()) {
     function importExport() {
         var form = document.getElementById('import-form');
         var formData = new FormData(form);
+        formData.append('mode', 'extract');
         var resultDiv = document.getElementById('import-result');
+        var importBtn = form.querySelector('button');
         
-        resultDiv.textContent = 'Importando... Esto puede tomar varios minutos.';
-        resultDiv.className = '';
+        function showProgress(current, total, label) {
+            var pct = total > 0 ? Math.round((current / total) * 100) : 0;
+            resultDiv.innerHTML = '<div style="background:#f5f5f5;padding:10px;border-radius:4px;">' +
+                '<div style="margin-bottom:6px;">' + label + ' (' + current + ' / ' + total + ')</div>' +
+                '<div style="background:#ddd;border-radius:4px;height:20px;overflow:hidden;">' +
+                '<div style="background:#4caf50;height:100%;width:' + pct + '%;border-radius:4px;color:#fff;text-align:center;font-size:12px;line-height:20px;">' + pct + '%</div>' +
+                '</div></div>';
+        }
         
+        function setResult(text, isError) {
+            resultDiv.textContent = text;
+            resultDiv.className = isError ? 'import-error' : '';
+        }
+        
+        function processChunks(extractId, total, chatTitle, topicsFound) {
+            var offset = 0;
+            var batchSize = 50;
+            var accumulated = { imported: 0, skipped: 0, media_processed: 0, topics: topicsFound || 0 };
+            
+            function nextChunk() {
+                return new Promise(function(resolve, reject) {
+                    showProgress(offset, total, 'Importando mensajes');
+                    
+                    var data = new URLSearchParams();
+                    data.append('mode', 'process');
+                    data.append('extract_id', extractId);
+                    data.append('offset', offset);
+                    data.append('batch_size', batchSize);
+                    data.append('csrf_token', document.querySelector('#import-form [name=csrf_token]').value);
+                    
+                    fetch('import.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: data.toString()
+                    })
+                    .then(function(r) {
+                        if (!r.ok) {
+                            return r.text().then(function(text) {
+                                try { var err = JSON.parse(text); throw new Error(err.error || 'HTTP ' + r.status); }
+                                catch(e) { if (e.message !== text) throw e; throw new Error('HTTP ' + r.status + ': ' + text.substring(0,200)); }
+                            });
+                        }
+                        return r.text();
+                    })
+                    .then(function(text) {
+                        var result;
+                        try { result = JSON.parse(text); } catch(e) {
+                            throw new Error('Respuesta inv\u00e1lida en lote: ' + text.substring(0, 200));
+                        }
+                        if (result.error) throw new Error(result.error);
+                        
+                        accumulated.imported += result.imported || 0;
+                        accumulated.skipped += result.skipped || 0;
+                        accumulated.media_processed += result.media_processed || 0;
+                        offset = result.offset || offset;
+                        
+                        if (result.more) {
+                            setTimeout(function() { nextChunk().then(resolve).catch(reject); }, 100);
+                        } else {
+                            resolve(accumulated);
+                        }
+                    })
+                    .catch(reject);
+                });
+            }
+            
+            return nextChunk();
+        }
+        
+        importBtn.disabled = true;
+        importBtn.textContent = 'Importando...';
+        setResult('Extrayendo archivo ZIP...');
+        
+        // FASE 1: Extraer ZIP
         fetch('import.php', {
             method: 'POST',
             body: formData
         })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('HTTP ' + response.status);
+        .then(function(r) {
+            if (!r.ok) {
+                return r.text().then(function(text) {
+                    try { var err = JSON.parse(text); throw new Error(err.error || 'HTTP ' + r.status); }
+                    catch(e) { if (e.message !== text) throw e; throw new Error('HTTP ' + r.status + ': ' + text.substring(0,200)); }
+                });
             }
-            return response.text();
+            return r.text();
         })
-        .then(text => {
-            try {
-                return JSON.parse(text);
-            } catch (e) {
-                resultDiv.textContent = 'Respuesta no válida: ' + text.substring(0, 200);
-                resultDiv.className = 'import-error';
-                return null;
+        .then(function(text) {
+            var data;
+            try { data = JSON.parse(text); } catch(e) {
+                throw new Error('Respuesta inv\u00e1lida: ' + text.substring(0, 200));
             }
+            if (data.error) throw new Error(data.error);
+            if (data.status !== 'extracted') throw new Error('Respuesta inesperada');
+            
+            // FASE 2: Procesar por lotes
+            return processChunks(data.extract_id, data.total, data.chat_title, data.topics_found);
         })
-        .then(data => {
-            if (!data) return;
-            if (data.error) {
-                resultDiv.textContent = 'Error: ' + data.error;
-                resultDiv.className = 'import-error';
-            } else {
-                resultDiv.textContent = 'Importación completada:\n' +
-                    '- ' + data.imported + ' mensajes importados\n' +
-                    '- ' + data.skipped + ' errores\n' +
-                    '- ' + data.media_processed + ' archivos subidos\n' +
-                    '- ' + data.topics_found + ' topics encontrados';
-                resultDiv.className = 'import-success';
-            }
+        .then(function(result) {
+            resultDiv.innerHTML = '';
+            resultDiv.innerHTML = '<div style="background:#e8f5e9;padding:14px;border-radius:4px;color:#2e7d32;">' +
+                '<p style="margin:0 0 8px 0;font-weight:bold;">Importaci\u00f3n completada</p>' +
+                '<p style="margin:0;">Mensajes importados: ' + result.imported + '</p>' +
+                '<p style="margin:0;">Errores: ' + result.skipped + '</p>' +
+                '<p style="margin:0;">Archivos subidos: ' + result.media_processed + '</p>' +
+                '<p style="margin:0;">Topics encontrados: ' + result.topics + '</p></div>';
+            resultDiv.className = 'import-success';
         })
-        .catch(error => {
+        .catch(function(error) {
+            resultDiv.innerHTML = '';
             resultDiv.textContent = 'Error: ' + error.message;
             resultDiv.className = 'import-error';
+        })
+        .finally(function() {
+            importBtn.disabled = false;
+            importBtn.textContent = 'Importar';
         });
     }
     </script>

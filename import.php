@@ -140,9 +140,9 @@ function handleExtract(): void
         jsonError('El ZIP contiene demasiados archivos (máx. 20000)');
     }
 
-    if ($totalUncompressedSize > 500 * 1024 * 1024) {
+    if ($totalUncompressedSize > MAX_ZIP_UNCOMPRESSED_SIZE) {
         $zip->close(); rrmdir($tempDir);
-        jsonError('El tamaño total descomprimido excede el límite de 500 MB');
+        jsonError('El tamaño total descomprimido excede el límite de ' . formatBytes(MAX_ZIP_UNCOMPRESSED_SIZE));
     }
 
     foreach (range(0, $zip->numFiles - 1) as $i) {
@@ -249,8 +249,16 @@ function handleExtract(): void
     }
     file_put_contents($tempDir . '/fileindex.json', json_encode($fileIndex));
 
-    // Cachear gallery ID
+    // Resolver gallery ID y persistirlo en metadata para que handleProcess lo re-use
     $galleryId = $tikiWikiClient->getMediaGalleryId((int) $trackerId);
+    if ($galleryId !== null) {
+        $metadata = json_decode(file_get_contents($tempDir . '/metadata.json'), true);
+        $metadata['gallery_id'] = $galleryId;
+        file_put_contents($tempDir . '/metadata.json', json_encode($metadata));
+        log_message("trackerGram import: Gallery ID {$galleryId} persistido para tracker {$trackerId}");
+    } else {
+        log_message("trackerGram import: WARNING — No se pudo resolver galleryId para tracker {$trackerId}");
+    }
 
     log_message("trackerGram import: Extract OK — {$totalMessages} mensajes, " . count($fileIndex) . " archivos");
 
@@ -325,8 +333,11 @@ function handleProcess(): void
         $lineNum++;
     }
 
-    // Procesar batch
-    $galleryId = $tikiWikiClient->getMediaGalleryId((int) $trackerId) ?? 29;
+    // Procesar batch: usar galleryId de metadata (persistido desde extract) o resolver
+    $galleryId = $metadata['gallery_id'] ?? $tikiWikiClient->getMediaGalleryId((int) $trackerId);
+    if ($galleryId === null) {
+        log_message("trackerGram import: NO HAY galleryId para tracker {$trackerId} — no se subirán archivos");
+    }
     $imported = 0;
     $skipped = 0;
     $mediaProcessed = 0;
@@ -490,9 +501,9 @@ function handleFull(): void
         jsonError('El ZIP contiene demasiados archivos (máx. 20000)');
     }
 
-    if ($totalUncompressedSize > 500 * 1024 * 1024) {
+    if ($totalUncompressedSize > MAX_ZIP_UNCOMPRESSED_SIZE) {
         $zip->close(); rrmdir($tempDir);
-        jsonError('El tamaño total descomprimido excede el límite de 500 MB');
+        jsonError('El tamaño total descomprimido excede el límite de ' . formatBytes(MAX_ZIP_UNCOMPRESSED_SIZE));
     }
 
     foreach (range(0, $zip->numFiles - 1) as $i) {
@@ -546,7 +557,10 @@ function handleFull(): void
         }
     }
 
-    $galleryId = $tikiWikiClient->getMediaGalleryId((int) $trackerId) ?? 29;
+    $galleryId = $tikiWikiClient->getMediaGalleryId((int) $trackerId);
+    if ($galleryId === null) {
+        log_message("trackerGram import (full): NO HAY galleryId para tracker {$trackerId} — no se subirán archivos");
+    }
 
     $fileIndex = [];
     $dirIterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($tempDir));
