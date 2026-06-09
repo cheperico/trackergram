@@ -39,20 +39,20 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 | | |
 |---|---|
-| **Versión** | v0.2.1 |
+| **Versión** | v0.2.2 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
 
 ### Qué funciona
 
 - ✅ Webhook en tiempo real: mensajes de Telegram → TikiWiki
-- ✅ Importación de exports ZIP de Telegram
+- ✅ Importación de exports ZIP de Telegram (incluyendo batch con progreso)
 - ✅ Soporte multimedia: fotos, videos, audio, documentos, stickers, notas de voz
 - ✅ Topics (forums) de Telegram con resolución de nombres
 - ✅ Reacciones a mensajes
 - ✅ Service messages (creación de topics, miembros, pins, etc.)
 - ✅ Creación automática de trackers en TikiWiki
-- ✅ Panel de administración web
+- ✅ Panel de administración web (clásico + moderno con progress bar)
 - ✅ Deduplicación de mensajes
 - ✅ Seguridad: CSRF, rate limiting, hash de contraseñas, path traversal protection
 - ✅ Reacciones formateadas como texto legible (👍 3 · ❤️ 1)
@@ -61,12 +61,14 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 - ✅ Pretty Tracker template (PRETTY_TRACKER.md)
 - ✅ Vista wiki tipo feed con TRACKERLIST + template Smarty personalizado (burbujas de chat)
 - ✅ MediaUrl poblado automáticamente en webhook e import
-- ✅ Parseo robusto de galleryId desde options del campo FG (múltiples formatos API)
+- ✅ Parseo robusto de galleryId desde options del campo FG (múltiples formatos API + endpoint `/fields` correcto)
 - ✅ `fromExport()` usa display name completo como firstName (consistente con webhook)
 - ✅ `userId` extraído con regex (soporta prefijos user/chat/channel)
 - ✅ Soporte para múltiples archivos por item (comma-separated en campo FG)
 - ✅ Creación automática de file gallery al crear tracker + FG con count=0
 - ✅ `uploadedFileIds` como array en NormalizedMessage
+- ✅ Límites dinámicos mostrados en admin (`upload_max_filesize`, `MAX_ZIP_UNCOMPRESSED_SIZE`)
+- ✅ Timeout específico para upload (60s) vs API general (30s) via constantes de config
 
 ---
 
@@ -356,6 +358,7 @@ ALLOWED_CHAT_IDS=...
 
 - **No agregar lógica de negocio en `api.php`** — Es solo entry point. Toda la lógica va en `WebhookHandler`.
 - **No usar `curl` directamente** — Usar `TelegramClient` y `TikiWikiClient`.
+- **No usar `GET /api/trackers/{id}` para obtener field definitions** — Ese endpoint devuelve **items**, no campos. Usar `GET /api/trackers/{id}/fields`. Confirmado en código fuente de TikiWiki (`ApiBridge.php` route `action=list_items`).
 - **No crear variables globales** — Usar `static` dentro de funciones o pasar por parámetros.
 - **No requerir archivos individuales** — Siempre usar `require_once 'bootstrap.php'` (en trackerGram).
 - **No duplicar lógica de parsing entre webhook e import** — Ambos convergen en `MessageMapper::toWikiFields()` vía `NormalizedMessage`. Webhook usa `fromWebhook()`, import usa `fromExport()`.
@@ -391,6 +394,8 @@ ALLOWED_CHAT_IDS=...
 - [ ] **Mensajes estructurados con prefijos**: Detectar y parsear mensajes con prefijos especiales (ej: GPS, alertas)
 - [x] **Inyección de dependencias**: Refactorizar clases estáticas en instanciables ✅
 - [x] **Unificar parsers de mensajes**: Definir modelo intermedio único (NormalizedMessage) ✅
+- [x] **Gallery resolution via endpoint correcto**: Usar `/fields` en vez de `/trackers/{id}` ✅
+- [x] **Timeouts separados upload/api**: 60s upload, 30s api, configurados vía constantes ✅
 - [ ] **Estandarizar manejo de errores**: Excepciones de dominio
 
 ### Prioridad Media
@@ -418,6 +423,8 @@ Ver [CAMBIOS.md](CAMBIOS.md) para el detalle completo por versión.
 
 | Versión | Cambio principal |
 |---|---|---|
+| v0.2.2 | Fix galleryId endpoint `/trackers/{id}/fields` (no más fallback `?? 29`), timeouts separados upload (60s) / API (30s), admin con límites dinámicos, batch import size 50, ZIP logging, Wiki Feed template docs |
+| v0.2.1 | Vista wiki tipo feed con TRACKERLIST + template Smarty, multimedia HTML5 nativo, mediaUrl auto-populado |
 | v0.1.9 | Fix galería (parseo multi-formato de options FG), fix usuario import (firstName completo, userId por regex), uploadedFileIds como array, createTracker() con galería + count=0 |
 | v0.1.8 | Reactions formateadas, links clickeables en imports, messageDate tipo Date, log_message() siempre escribe, Pretty Tracker template |
 | v0.1.7 | `api.php` → entry point puro, `WebhookHandler` creado, `bootstrap.php`, seguridad ZIP |

@@ -1,5 +1,18 @@
 # Cambios - Changelog
 
+## v0.2.2
+- **Fix**: Gallery resolution usa endpoint correcto `GET /api/trackers/{id}/fields` en vez de `GET /api/trackers/{id}`.
+  - `getMediaGalleryId()` y `updateFgFieldOptions()` ahora consultan `/fields` que devuelve definiciones de campos (no items).
+  - Eliminado `extractTrackerData()` y fallback hardcodeado `?? 29`.
+  - `repairFgGallery()` simplificado sin HTTP call para tracker name.
+- **Fix**: `bootstrap.php` ahora lee `TIMEOUT_TIKIWIKI_UPLOAD` (60s) y `TIMEOUT_TIKIWIKI_API` (30s) desde config.php.
+- **Feat**: Admin panel muestra límites dinámicos desde PHP (`upload_max_filesize`, `MAX_ZIP_UNCOMPRESSED_SIZE`, `MEDIA_DOWNLOAD_MAX_SIZE`).
+- **Feat**: Import batch size configurado a 50 items por request.
+- **Feat**: Logging de ZIP entry inválido (`badEntry`) en import.php para debug de "rutas no válidas".
+- **Feat**: `config.php` agrega `MAX_ZIP_UNCOMPRESSED_SIZE` (500MB) y helper `formatBytes()`.
+- **Docs**: `TEMPLATE_FEED.md` — template y CSS para wiki feed tipo chat, con max=50 y sin border-radius.
+- **Chore**: Eliminado `check_file.php` (diagnóstico, no parte del proyecto).
+
 ## v0.2.1
 - **Feat**: Vista wiki tipo feed para tracker 22 — implementado con `{TRACKERLIST(tplwiki="plantillaTrackergram")}` más template Smarty personalizado con diseño tipo burbuja de chat.
 - **Feat**: Multimedia con HTML5 directo — imágenes ocupan 100% del ancho, videos y audios con reproductores `<video controls>` y `<audio controls>` nativos del browser.

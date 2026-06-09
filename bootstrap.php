@@ -14,8 +14,8 @@ require_once __DIR__ . '/WebhookHandler.php';
 $tikiWikiClient = new TikiWikiClient(
     apiUrl: TIKIWIKI_API_URL,
     token: TIKIWIKI_TOKEN,
-    timeout: 30,
-    uploadTimeout: 30
+    timeout: TIMEOUT_TIKIWIKI_API,
+    uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
 );
 
 $telegramClient = new TelegramClient(

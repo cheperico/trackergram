@@ -124,7 +124,6 @@ Wiki page que contiene el `{TRACKERLIST}` + CSS. Ejemplo: `ChatTelegram`.
 
 .tgram-bubble {
   background: #fff;
-  border-radius: 14px;
   padding: 12px 16px;
   margin: 8px 0;
   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
@@ -170,7 +169,6 @@ Wiki page que contiene el `{TRACKERLIST}` + CSS. Ejemplo: `ChatTelegram`.
   background: #e8f0fe;
   color: #1a73e8;
   padding: 1px 8px;
-  border-radius: 10px;
   font-size: 0.8em;
 }
 
@@ -190,26 +188,22 @@ Wiki page que contiene el `{TRACKERLIST}` + CSS. Ejemplo: `ChatTelegram`.
 
 .tgram-media {
   margin-top: 8px;
-  border-radius: 10px;
   overflow: hidden;
 }
 
 .tgram-media img {
   width: 100%;
-  border-radius: 10px;
   display: block;
 }
 
 .tgram-media video {
   width: 100%;
-  border-radius: 10px;
   display: block;
   background: #000;
 }
 
 .tgram-media audio {
   width: 100%;
-  border-radius: 8px;
   margin-top: 4px;
 }
 
@@ -225,7 +219,6 @@ Wiki page que contiene el `{TRACKERLIST}` + CSS. Ejemplo: `ChatTelegram`.
   color: #666;
   padding: 4px 8px;
   background: #f5f5f5;
-  border-radius: 6px;
   border-left: 3px solid #1a73e8;
 }
 
@@ -241,13 +234,11 @@ Wiki page que contiene el `{TRACKERLIST}` + CSS. Ejemplo: `ChatTelegram`.
   font-size: 0.9em;
   padding: 3px 10px;
   background: #f0f0f0;
-  border-radius: 14px;
   display: inline-block;
 }
 
 .tgram-location {
   margin-top: 6px;
-  border-radius: 10px;
   overflow: hidden;
 }
 
@@ -256,7 +247,6 @@ Wiki page que contiene el `{TRACKERLIST}` + CSS. Ejemplo: `ChatTelegram`.
   margin-top: 4px;
   padding: 6px 12px;
   background: #f5f5f5;
-  border-radius: 8px;
   text-decoration: none;
   color: #1a73e8;
   font-size: 0.9em;
@@ -271,7 +261,6 @@ Wiki page que contiene el `{TRACKERLIST}` + CSS. Ejemplo: `ChatTelegram`.
   padding: 4px 12px;
   margin: 0 2px;
   border: 1px solid #ddd;
-  border-radius: 6px;
   text-decoration: none;
   color: #1a73e8;
 }
@@ -287,7 +276,7 @@ Wiki page que contiene el `{TRACKERLIST}` + CSS. Ejemplo: `ChatTelegram`.
     trackerId="22",
     fields="171:172:173:174:175:176:177:178:179:180:181:182:183:184:185:186:187:188:189:190:191:192:193:194:195:196",
     sort_mode="f_176_desc",
-    max="100",
+    max="50",
     showpagination="y",
     status="opc",
     tplwiki="plantillaTrackergram"
