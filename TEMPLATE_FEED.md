@@ -39,9 +39,9 @@ Wiki page usada como `tplwiki` en el `{TRACKERLIST}`. Se aplica a **cada item** 
       {if $f_181 == 'photo' || $f_181 == 'sticker'}
         <a href="{$f_184}" target="_blank"><img src="{$f_184}" /></a>
       {elseif $f_181 == 'video' || $f_181 == 'video_note'}
-        <video src="{$f_184}" controls></video>
+        {ldelim}HTML(){rdelim}<video src="{$f_184}" controls></video>{ldelim}/HTML{rdelim}
       {elseif $f_181 == 'audio' || $f_181 == 'voice'}
-        <audio src="{$f_184}" controls></audio>
+        {ldelim}HTML(){rdelim}<audio src="{$f_184}" controls></audio>{ldelim}/HTML{rdelim}
       {else}
         <a href="{$f_184}" target="_blank" class="tgram-download">📎 {$f_186}</a>
       {/if}
