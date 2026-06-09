@@ -51,6 +51,7 @@ class WebhookHandler
 
     /**
      * Descargar archivo de Telegram y subir a TikiWiki
+     * Con límite real: usa WRITEFUNCTION para contar bytes y abortar si excede
      */
     public function downloadAndUploadMedia(NormalizedMessage $msg): ?string
     {
@@ -64,6 +65,7 @@ class WebhookHandler
             return null;
         }
 
+        // HEAD request previa para rechazar rápido archivos grandes conocidos
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $fileUrl);
         curl_setopt($ch, CURLOPT_NOBODY, true);
@@ -79,19 +81,54 @@ class WebhookHandler
         }
 
         $tempFile = tempnam(sys_get_temp_dir(), 'tg_media_');
+        $fp = fopen($tempFile, 'wb');
+        if (!$fp) {
+            log_message("trackerGram: Cannot create temp file for download");
+            return null;
+        }
+
+        $downloadedBytes = 0;
+        $maxSize = $this->maxDownloadSize;
+        $aborted = false;
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $fileUrl);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_FILE, fopen($tempFile, 'wb'));
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        // WRITEFUNCTION: controla bytes escritos y aborta si excede límite
+        curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($handle, $data) use ($fp, &$downloadedBytes, $maxSize, &$aborted) {
+            $len = strlen($data);
+            if ($downloadedBytes + $len > $maxSize) {
+                $aborted = true;
+                return 0; // aborta la transferencia
+            }
+            $written = fwrite($fp, $data);
+            if ($written !== false) {
+                $downloadedBytes += $written;
+            }
+            return $written === false ? 0 : $written;
+        });
         curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
+        fclose($fp);
 
-        if ($httpCode !== 200) {
-            log_message("trackerGram: Cannot download file from Telegram: {$msg->fileId} (HTTP $httpCode)");
+        // Verificar si se abortó por tamaño o por error HTTP
+        if ($aborted || $httpCode !== 200) {
             unlink($tempFile);
+            if ($aborted) {
+                log_message("trackerGram: File too large (>={$maxSize} bytes) for file_id: {$msg->fileId}");
+            } else {
+                log_message("trackerGram: Cannot download file from Telegram: {$msg->fileId} (HTTP $httpCode)");
+            }
+            return null;
+        }
+
+        // Verificación final: el archivo en disco no debe exceder el límite
+        $actualSize = filesize($tempFile);
+        if ($actualSize > $this->maxDownloadSize) {
+            unlink($tempFile);
+            log_message("trackerGram: Downloaded file too large ({$actualSize} bytes) for file_id: {$msg->fileId}");
             return null;
         }
 
@@ -187,6 +224,7 @@ class WebhookHandler
         $msg->username = $message['from']['username'] ?? '';
         $msg->firstName = $message['from']['first_name'] ?? '';
         $msg->lastName = $message['from']['last_name'] ?? '';
+        $msg->displayName = trim($msg->firstName . ' ' . $msg->lastName);
         $msg->date = (string) $message['date'];
 
 
@@ -267,6 +305,7 @@ class WebhookHandler
         $msg->username = $user['username'] ?? '';
         $msg->firstName = $firstName;
         $msg->lastName = $lastName;
+        $msg->displayName = trim($firstName . ' ' . $lastName);
         $msg->messageType = 'system';
         $msg->text = $text;
         $msg->date = (string) ($reaction['date'] ?? time());

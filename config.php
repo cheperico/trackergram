@@ -88,19 +88,32 @@ function log_message(string $message): void
     $timestamp = date('[Y-m-d H:i:s] ');
     $logLine = $timestamp . $message . PHP_EOL;
 
-    // Siempre al sistema
+    // Siempre al sistema (Apache error_log, stderr en CLI, syslog en Docker)
     error_log($logLine);
 
-    // Siempre al archivo (con rotación si supera 10MB)
+    // Intentar escribir en debug.log local (con rotación si supera 10MB)
     $logFile = __DIR__ . '/debug.log';
+    $rotated = false;
     if (file_exists($logFile) && filesize($logFile) > 10 * 1024 * 1024) {
-        $rotated = __DIR__ . '/debug.log.old';
-        @rename($logFile, $rotated);
+        $rotatedName = __DIR__ . '/debug.log.old';
+        if (@rename($logFile, $rotatedName)) {
+            $rotated = true;
+        }
+        // Si falla rename, truncamos el archivo (mejor que perder logs)
+        if (!$rotated) {
+            @file_put_contents($logFile, '');
+        }
     }
 
-    if (@file_put_contents($logFile, $logLine, FILE_APPEND | LOCK_EX) === false) {
+    $written = @file_put_contents($logFile, $logLine, FILE_APPEND | LOCK_EX);
+    if ($written === false) {
+        // Fallback 1: temp del sistema
         $tempLog = sys_get_temp_dir() . '/trackergram_debug.log';
-        @file_put_contents($tempLog, $logLine, FILE_APPEND | LOCK_EX);
+        $written = @file_put_contents($tempLog, $logLine, FILE_APPEND | LOCK_EX);
+    }
+    if ($written === false) {
+        // Fallback 2: último recurso, log al sistema con alerta
+        error_log("trackerGram CRITICAL: No se pudo escribir log en {$logFile} ni en temp");
     }
 }
 ?>

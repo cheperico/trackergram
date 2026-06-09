@@ -234,6 +234,23 @@ visibleInViewMode = y
 visibleInEditMode = y
 visibleInHistoryMode = y
 
+[FIELD26]
+name = display_name
+permName = telegrammessageDisplayName
+type = t
+isMain = n
+isSearchable = y
+isTblVisible = y
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
 [FIELD11]
 name = message_type
 permName = telegrammessageMessageType

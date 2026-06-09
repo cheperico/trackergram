@@ -324,9 +324,11 @@ class MessageMapper
 
         // En el export de Telegram, 'from' es un string con el display name completo
         // (no hay first_name/last_name separados ni username).
-        // Usamos el string completo como firstName para consistencia con webhook.
+        // firstName guarda el string original (dato crudo).
+        // displayName tiene el mismo valor (para mostrar unificado).
         $from = $message['from'] ?? $message['actor'] ?? '';
         $msg->firstName = $from;
+        $msg->displayName = $from;
         // lastName se deja vacío — el export no tiene este campo separado.
         // username se deja vacío — el export no tiene @handle.
 
@@ -432,6 +434,7 @@ class MessageMapper
             'fields[telegrammessageUsername]' => htmlspecialchars($msg->username, ENT_QUOTES, 'UTF-8'),
             'fields[telegrammessageFirstName]' => htmlspecialchars($msg->firstName, ENT_QUOTES, 'UTF-8'),
             'fields[telegrammessageLastName]' => htmlspecialchars($msg->lastName, ENT_QUOTES, 'UTF-8'),
+            'fields[telegrammessageDisplayName]' => htmlspecialchars($msg->displayName, ENT_QUOTES, 'UTF-8'),
             'fields[telegrammessageMessageType]' => $msg->messageType,
             'fields[telegrammessageText]' => htmlspecialchars($msg->text, ENT_QUOTES, 'UTF-8'),
             'fields[telegrammessageLocation]' => $msg->location,

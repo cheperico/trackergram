@@ -17,6 +17,8 @@ class NormalizedMessage
     public string $username = '';
     public string $firstName = '';
     public string $lastName = '';
+    /** Nombre de usuario para mostrar (webhook: firstName + lastName, import: display name original) */
+    public string $displayName = '';
     public string $messageType = 'text';
     public string $text = '';
     public string $location = '';

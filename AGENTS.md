@@ -39,7 +39,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 | | |
 |---|---|
-| **Versión** | v0.1.9 |
+| **Versión** | v0.2.0 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
 
@@ -214,6 +214,7 @@ El tracker por defecto tiene estos campos (permNames):
 | `telegrammessageUsername` | t (text) | Username |
 | `telegrammessageFirstName` | t (text) | Nombre |
 | `telegrammessageLastName` | t (text) | Apellido |
+| `telegrammessageDisplayName` | t (text) | Nombre para mostrar (unificado: webhook concatena firstName+lastName, import copia from original) |
 | `telegrammessageMessageType` | t (text) | Tipo: text, photo, video, etc. |
 | `telegrammessageText` | a (textarea) | Contenido del mensaje |
 | `telegrammessageLocation` | G (geolocation) | Coordenadas GPS (lon,lat,zoom) |

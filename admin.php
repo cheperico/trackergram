@@ -703,40 +703,169 @@ if (!checkAuth()) {
             function importExportModern() {
                 var form = document.getElementById('import-form-modern');
                 var formData = new FormData(form);
+                formData.append('mode', 'extract'); // modo chunked
                 var resultDiv = document.getElementById('import-result-modern');
+                var importBtn = form.querySelector('button');
                 
-                resultDiv.innerHTML = '<span style="color:var(--text-secondary);">⏳ Importando... Esto puede tomar varios minutos.</span>';
+                // Helper seguro: muestra texto plano
+                function setResult(text, isError) {
+                    resultDiv.innerHTML = '';
+                    if (isError) resultDiv.style.color = 'var(--error)';
+                    else resultDiv.style.color = '';
+                    resultDiv.textContent = text;
+                }
                 
+                // Helper: muestra progreso con barra
+                function showProgress(current, total, label) {
+                    var pct = total > 0 ? Math.round((current / total) * 100) : 0;
+                    resultDiv.innerHTML = '';
+                    
+                    var container = document.createElement('div');
+                    container.style.cssText = 'background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:16px;';
+                    
+                    var labelEl = document.createElement('div');
+                    labelEl.style.cssText = 'margin-bottom:8px;color:var(--text);';
+                    labelEl.textContent = label + ' (' + current + ' / ' + total + ')';
+                    container.appendChild(labelEl);
+                    
+                    var barOuter = document.createElement('div');
+                    barOuter.style.cssText = 'background:var(--border);border-radius:4px;height:20px;overflow:hidden;';
+                    
+                    var barInner = document.createElement('div');
+                    barInner.style.cssText = 'background:#4caf50;height:100%;width:' + pct + '%;transition:width 0.3s;border-radius:4px;';
+                    barInner.textContent = pct + '%';
+                    barInner.style.cssText += ';color:#fff;text-align:center;font-size:12px;line-height:20px;';
+                    barOuter.appendChild(barInner);
+                    
+                    container.appendChild(barOuter);
+                    resultDiv.appendChild(container);
+                }
+                
+                // Deshabilitar botón durante importación
+                importBtn.disabled = true;
+                importBtn.textContent = '⏳ Importando...';
+                
+                setResult('⏳ Extrayendo archivo ZIP...');
+                
+                // FASE 1: Extraer ZIP
                 fetch('import.php', {
                     method: 'POST',
                     body: formData
                 })
-                .then(response => {
-                    if (!response.ok) throw new Error('HTTP ' + response.status);
-                    return response.text();
-                })
-                .then(text => {
-                    try { return JSON.parse(text); }
-                    catch (e) {
-                        resultDiv.innerHTML = '<span style="color:var(--error);">❌ Respuesta no válida: ' + text.substring(0, 200) + '</span>';
-                        return null;
+                .then(function(r) {
+                    if (!r.ok) {
+                        return r.text().then(function(text) {
+                            try { var err = JSON.parse(text); throw new Error(err.error || 'HTTP ' + r.status); }
+                            catch(e) { if (e.message !== text) throw e; throw new Error('HTTP ' + r.status + ': ' + text.substring(0,200)); }
+                        });
                     }
+                    return r.text();
                 })
-                .then(data => {
-                    if (!data) return;
-                    if (data.error) {
-                        resultDiv.innerHTML = '<span style="color:var(--error);">❌ Error: ' + data.error + '</span>';
-                    } else {
-                        resultDiv.innerHTML = '<div style="background:#e8f5e9;padding:14px;border-radius:8px;color:#2e7d32;">✅ Importación completada:<br>' +
-                            '📨 ' + data.imported + ' mensajes importados<br>' +
-                            '⚠️ ' + data.skipped + ' errores<br>' +
-                            '📎 ' + data.media_processed + ' archivos subidos<br>' +
-                            '📂 ' + data.topics_found + ' topics encontrados</div>';
+                .then(function(text) {
+                    var data;
+                    try { data = JSON.parse(text); } catch(e) {
+                        throw new Error('Respuesta inválida: ' + text.substring(0, 200));
                     }
+                    if (data.error) throw new Error(data.error);
+                    if (data.status !== 'extracted') throw new Error('Respuesta inesperada');
+                    
+                    // FASE 2: Procesar por lotes
+                    return processChunks(data.extract_id, data.total, data.chat_title, data.topics_found);
                 })
-                .catch(error => {
-                    resultDiv.innerHTML = '<span style="color:var(--error);">❌ Error: ' + error.message + '</span>';
+                .then(function(result) {
+                    // Mostrar resultado final
+                    resultDiv.innerHTML = '';
+                    
+                    var div = document.createElement('div');
+                    div.style.cssText = 'background:#e8f5e9;padding:14px;border-radius:8px;color:#2e7d32;';
+                    
+                    var title = document.createElement('p');
+                    title.style.cssText = 'margin:0 0 8px 0;font-weight:bold;';
+                    title.textContent = '✅ Importación completada';
+                    div.appendChild(title);
+                    
+                    var lines = [
+                        '📨 ' + result.imported + ' mensajes importados',
+                        '⚠️ ' + result.skipped + ' errores',
+                        '📎 ' + result.media_processed + ' archivos subidos',
+                        '📂 ' + result.topics + ' topics encontrados'
+                    ];
+                    lines.forEach(function(line) {
+                        var p = document.createElement('p');
+                        p.style.cssText = 'margin:0;';
+                        p.textContent = line;
+                        div.appendChild(p);
+                    });
+                    
+                    resultDiv.appendChild(div);
+                })
+                .catch(function(error) {
+                    resultDiv.innerHTML = '';
+                    resultDiv.style.color = 'var(--error)';
+                    resultDiv.textContent = '❌ Error: ' + error.message;
+                })
+                .finally(function() {
+                    importBtn.disabled = false;
+                    importBtn.textContent = '📥 Importar';
                 });
+            }
+            
+            function processChunks(extractId, total, chatTitle, topicsFound) {
+                var offset = 0;
+                var batchSize = 100;
+                var accumulated = { imported: 0, skipped: 0, media_processed: 0, topics: topicsFound || 0 };
+                
+                function nextChunk() {
+                    return new Promise(function(resolve, reject) {
+                        showProgress(offset, total, '📨 Importando mensajes');
+                        
+                        var data = new URLSearchParams();
+                        data.append('mode', 'process');
+                        data.append('extract_id', extractId);
+                        data.append('offset', offset);
+                        data.append('batch_size', batchSize);
+                        data.append('csrf_token', document.querySelector('#import-form-modern [name=csrf_token]').value);
+                        
+                        fetch('import.php', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            body: data.toString()
+                        })
+                        .then(function(r) {
+                            if (!r.ok) {
+                                return r.text().then(function(text) {
+                                    try { var err = JSON.parse(text); throw new Error(err.error || 'HTTP ' + r.status); }
+                                    catch(e) { if (e.message !== text) throw e; throw new Error('HTTP ' + r.status + ': ' + text.substring(0,200)); }
+                                });
+                            }
+                            return r.text();
+                        })
+                        .then(function(text) {
+                            var result;
+                            try { result = JSON.parse(text); } catch(e) {
+                                throw new Error('Respuesta inválida en lote: ' + text.substring(0, 200));
+                            }
+                            if (result.error) throw new Error(result.error);
+                            
+                            // Acumular
+                            accumulated.imported += result.imported || 0;
+                            accumulated.skipped += result.skipped || 0;
+                            accumulated.media_processed += result.media_processed || 0;
+                            offset = result.offset || offset;
+                            
+                            if (result.more) {
+                                // Siguiente lote (con pequeño delay para no saturar)
+                                setTimeout(function() { nextChunk().then(resolve).catch(reject); }, 100);
+                            } else {
+                                // Terminado
+                                resolve(accumulated);
+                            }
+                        })
+                        .catch(reject);
+                    });
+                }
+                
+                return nextChunk();
             }
             </script>
         </div>

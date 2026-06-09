@@ -10,6 +10,8 @@ class TikiWikiClient
     private int $timeout;
     private int $uploadTimeout;
     private array $mediaGalleryIdCache = [];
+    /** Trackers where repairFgGallery was already attempted (prevents loops) */
+    private array $repairedTrackers = [];
 
     public function __construct(
         string $apiUrl,
@@ -50,14 +52,33 @@ class TikiWikiClient
             $data = json_decode($response, true);
             if (isset($data['configuration']['fieldDefinitions'])) {
                 foreach ($data['configuration']['fieldDefinitions'] as $field) {
-                    if (($field['name'] ?? '') === 'telegrammessageMedia' && ($field['type'] ?? '') === 'FG') {
-                        $galleryId = $this->extractGalleryIdFromOptions($field['options'] ?? null);
+                    // Buscar por name o por permName (algunas APIs devuelven solo uno)
+                    $fieldName = $field['name'] ?? $field['permName'] ?? '';
+                    if (($field['type'] ?? '') === 'FG' && ($fieldName === 'telegrammessageMedia' || $field['permName'] === 'telegrammessageMedia')) {
+                        $options = $field['options'] ?? null;
+                        $galleryId = $this->extractGalleryIdFromOptions($options);
                         if ($galleryId !== null) {
                             $this->mediaGalleryIdCache[$trackerId] = $galleryId;
                             log_message("TikiWikiClient: Gallery ID {$galleryId} resuelto para tracker {$trackerId}");
                             return $galleryId;
                         }
-                        log_message("TikiWikiClient: No se pudo extraer galleryId de options del campo FG en tracker {$trackerId}");
+                        // No se pudo extraer galleryId — loguear el options real para debug
+                        $optionsPreview = is_string($options) ? $options : (is_array($options) ? json_encode($options, JSON_UNESCAPED_UNICODE) : var_export($options, true));
+                        log_message("TikiWikiClient: No se pudo extraer galleryId de options del campo FG en tracker {$trackerId}. Raw options: " . substr($optionsPreview, 0, 500));
+                        
+                        // Auto-reparación: crear galería + actualizar FG field (solo una vez por tracker)
+                        if (!in_array($trackerId, $this->repairedTrackers, true)) {
+                            $this->repairedTrackers[] = $trackerId;
+                            log_message("TikiWikiClient: Intentando auto-reparar galería para tracker {$trackerId}");
+                            $newGalleryId = $this->repairFgGallery($trackerId);
+                            if ($newGalleryId !== null) {
+                                $this->mediaGalleryIdCache[$trackerId] = $newGalleryId;
+                                log_message("TikiWikiClient: Gallery ID {$newGalleryId} creado y asignado tras auto-reparación");
+                                return $newGalleryId;
+                            }
+                        } else {
+                            log_message("TikiWikiClient: Auto-reparación ya intentada para tracker {$trackerId} — no reintentar");
+                        }
                     }
                 }
             }
@@ -196,7 +217,7 @@ class TikiWikiClient
             "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         ]);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        // No FOLLOWLOCATION: evita leak del token si TikiWiki redirige a otro host
         curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
 
         $response = curl_exec($ch);
@@ -372,6 +393,50 @@ class TikiWikiClient
         return false;
     }
 
+    /**
+     * Reparar campo FG de un tracker: crea galería y actualiza options
+     * Se llama automáticamente cuando getMediaGalleryId() no encuentra galleryId
+     */
+    private function repairFgGallery(int $trackerId): ?int
+    {
+        $trackerName = 'Tracker ' . $trackerId;
+        // Intentar obtener el nombre del tracker desde la API
+        $url = $this->apiUrl . "trackers/$trackerId";
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Authorization: Bearer " . $this->token,
+            "User-Agent: Mozilla/5.0"
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($httpCode === 200) {
+            $data = json_decode($response, true);
+            if (!empty($data['name'])) {
+                $trackerName = $data['name'];
+            }
+        }
+
+        // Crear galería
+        $galleryId = $this->createGallery($trackerName . ' Media');
+        if ($galleryId === null) {
+            log_message("TikiWikiClient: repairFgGallery — no se pudo crear galería para tracker {$trackerId}");
+            return null;
+        }
+
+        // Actualizar el campo FG
+        if ($this->updateFgFieldOptions($trackerId, $galleryId)) {
+            log_message("TikiWikiClient: repairFgGallery — galería {$galleryId} asignada a tracker {$trackerId}");
+            return $galleryId;
+        }
+
+        log_message("TikiWikiClient: repairFgGallery — galería creada ({$galleryId}) pero no se pudo actualizar FG field");
+        return $galleryId; // retornar la galería igual, por si el update falla pero la galería existe
+    }
+
     public function createTracker(string $trackerName): ?int
     {
         $url = $this->apiUrl . "trackers";
@@ -406,6 +471,7 @@ class TikiWikiClient
                 ['name' => 'telegrammessageUsername', 'type' => 't', 'permName' => 'telegrammessageUsername'],
                 ['name' => 'telegrammessageFirstName', 'type' => 't', 'permName' => 'telegrammessageFirstName'],
                 ['name' => 'telegrammessageLastName', 'type' => 't', 'permName' => 'telegrammessageLastName'],
+                ['name' => 'telegrammessageDisplayName', 'type' => 't', 'permName' => 'telegrammessageDisplayName'],
                 ['name' => 'telegrammessageMessageType', 'type' => 't', 'permName' => 'telegrammessageMessageType'],
                 ['name' => 'telegrammessageText', 'type' => 'a', 'permName' => 'telegrammessageText'],
                 ['name' => 'telegrammessageLocation', 'type' => 'G', 'permName' => 'telegrammessageLocation'],

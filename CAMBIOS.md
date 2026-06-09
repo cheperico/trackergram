@@ -1,5 +1,18 @@
 # Cambios - Changelog
 
+## v0.2.0
+- **Feat**: Nuevo campo `telegrammessageDisplayName` — nombre para mostrar unificado entre webhook e import.
+  - Webhook: concatena `firstName + " " + lastName`
+  - Import: copia el `from` original del export
+  - `firstName`/`lastName` se conservan como datos crudos originales
+- **Fix**: Import — inicialización de `$filePath` para evitar "Undefined variable" cuando un mensaje no tiene media.
+- **Fix**: Seguridad P2 — XSS en admin moderno, DoS en webhook, límite 20MB real en descarga de media, token leak en redirects, validación de tamaño en import.
+- **Feat**: Import chunked — `import.php` ahora soporta `mode=extract` y `mode=process`. Admin moderno con barra de progreso y procesamiento por lotes de 100 mensajes.
+- **Fix**: `log_message()` mejorado con mejor manejo de errores de escritura y rotación.
+- **Chore**: `.htaccess` actualizado con límites para imports grandes (200M, 1024M, tiempo ilimitado).
+- **Chore**: Límites de import aumentados (20000 archivos, 500MB descomprimido).
+- **Docs**: README.md y AGENTS.md actualizados con el nuevo campo displayName.
+
 ## v0.1.9
 - **Fix**: Galería equivocada en import/webhook — `getMediaGalleryId()` ahora parsea todos los formatos de options que devuelve la API (array asociativo, array legacy, JSON string). Nueva `extractGalleryIdFromOptions()`.
 - **Fix**: WebhookHandler ahora pasa `trackerId` a `getMediaGalleryId()` en vez de depender del default del `.env`.
