@@ -63,12 +63,12 @@ class TikiWikiClient
                         }
                         // No se pudo extraer galleryId — loguear el options real para debug
                         $optionsPreview = is_string($options) ? $options : (is_array($options) ? json_encode($options, JSON_UNESCAPED_UNICODE) : var_export($options, true));
-                        log_message("TikiWikiClient: No se pudo extraer galleryId de options del campo FG en tracker {$trackerId}. Raw options: " . substr($optionsPreview, 0, 500));
+                        log_message("TikiWikiClient: No se pudo extraer galleryId de options del campo FG en tracker {$trackerId}. Raw options: " . substr($optionsPreview, 0, 500), true);
                         
                         // Auto-reparación: crear galería + actualizar FG field (solo una vez por tracker)
                         if (!in_array($trackerId, $this->repairedTrackers, true)) {
                             $this->repairedTrackers[] = $trackerId;
-                            log_message("TikiWikiClient: Intentando auto-reparar galería para tracker {$trackerId}");
+                            log_message("TikiWikiClient: Intentando auto-reparar galería para tracker {$trackerId}", true);
                             $newGalleryId = $this->repairFgGallery($trackerId);
                             if ($newGalleryId !== null) {
                                 $this->mediaGalleryIdCache[$trackerId] = $newGalleryId;
@@ -80,12 +80,12 @@ class TikiWikiClient
                         }
                     }
                 }
-            } else {
-                log_message("TikiWikiClient: GET trackers/{$trackerId}/fields sin clave 'fields'. Keys: " . implode(', ', array_keys($data)));
-            }
-        } else {
-            log_message("TikiWikiClient: Error HTTP {$httpCode} al obtener fields de tracker {$trackerId}");
+} else {
+            log_message("TikiWikiClient: GET trackers/{$trackerId}/fields sin clave 'fields'. Keys: " . implode(', ', array_keys($data)), true);
         }
+    } else {
+        log_message("TikiWikiClient: Error HTTP {$httpCode} al obtener fields de tracker {$trackerId}", true);
+    }
 
         return null;
     }
@@ -150,25 +150,32 @@ class TikiWikiClient
 
     // extractTrackerData eliminado — ahora usamos GET /api/trackers/{id}/fields directamente
 
-    public function uploadFile(string $filePath, string $fileName, ?int $galleryId = null): ?string
+    public function uploadFile(string $filePath, string $fileName, ?int $galleryId = null, string $source = 'webhook', string $caption = ''): ?string
     {
         $galleryId ??= $this->getMediaGalleryId();
 
         $url = $this->apiUrl . "galleries/upload";
 
         if (!file_exists($filePath)) {
-            log_message("TikiWikiClient: File not found for upload: $filePath");
+            log_message("TikiWikiClient: File not found for upload: $filePath", true);
             return null;
         }
 
         $mimeType = $this->getMimeType($filePath);
+
+        $description = 'Subido desde trackerGram ' . $source;
+        if ($caption !== '') {
+            $description .= ' | ' . $caption;
+        } else {
+            $description .= ' - ' . date('Y-m-d H:i:s');
+        }
 
         $postFields = [
             'galleryId' => $galleryId,
             'data' => curl_file_create($filePath, $mimeType, $fileName),
             'name' => $fileName,
             'title' => $fileName,
-            'description' => 'Subido desde trackerGram webhook - ' . date('Y-m-d H:i:s')
+            'description' => $description
         ];
 
         $ch = curl_init();
@@ -188,12 +195,12 @@ class TikiWikiClient
         curl_close($ch);
 
         if ($curlError) {
-            log_message("TikiWikiClient: cURL error en uploadFile: $curlError");
+            log_message("TikiWikiClient: cURL error en uploadFile: $curlError", true);
             return null;
         }
 
         if ($httpCode !== 200 && $httpCode !== 201) {
-            log_message("TikiWikiClient: uploadFile HTTP $httpCode - Response: " . substr($response, 0, 200));
+            log_message("TikiWikiClient: uploadFile HTTP $httpCode - Response: " . substr($response, 0, 200), true);
             return null;
         }
 
@@ -203,7 +210,7 @@ class TikiWikiClient
             return (string) $fileId;
         }
 
-        log_message("TikiWikiClient: uploadFile respuesta sin fileId - Response: " . substr($response, 0, 200));
+        log_message("TikiWikiClient: uploadFile respuesta sin fileId - Response: " . substr($response, 0, 200), true);
         return null;
     }
 
@@ -229,19 +236,19 @@ class TikiWikiClient
         curl_close($ch);
 
         if ($error) {
-            log_message("TikiWikiClient: cURL error al crear item: $error");
+            log_message("TikiWikiClient: cURL error al crear item: $error", true);
             return false;
         }
 
         if ($httpCode !== 200 && $httpCode !== 201) {
-            log_message("TikiWikiClient: HTTP $httpCode al crear item - Response: $response");
+            log_message("TikiWikiClient: HTTP $httpCode al crear item - Response: $response", true);
             return false;
         }
 
         $responseData = json_decode($response, true);
         if (!$responseData || !isset($responseData['itemId'])) {
             $clean = str_replace(["\r", "\n"], ' ', strip_tags(substr($response, 0, 300)));
-            log_message("TikiWikiClient: Respuesta inválida (Status $httpCode): $clean");
+            log_message("TikiWikiClient: Respuesta inválida (Status $httpCode): $clean", true);
             return false;
         }
 
@@ -316,7 +323,7 @@ class TikiWikiClient
             }
         }
 
-        log_message("TikiWikiClient: Error al crear galería '{$name}' (HTTP {$httpCode})");
+        log_message("TikiWikiClient: Error al crear galería '{$name}' (HTTP {$httpCode})", true);
         return null;
     }
 
@@ -343,7 +350,7 @@ class TikiWikiClient
         curl_close($ch);
 
         if ($httpCode !== 200) {
-            log_message("TikiWikiClient: Error HTTP {$httpCode} al obtener fields de tracker {$trackerId}");
+            log_message("TikiWikiClient: Error HTTP {$httpCode} al obtener fields de tracker {$trackerId}", true);
             return false;
         }
 
@@ -360,7 +367,7 @@ class TikiWikiClient
         }
 
         if ($fieldId === null) {
-            log_message("TikiWikiClient: No se encontró el campo telegrammessageMedia en tracker {$trackerId}");
+            log_message("TikiWikiClient: No se encontró el campo telegrammessageMedia en tracker {$trackerId}", true);
             return false;
         }
 
@@ -393,7 +400,7 @@ class TikiWikiClient
             return true;
         }
 
-        log_message("TikiWikiClient: Error HTTP {$httpCode} al actualizar FG field en tracker {$trackerId}");
+        log_message("TikiWikiClient: Error HTTP {$httpCode} al actualizar FG field en tracker {$trackerId}", true);
         return false;
     }
 
@@ -408,7 +415,7 @@ class TikiWikiClient
         // Crear galería
         $galleryId = $this->createGallery($trackerName . ' Media');
         if ($galleryId === null) {
-            log_message("TikiWikiClient: repairFgGallery — no se pudo crear galería para tracker {$trackerId}");
+            log_message("TikiWikiClient: repairFgGallery — no se pudo crear galería para tracker {$trackerId}", true);
             return null;
         }
 
@@ -418,7 +425,7 @@ class TikiWikiClient
             return $galleryId;
         }
 
-        log_message("TikiWikiClient: repairFgGallery — galería creada ({$galleryId}) pero no se pudo actualizar FG field");
+        log_message("TikiWikiClient: repairFgGallery — galería creada ({$galleryId}) pero no se pudo actualizar FG field", true);
         return $galleryId; // retornar la galería igual, por si el update falla pero la galería existe
     }
 

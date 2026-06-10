@@ -61,7 +61,7 @@ class WebhookHandler
 
         $fileUrl = $this->telegramClient->getFileUrl($msg->fileId);
         if (!$fileUrl) {
-            log_message("trackerGram: Cannot get download URL for file: {$msg->fileId}");
+            log_message("trackerGram: Cannot get download URL for file: {$msg->fileId}", true);
             return null;
         }
 
@@ -76,14 +76,14 @@ class WebhookHandler
         curl_close($ch);
 
         if ($contentLength > $this->maxDownloadSize) {
-            log_message("trackerGram: File too large ($contentLength bytes) for file_id: {$msg->fileId}");
+            log_message("trackerGram: File too large ($contentLength bytes) for file_id: {$msg->fileId}", true);
             return null;
         }
 
         $tempFile = tempnam(sys_get_temp_dir(), 'tg_media_');
         $fp = fopen($tempFile, 'wb');
         if (!$fp) {
-            log_message("trackerGram: Cannot create temp file for download");
+            log_message("trackerGram: Cannot create temp file for download", true);
             return null;
         }
 
@@ -117,9 +117,9 @@ class WebhookHandler
         if ($aborted || $httpCode !== 200) {
             unlink($tempFile);
             if ($aborted) {
-                log_message("trackerGram: File too large (>={$maxSize} bytes) for file_id: {$msg->fileId}");
+                log_message("trackerGram: File too large (>={$maxSize} bytes) for file_id: {$msg->fileId}", true);
             } else {
-                log_message("trackerGram: Cannot download file from Telegram: {$msg->fileId} (HTTP $httpCode)");
+                log_message("trackerGram: Cannot download file from Telegram: {$msg->fileId} (HTTP $httpCode)", true);
             }
             return null;
         }
@@ -128,18 +128,18 @@ class WebhookHandler
         $actualSize = filesize($tempFile);
         if ($actualSize > $this->maxDownloadSize) {
             unlink($tempFile);
-            log_message("trackerGram: Downloaded file too large ({$actualSize} bytes) for file_id: {$msg->fileId}");
+            log_message("trackerGram: Downloaded file too large ({$actualSize} bytes) for file_id: {$msg->fileId}", true);
             return null;
         }
 
         $galleryId = $this->tikiWikiClient->getMediaGalleryId($this->trackerId);
         if ($galleryId === null) {
-            log_message("trackerGram: NO HAY galleryId para tracker {$this->trackerId} — no se puede subir media");
+            log_message("trackerGram: NO HAY galleryId para tracker {$this->trackerId} — no se puede subir media", true);
             unlink($tempFile);
             return null;
         }
         $fileName = $msg->fileName ?? 'file_' . $msg->fileId;
-        $result = $this->tikiWikiClient->uploadFile($tempFile, $fileName, $galleryId);
+        $result = $this->tikiWikiClient->uploadFile($tempFile, $fileName, $galleryId, 'webhook', $msg->mediaCaption);
         unlink($tempFile);
 
         return $result;
@@ -171,7 +171,7 @@ class WebhookHandler
         $requiredFields = ['message_id', 'chat', 'from', 'date'];
         foreach ($requiredFields as $field) {
             if (!isset($message[$field])) {
-                log_message("ERROR: Campo requerido '$field' no encontrado en el mensaje");
+                log_message("ERROR: Campo requerido '$field' no encontrado en el mensaje", true);
                 return;
             }
         }
@@ -182,7 +182,7 @@ class WebhookHandler
             $value = $message;
             foreach ($keys as $key) {
                 if (!isset($value[$key])) {
-                    log_message("ERROR: Subcampo requerido '$fieldPath' no encontrado en el mensaje");
+                    log_message("ERROR: Subcampo requerido '$fieldPath' no encontrado en el mensaje", true);
                     return;
                 }
                 $value = $value[$key];
@@ -218,6 +218,9 @@ class WebhookHandler
 
         // Parsear mensaje via MessageMapper
         $msg = $this->messageMapper->fromWebhook($message);
+
+        // Propagar caption si es parte de un álbum (media_group_id)
+        $this->propagateMediaGroupCaption($msg, $message);
 
         // Completar contexto
         $msg->messageId = (string) $message['message_id'];
@@ -269,9 +272,9 @@ class WebhookHandler
 
         // Enviar a TikiWiki
         if (!$this->sendToTikiWikiWithRetries($msg)) {
-            log_message("ERROR: No se pudo enviar mensaje a TikiWiki después de {$this->retryMaxAttempts} intentos: message_id={$msg->messageId}");
+            log_message("ERROR: No se pudo enviar mensaje a TikiWiki después de {$this->retryMaxAttempts} intentos: message_id={$msg->messageId}", true);
         } elseif ($this->tikiWikiClient->messageExists($this->trackerId, $message['message_id'], $chatId) > 1) {
-            log_message("WARNING: duplicado detectado post-insert para message_id={$message['message_id']} — posible race condition");
+            log_message("WARNING: duplicado detectado post-insert para message_id={$message['message_id']} — posible race condition", true);
         }
 
         log_message("Mensaje procesado: Topic $topicId, User {$message['from']['first_name']}");
@@ -320,7 +323,7 @@ class WebhookHandler
         $msg->date = (string) ($reaction['date'] ?? time());
 
         if (!$this->sendToTikiWikiWithRetries($msg)) {
-            log_message("ERROR: No se pudo enviar reacción a TikiWiki: message_id={$originalMessageId}");
+            log_message("ERROR: No se pudo enviar reacción a TikiWiki: message_id={$originalMessageId}", true);
         }
     }
 
@@ -359,7 +362,7 @@ class WebhookHandler
         $msg->date = (string) ($reactionCount['date'] ?? time());
 
         if (!$this->sendToTikiWikiWithRetries($msg)) {
-            log_message("ERROR: No se pudo enviar conteo de reacciones a TikiWiki: message_id={$originalMessageId}");
+            log_message("ERROR: No se pudo enviar conteo de reacciones a TikiWiki: message_id={$originalMessageId}", true);
         }
     }
 
@@ -374,6 +377,71 @@ class WebhookHandler
             $this->processMessageReaction($update['message_reaction']);
         } elseif (isset($update['message_reaction_count'])) {
             $this->processMessageReactionCount($update['message_reaction_count']);
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    // Propagación de caption en álbumes
+    // ──────────────────────────────────────────────
+    // Cada foto se procesa INDIVIDUALMENTE (sin buffer).
+    // Guardamos el caption de la primera foto del álbum y lo propagamos
+    // a las siguientes. Cache auto-limpiante: entradas >60s se eliminan.
+
+    private function getMediaGroupCaptionFile(): string
+    {
+        return __DIR__ . '/media_group_captions.json';
+    }
+
+    private function loadMediaGroupCaptions(): array
+    {
+        $file = $this->getMediaGroupCaptionFile();
+        if (!file_exists($file)) return [];
+        $data = json_decode(file_get_contents($file), true);
+        return is_array($data) ? $data : [];
+    }
+
+    private function saveMediaGroupCaptions(array $captions): void
+    {
+        // Limpiar entradas con más de 60 segundos
+        $now = time();
+        foreach ($captions as $key => $entry) {
+            if (($now - $entry['time']) > 60) {
+                unset($captions[$key]);
+            }
+        }
+        file_put_contents($this->getMediaGroupCaptionFile(), json_encode($captions), LOCK_EX);
+    }
+
+    /**
+     * Propagar caption dentro de un álbum.
+     * Se llama desde processMessage() justo después de fromWebhook().
+     */
+    private function propagateMediaGroupCaption(NormalizedMessage $msg, array $message): void
+    {
+        if (!isset($message['media_group_id'])) return;
+
+        $chatId = $message['chat']['id'];
+        $groupId = $message['media_group_id'];
+        $key = $chatId . ':' . $groupId;
+        $currentCaption = $message['caption'] ?? '';
+
+        if ($currentCaption !== '') {
+            // Primer mensaje del álbum — guardar caption
+            $captions = $this->loadMediaGroupCaptions();
+            $captions[$key] = ['caption' => $currentCaption, 'time' => time()];
+            $this->saveMediaGroupCaptions($captions);
+        } else {
+            // Mensaje subsiguiente — propagar caption guardado
+            if ($msg->mediaCaption !== '') return; // ya tiene caption
+            $captions = $this->loadMediaGroupCaptions();
+            $saved = $captions[$key]['caption'] ?? '';
+            if ($saved !== '') {
+                $msg->mediaCaption = $saved;
+                // Actualizar text si es tipo "Foto:" sin caption
+                if ($msg->text !== '' && strpos($msg->text, ':') !== false && strpos($msg->text, $saved) === false) {
+                    $msg->text .= ' - ' . htmlspecialchars($saved);
+                }
+            }
         }
     }
 }

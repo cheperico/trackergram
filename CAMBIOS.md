@@ -1,5 +1,17 @@
 # Cambios - Changelog
 
+## v0.2.3
+- **Fix**: `log_message()` ahora respeta `DEBUG_MODE` — solo escribe a `debug.log` cuando `DEBUG_MODE=true` o se pasa `$force=true`. Sistema (`error_log()`) siempre escribe.
+- **Feat**: Nuevo parámetro `$force` en `log_message()` — errores críticos (auth, API, ZIP, filesize) pasan `$force=true` para siempre quedar registrados.
+- **Docs**: Documentación completa auditada y sincronizada con código actual:
+  - `roadmap.md`: versión actualizada a v0.2.2, items completados marcados, cobertura de service messages sincronizada
+  - `AGENTS.md`: `log_message()` behavior corregido, servidor prod actualizado, tabla de constantes expandida, roadmap referenciado a archivo externo
+  - `TECHNICAL.md`: referencias a métodos estáticos reemplazadas por instancias (DI ya implementada), deuda técnica actualizada
+  - `INSTALL.md`: guía post-instalación para wiki feed, límites reales de PHP incluidos, tabla de constantes internas
+  - `.env.example`: comentario mejorado para `ALLOWED_CHAT_IDS`
+  - `CAMBIOS.md`: entrada v0.2.3 agregada (este cambio)
+- **Chore**: Todos los archivos PHP revisados — llamadas críticas a `log_message()` ahora usan `$force=true`.
+
 ## v0.2.2
 - **Fix**: Gallery resolution usa endpoint correcto `GET /api/trackers/{id}/fields` en vez de `GET /api/trackers/{id}`.
   - `getMediaGalleryId()` y `updateFgFieldOptions()` ahora consultan `/fields` que devuelve definiciones de campos (no items).
@@ -10,7 +22,7 @@
 - **Feat**: Import batch size configurado a 50 items por request.
 - **Feat**: Logging de ZIP entry inválido (`badEntry`) en import.php para debug de "rutas no válidas".
 - **Feat**: `config.php` agrega `MAX_ZIP_UNCOMPRESSED_SIZE` (500MB) y helper `formatBytes()`.
-- **Docs**: `TEMPLATE_FEED.md` — template y CSS para wiki feed tipo chat, con max=50 y sin border-radius.
+- **Docs**: `opt/visualizacion-tiki.md` — unificación de investigación (Pretty Tracker) e implementación (template + CSS para wiki feed tipo chat).
 - **Chore**: Eliminado `check_file.php` (diagnóstico, no parte del proyecto).
 
 ## v0.2.1
@@ -20,7 +32,7 @@
   - WebhookHandler: construye URL `tiki-download_file.php?fileId=X` tras cada upload exitoso
   - Import (handleProcess y handleFull): mismo tratamiento con `media_url` en contexto
   - MessageMapper::fromExport(): toma `media_url` del contexto y lo pasa a `NormalizedMessage`
-- **Docs**: PRETTY_TRACKER.md actualizado — la solución TRACKERLIST + tplwiki está implementada y operativa.
+- **Docs**: `opt/visualizacion-tiki.md` — investigación Pretty Tracker + implementación TRACKERLIST + tplwiki.
 - **Chore**: Documentación de la sesión de diseño de template wiki en `reports/template-wiki-feed.md`
 
 ## v0.2.0

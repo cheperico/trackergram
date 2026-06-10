@@ -17,7 +17,7 @@ set_time_limit(0);
 session_start();
 
 function handleError($errno, $errstr, $errfile, $errline) {
-    log_message("import.php: ERROR $errno - $errstr in $errfile:$errline");
+    log_message("import.php: ERROR $errno - $errstr in $errfile:$errline", true);
     http_response_code(500);
     echo json_encode(['error' => "Error: $errstr"]);
     exit;
@@ -25,7 +25,7 @@ function handleError($errno, $errstr, $errfile, $errline) {
 set_error_handler('handleError');
 
 function handleException($exc) {
-    log_message("import.php: EXCEPTION " . $exc->getMessage() . " in " . $exc->getFile() . ":" . $exc->getLine());
+    log_message("import.php: EXCEPTION " . $exc->getMessage() . " in " . $exc->getFile() . ":" . $exc->getLine(), true);
     http_response_code(500);
     echo json_encode(['error' => "Exception: " . $exc->getMessage()]);
     exit;
@@ -37,7 +37,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 if (!isset($_SESSION['authenticated']) || $_SESSION['authenticated'] !== true) {
-    log_message("import.php: NO AUTENTICADO");
+    log_message("import.php: NO AUTENTICADO", true);
     http_response_code(403);
     echo json_encode(['error' => 'No autenticado']);
     exit;
@@ -133,7 +133,7 @@ function handleExtract(): void
     }
 
     if (!$safeExtract) {
-        log_message("trackerGram import: ZIP entry inválido: '{$badEntry}'");
+        log_message("trackerGram import: ZIP entry inválido: '{$badEntry}'", true);
         $zip->close(); rrmdir($tempDir);
         jsonError('El archivo ZIP contiene rutas no válidas');
     }
@@ -260,7 +260,7 @@ function handleExtract(): void
         file_put_contents($tempDir . '/metadata.json', json_encode($metadata));
         log_message("trackerGram import: Gallery ID {$galleryId} persistido para tracker {$trackerId}");
     } else {
-        log_message("trackerGram import: WARNING — No se pudo resolver galleryId para tracker {$trackerId}");
+        log_message("trackerGram import: WARNING — No se pudo resolver galleryId para tracker {$trackerId}", true);
     }
 
     log_message("trackerGram import: Extract OK — {$totalMessages} mensajes, " . count($fileIndex) . " archivos");
@@ -293,7 +293,7 @@ function handleProcess(): void
 
     $tempDir = sys_get_temp_dir() . '/' . $extractId;
     if (!is_dir($tempDir)) {
-        log_message("trackerGram import: Extract not found: {$extractId}");
+        log_message("trackerGram import: Extract not found: {$extractId}", true);
         jsonError('La sesión de importación expiró. Por favor, suba el archivo nuevamente.');
     }
 
@@ -339,7 +339,7 @@ function handleProcess(): void
     // Procesar batch: usar galleryId de metadata (persistido desde extract) o resolver
     $galleryId = $metadata['gallery_id'] ?? $tikiWikiClient->getMediaGalleryId((int) $trackerId);
     if ($galleryId === null) {
-        log_message("trackerGram import: NO HAY galleryId para tracker {$trackerId} — no se subirán archivos");
+        log_message("trackerGram import: NO HAY galleryId para tracker {$trackerId} — no se subirán archivos", true);
     }
     $imported = 0;
     $skipped = 0;
@@ -372,6 +372,47 @@ function handleProcess(): void
             $topicTitle = $topics[$replyTo];
         }
 
+        // --- Propagación de caption para álbumes/grupos de fotos ---
+        // En export JSON, cuando se mandan varias fotos con un texto,
+        // solo la PRIMERA foto tiene el caption. Propagar a las siguientes.
+        static $lastPhotoCaption = '';
+        static $lastPhotoSender = '';
+        static $lastPhotoTime = 0;
+
+        if (!empty($msg['photo'])) {
+            $hasOwnCaption = !empty($msg['photo_caption']) || !empty($msg['text']);
+            if (!$hasOwnCaption && $lastPhotoCaption !== '') {
+                $sameSender = ($msg['from_id'] ?? '') === $lastPhotoSender;
+                $timeDiff = abs(($msg['date_unixtime'] ?? 0) - $lastPhotoTime);
+                if ($sameSender && $timeDiff <= 1) {
+                    $msg['photo_caption'] = $lastPhotoCaption;
+                }
+            }
+            if ($hasOwnCaption) {
+                if ($msg['photo_caption']) {
+                    $lastPhotoCaption = $msg['photo_caption'];
+                } elseif (is_string($msg['text'])) {
+                    $lastPhotoCaption = $msg['text'];
+                } elseif (is_array($msg['text'])) {
+                    $parts = [];
+                    foreach ($msg['text'] as $entity) {
+                        if (isset($entity['text'])) {
+                            $parts[] = $entity['text'];
+                        }
+                    }
+                    $lastPhotoCaption = implode('', $parts);
+                } else {
+                    $lastPhotoCaption = '';
+                }
+                $lastPhotoSender = $msg['from_id'] ?? '';
+                $lastPhotoTime = $msg['date_unixtime'] ?? 0;
+            }
+        } else {
+            $lastPhotoCaption = '';
+            $lastPhotoSender = '';
+            $lastPhotoTime = 0;
+        }
+
         // Subir media si existe
         $uploadedFileIds = [];
         if ($msgType === 'message') {
@@ -389,13 +430,14 @@ function handleProcess(): void
             if ($filePath && file_exists($filePath)) {
                 $fileSize = @filesize($filePath);
                 if ($fileSize !== false && $fileSize <= MEDIA_DOWNLOAD_MAX_SIZE) {
-                    $fileId = $tikiWikiClient->uploadFile($filePath, $fileName, $galleryId);
+                    $caption = !empty($msg['photo']) ? ($msg['photo_caption'] ?? '') : ($msg['file_caption'] ?? ($msg['caption'] ?? ''));
+                    $fileId = $tikiWikiClient->uploadFile($filePath, $fileName, $galleryId, 'import', $caption);
                     if ($fileId) {
                         $uploadedFileIds[] = $fileId;
                         $mediaProcessed++;
                     }
                 } elseif ($fileSize !== false) {
-                    log_message("trackerGram import: SKIP file too large ({$fileSize} bytes): {$fileName}");
+                    log_message("trackerGram import: SKIP file too large ({$fileSize} bytes): {$fileName}", true);
                 }
             }
         }
@@ -503,7 +545,7 @@ function handleFull(): void
     }
 
     if (!$safeExtract) {
-        log_message("trackerGram import: ZIP entry inválido (full): '{$badEntry}'");
+        log_message("trackerGram import: ZIP entry inválido (full): '{$badEntry}'", true);
         $zip->close(); rrmdir($tempDir);
         jsonError('El archivo ZIP contiene rutas no válidas');
     }
@@ -571,7 +613,7 @@ function handleFull(): void
 
     $galleryId = $tikiWikiClient->getMediaGalleryId((int) $trackerId);
     if ($galleryId === null) {
-        log_message("trackerGram import (full): NO HAY galleryId para tracker {$trackerId} — no se subirán archivos");
+        log_message("trackerGram import (full): NO HAY galleryId para tracker {$trackerId} — no se subirán archivos", true);
     }
 
     $fileIndex = [];
@@ -607,6 +649,45 @@ function handleFull(): void
             $topicTitle = $topics[$replyTo];
         }
 
+        // --- Propagación de caption para álbumes/grupos de fotos ---
+        static $lastPhotoCaption = '';
+        static $lastPhotoSender = '';
+        static $lastPhotoTime = 0;
+
+        if (!empty($msg['photo'])) {
+            $hasOwnCaption = !empty($msg['photo_caption']) || !empty($msg['text']);
+            if (!$hasOwnCaption && $lastPhotoCaption !== '') {
+                $sameSender = ($msg['from_id'] ?? '') === $lastPhotoSender;
+                $timeDiff = abs(($msg['date_unixtime'] ?? 0) - $lastPhotoTime);
+                if ($sameSender && $timeDiff <= 1) {
+                    $msg['photo_caption'] = $lastPhotoCaption;
+                }
+            }
+            if ($hasOwnCaption) {
+                if ($msg['photo_caption']) {
+                    $lastPhotoCaption = $msg['photo_caption'];
+                } elseif (is_string($msg['text'])) {
+                    $lastPhotoCaption = $msg['text'];
+                } elseif (is_array($msg['text'])) {
+                    $parts = [];
+                    foreach ($msg['text'] as $entity) {
+                        if (isset($entity['text'])) {
+                            $parts[] = $entity['text'];
+                        }
+                    }
+                    $lastPhotoCaption = implode('', $parts);
+                } else {
+                    $lastPhotoCaption = '';
+                }
+                $lastPhotoSender = $msg['from_id'] ?? '';
+                $lastPhotoTime = $msg['date_unixtime'] ?? 0;
+            }
+        } else {
+            $lastPhotoCaption = '';
+            $lastPhotoSender = '';
+            $lastPhotoTime = 0;
+        }
+
         $uploadedFileIds = [];
 
         if ($msgType === 'message') {
@@ -623,13 +704,14 @@ function handleFull(): void
             if ($filePath && file_exists($filePath)) {
                 $fileSize = @filesize($filePath);
                 if ($fileSize !== false && $fileSize <= MEDIA_DOWNLOAD_MAX_SIZE) {
-                    $fileId = $tikiWikiClient->uploadFile($filePath, $fileName, $galleryId);
+                    $caption = !empty($msg['photo']) ? ($msg['photo_caption'] ?? '') : ($msg['file_caption'] ?? ($msg['caption'] ?? ''));
+                    $fileId = $tikiWikiClient->uploadFile($filePath, $fileName, $galleryId, 'import', $caption);
                     if ($fileId) {
                         $uploadedFileIds[] = $fileId;
                         $mediaProcessed++;
                     }
                 } elseif ($fileSize !== false) {
-                    log_message("trackerGram import: SKIP file too large ({$fileSize} bytes): {$fileName}");
+                    log_message("trackerGram import: SKIP file too large ({$fileSize} bytes): {$fileName}", true);
                 }
             }
         }
@@ -699,7 +781,7 @@ function findFileInTempFallback(string $tempDir, string $fileName): string {
 }
 
 function jsonError(string $message): void {
-    log_message("trackerGram import: ERROR — {$message}");
+    log_message("trackerGram import: ERROR — {$message}", true);
     http_response_code(400);
     echo json_encode(['error' => $message]);
     exit;

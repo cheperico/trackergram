@@ -87,11 +87,14 @@ ini_set('display_errors', 0);
 /**
  * Función de logging - única función de logging del proyecto
  * 
- * Siempre escribe a error_log() del sistema y al archivo debug.log.
- * DEBUG_MODE=true activa logs adicionales en los puntos que llaman a esta función.
+ * Siempre escribe a error_log() del sistema (stdout/stderr en Docker, Apache error_log).
+ * Escribe a debug.log solo si DEBUG_MODE=true o $force=true.
  * El archivo debug.log se rota automáticamente al superar 10MB.
+ * 
+ * @param string $message Mensaje a loguear
+ * @param bool $force Si true, escribe a debug.log aunque DEBUG_MODE=false (para errores críticos)
  */
-function log_message(string $message): void
+function log_message(string $message, bool $force = false): void
 {
     $timestamp = date('[Y-m-d H:i:s] ');
     $logLine = $timestamp . $message . PHP_EOL;
@@ -99,12 +102,17 @@ function log_message(string $message): void
     // Siempre al sistema (Apache error_log, stderr en CLI, syslog en Docker)
     error_log($logLine);
 
+    // Solo a debug.log si DEBUG_MODE o force
+    $debugMode = defined('DEBUG_MODE') && DEBUG_MODE;
+    if (!$debugMode && !$force) {
+        return;
+    }
+
     $logFile = __DIR__ . '/debug.log';
 
     // ── Verificar encoding del archivo existente ──
     // Si el archivo tiene BOM UTF-16 (FF FE o FE FF) está corrupto.
     // Lo respaldamos y empezamos de nuevo.
-    $fileOk = true;
     if (file_exists($logFile) && filesize($logFile) > 0) {
         $firstBytes = @file_get_contents($logFile, false, null, 0, 2);
         if ($firstBytes === "\xFF\xFE" || $firstBytes === "\xFE\xFF") {
@@ -112,7 +120,6 @@ function log_message(string $message): void
             if (@rename($logFile, $backup)) {
                 error_log("trackerGram: debug.log corrupto (BOM UTF-16) respaldado a " . basename($backup));
             } else {
-                // No se pudo renombrar — truncar
                 @file_put_contents($logFile, '');
             }
         }

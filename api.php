@@ -12,7 +12,7 @@ require_once 'bootstrap.php';
 // solo se ejecuta si api.php es el entry point directo
 if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty(TELEGRAM_WEBHOOK_SECRET)) {
-        log_message("trackerGram: TELEGRAM_WEBHOOK_SECRET no configurado — rechazando webhook");
+        log_message("trackerGram: TELEGRAM_WEBHOOK_SECRET no configurado — rechazando webhook", true);
         http_response_code(500);
         die(json_encode(['error' => 'Webhook secret no configurado']));
     }
@@ -59,7 +59,7 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
     $update = json_decode($input, true);
 
     if (!$update) {
-        log_message("trackerGram: JSON inválido en webhook");
+        log_message("trackerGram: JSON inválido en webhook", true);
         http_response_code(400);
         die(json_encode(['error' => 'Invalid JSON']));
     }

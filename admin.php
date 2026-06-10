@@ -265,6 +265,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
 // Verificar autenticación antes de procesar cualquier acción
 if (!checkAuth()) {
     // Mostrar login y terminar
+    $loginFailed = $_SERVER['REQUEST_METHOD'] === 'POST';
     ?>
     <!DOCTYPE html>
     <html>
@@ -273,8 +274,8 @@ if (!checkAuth()) {
     </head>
     <body>
         <h1>trackerGram - Login</h1>
-        <?php if (isset($loginError)): ?>
-            <p style="color: red;"><?php echo htmlspecialchars($loginError); ?></p>
+        <?php if ($loginFailed): ?>
+            <p style="color: red;">Usuario o contraseña incorrectos</p>
         <?php endif; ?>
         <form method="post">
             <label>Usuario:</label><br>
@@ -413,29 +414,6 @@ if (isset($_GET['ui'])) {
     setcookie('tg_ui', $uiMode, time() + 365 * 86400, '/', '', !empty($_SERVER['HTTPS']), true);
 }
 
-// Mostrar login si no está autenticado
-if (!checkAuth()) {
-    ?>
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>trackerGram - Login</title>
-    </head>
-    <body>
-        <h1>trackerGram - Login</h1>
-        <?php if ($_SERVER['REQUEST_METHOD'] === 'POST'): ?>
-            <p style="color: red;">Usuario o contraseña incorrectos</p>
-        <?php endif; ?>
-        <form method="post">
-            <label>Usuario: <input type="text" name="login_username" required></label><br><br>
-            <label>Contraseña: <input type="password" name="login_password" required></label><br><br>
-            <button type="submit">Iniciar sesión</button>
-        </form>
-    </body>
-    </html>
-    <?php
-    exit;
-}
 ?>
 <!DOCTYPE html>
 <html>

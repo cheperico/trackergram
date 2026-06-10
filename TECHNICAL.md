@@ -49,8 +49,8 @@ if (!hash_equals(TELEGRAM_WEBHOOK_SECRET, $secretToken)) {
 // Rate limiting
 // ...
 
-// Delegar en WebhookHandler
-WebhookHandler::processUpdate($update);
+// Delegar en WebhookHandler (inyectado en bootstrap.php)
+$webhookHandler->processUpdate($update);
 ```
 
 **Por qué está así**: `api.php` no tiene lógica de negocio. Solo valida que la petición venga de Telegram (secret token), limita la cantidad de peticiones (rate limiting), y delega en `WebhookHandler`. Esto se hizo en la refactorización v0.1.7 — antes, `api.php` tenía cientos de líneas de lógica mezclada.
@@ -91,13 +91,13 @@ Pero esto es solo el caso más simple. Un mensaje puede tener:
 
 ### Cómo detectamos el tipo de mensaje
 
-La clase `MessageMapper` tiene un método `fromWebhook()` que recibe el array del mensaje y devuelve información estructurada:
+La clase `MessageMapper` tiene un método `fromWebhook()` que recibe el array del mensaje y devuelve un objeto `NormalizedMessage`:
 
 ```php
-$info = MessageMapper::fromWebhook($message);
-// $info['type'] = 'photo', 'video', 'text', 'system', etc.
-// $info['file_id'] = el ID del archivo en Telegram
-// $info['text'] = texto descriptivo
+$normalized = $messageMapper->fromWebhook($message);
+// $normalized->messageType = 'photo', 'video', 'text', 'system', etc.
+// $normalized->fileId = el ID del archivo en Telegram
+// $normalized->text = texto descriptivo
 ```
 
 El enfoque es simple: chequear cada campo posible en orden de prioridad. Si tiene `photo`, es una foto. Si tiene `video`, es un video. Si no tiene ninguno de los campos conocidos, es "otro".
@@ -116,7 +116,7 @@ Los campos del tracker tienen "permanent names" — identificadores únicos que 
 
 ### El mapeo de campos
 
-`MessageMapper::toWikiFields()` toma los datos estructurados y los convierte al formato que TikiWiki espera:
+`$messageMapper->toWikiFields()` toma un `NormalizedMessage` y lo convierte al formato que TikiWiki espera:
 
 ```php
 $fields = [
@@ -131,7 +131,7 @@ $fields = [
 
 ### El cliente de TikiWiki
 
-`TikiWikiClient::createTrackerItem()` hace el POST a la API:
+`$tikiWikiClient->createTrackerItem()` hace el POST a la API (o `createTrackerItemWithMedia()` si incluye archivos multimedia):
 
 ```php
 $url = TIKIWIKI_API_URL . "trackers/$trackerId/items";
@@ -234,7 +234,7 @@ Telegram puede enviar el mismo webhook dos veces. Si no verificamos, terminamos 
 Antes de crear un item, verificamos si ya existe:
 
 ```php
-if (TikiWikiClient::messageExists(TIKIWIKI_TRACKER_ID, $message['message_id'], $chatId) > 0) {
+if ($tikiWikiClient->messageExists(TIKIWIKI_TRACKER_ID, $message['message_id'], $chatId) > 0) {
     return; // Ya existe, saltar
 }
 ```
@@ -250,8 +250,8 @@ Incluso con verificación previa, puede haber race conditions: dos webhooks del 
 **Solución**: Verificación post-insert:
 
 ```php
-if (TikiWikiClient::messageExists(...) > 1) {
-    error_log("WARNING: duplicado detectado post-insert — posible race condition");
+if ($tikiWikiClient->messageExists(...) > 1) {
+    log_message("WARNING: duplicado detectado post-insert — posible race condition", true);
 }
 ```
 
@@ -269,7 +269,7 @@ La API de TikiWiki puede fallar temporalmente (timeout, error 500, etc.). No que
 
 ```php
 for ($i = 0; $i < RETRY_MAX_ATTEMPTS; $i++) {
-    if (TikiWikiClient::createTrackerItem(...)) {
+    if ($tikiWikiClient->createTrackerItem(...)) {
         return true;
     }
     usleep(RETRY_DELAY_MICROSECONDS); // 0.1 segundos
@@ -365,18 +365,21 @@ bootstrap.php
     ├── MessageMapper.php   → transformación de datos
     └── WebhookHandler.php  → orquesta todo
 
-api.php → bootstrap.php → WebhookHandler::processUpdate()
-admin.php → bootstrap.php → TikiWikiClient::createTracker()
-import.php → bootstrap.php → MessageMapper::toWikiFields() + TikiWikiClient
+api.php → bootstrap.php → $webhookHandler->processUpdate()
+admin.php → bootstrap.php → $tikiWikiClient->createTracker()
+import.php → bootstrap.php → $messageMapper->toWikiFields() + $tikiWikiClient
 ```
 
-### Deuda técnica identificada
+### Deuda técnica (actual — v0.2.2)
 
-1. **Clases estáticas**: `TikiWikiClient`, `TelegramClient`, `WebhookHandler` usan métodos estáticos. No hay inyección de dependencias, lo que dificulta el testing unitario.
-2. **Parsers separados**: `WebhookHandler::extractMessageData()` e `import.php` tienen lógica similar pero separada. Deberían converger en un modelo intermedio único.
-3. **Manejo de errores inconsistente**: Algunas funciones retornan `null`, otras `false`, otras usan `die()`. Deberían usar excepciones de dominio.
+Items **ya resueltos** en versiones recientes:
+- ✅ **Inyección de dependencias**: `TikiWikiClient`, `TelegramClient`, `WebhookHandler` y `MessageMapper` son instanciables con dependencias inyectadas por constructor. Ver `bootstrap.php` para el wiring.
+- ✅ **Modelo intermedio único**: `NormalizedMessage` es el modelo único entre ambos parsers. Webhook usa `fromWebhook()`, import usa `fromExport()`, ambos convergen en `toWikiFields()`.
 
-Estas mejoras están en el roadmap como prioridad alta.
+Items aún pendientes:
+- ⬜ **Manejo de errores inconsistente**: Algunas funciones retornan `null`, otras `false`, otras usan `die()`. Pendiente migrar a excepciones de dominio (ver roadmap).
+- ⬜ **Tests unitarios**: Las clases son instanciables y testeables, pero faltan los tests.
+- ⬜ **PSR-4 autoloading**: Sin autoloader, todo se incluye con `require_once`.
 
 ---
 
@@ -475,10 +478,10 @@ tail -f debug.log
 
 ### Lo que haríamos diferente
 
-1. **Inyección de dependencias desde el inicio**: Las clases estáticas fueron rápidas pero ahora dificultan el testing.
-2. **Tests unitarios desde el principio**: Muchos bugs se hubieran detectado automáticamente.
-3. **Un modelo intermedio único para mensajes**: Evitaría tener parsers separados para webhook e import.
-4. **Excepciones de dominio**: En vez de mezclar `null`, `false` y `die()`, usar excepciones tipadas.
+1. ✅ ~~Inyección de dependencias desde el inicio~~ — **Ya implementado** (v0.2.0)
+2. ⬜ **Tests unitarios desde el principio**: Muchos bugs se hubieran detectado automáticamente.
+3. ✅ ~~Un modelo intermedio único para mensajes~~ — **Ya implementado** (NormalizedMessage, v0.1.9)
+4. ⬜ **Excepciones de dominio**: En vez de mezclar `null`, `false` y `die()`, usar excepciones tipadas.
 
 ---
 

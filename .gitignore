@@ -26,5 +26,5 @@ import_temp/
 # Reportes externos (no subir a GitHub)
 reports/
 
-# Archivos locales con tokens/bots
-telegram_bots.md
+# Configuración específica de instancia (no subir a GitHub)
+opt/

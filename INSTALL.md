@@ -47,16 +47,17 @@ php -m | grep -E "(curl|json|mbstring|zip)"
    cp .env.example .env
    ```
 3. Editá `.env` con tus credenciales:
-   ```env
-   TELEGRAM_BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
-   TELEGRAM_WEBHOOK_SECRET=un_token_secreto_aleatorio_de_32_caracteres
-   TIKIWIKI_API_URL=https://wiki.ejemplo.com/api/
-   TIKIWIKI_TOKEN=tu_token_de_tikiwiki
-   TIKIWIKI_TRACKER_ID=1
-   ADMIN_USERNAME=admin
-   ADMIN_PASSWORD=una_contraseña_segura
-   DEBUG_MODE=false
-   ```
+    ```env
+    TELEGRAM_BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
+    TELEGRAM_WEBHOOK_SECRET=un_token_secreto_aleatorio_de_32_caracteres
+    TIKIWIKI_API_URL=https://wiki.ejemplo.com/api/
+    TIKIWIKI_TOKEN=tu_token_de_tikiwiki
+    TIKIWIKI_TRACKER_ID=1
+    ADMIN_USERNAME=admin
+    ADMIN_PASSWORD=una_contraseña_segura
+    DEBUG_MODE=false
+    ALLOWED_CHAT_IDS=-100123456789,-100987654321
+    ```
 4. Configurá los permisos:
    ```bash
    sudo chown -R www-data:www-data /ruta/a/trackergram
@@ -140,11 +141,24 @@ Si tu firewall bloquea IPs no conocidas, necesitás permitir las subredes de Tel
 ### php.ini recomendado
 
 ```ini
-upload_max_filesize = 10M
-post_max_size = 10M
-max_execution_time = 30
-memory_limit = 256M
+upload_max_filesize = 200M
+post_max_size = 200M
+max_execution_time = 300
+memory_limit = 512M
 ```
+
+> **Nota**: Los valores dependen del uso. Para importar exports ZIP grandes (≥500MB) se necesita `max_execution_time` alto y suficiente memoria. El archivo `.htaccess` incluido ya configura estos límites para los endpoints HTTP.
+
+### Límites internos de trackerGram
+
+Estos límites se definen como constantes en `config.php`:
+
+| Constante | Valor | Descripción |
+|---|---|---|
+| `MEDIA_DOWNLOAD_MAX_SIZE` | 20 MB | Máximo tamaño de archivo multimedia que se descarga de Telegram |
+| `MAX_ZIP_UNCOMPRESSED_SIZE` | 500 MB | Máximo tamaño total descomprimido de un ZIP importado |
+| `TIMEOUT_TIKIWIKI_UPLOAD` | 60 s | Timeout para subir archivos a TikiWiki |
+| `TIMEOUT_TIKIWIKI_API` | 30 s | Timeout general para llamadas a la API de TikiWiki |
 
 ---
 
@@ -174,7 +188,28 @@ sudo chown -R www-data:www-data /ruta/a/trackergram
 
 ---
 
-## Solución de Problemas
+---
+
+## Paso 6 (Opcional): Configurar la Vista Wiki Feed
+
+trackerGram incluye una plantilla Smarty para mostrar los mensajes del tracker como un feed tipo chat en una página wiki de TikiWiki.
+
+1. Creá dos páginas wiki en TikiWiki:
+   - `plantillaTrackergram` — contiene el template Smarty por-item
+   - `ChatTelegram` (o el nombre que quieras) — página principal con el `{TRACKERLIST}` + CSS
+
+2. Copiá el contenido de `opt/visualizacion-tiki.md` según la sección que corresponda (investigación e implementación están separadas).
+
+3. Asegurate de que los plugins necesarios estén habilitados en TikiWiki:
+   - `wikiplugin_html` (habilitado + aprobado)
+   - `wikiplugin_mediaplayer` (para audio/video)
+   - `wikiplugin_trackerlist` (normalmente activo por defecto)
+
+4. Ajustá el `trackerId="22"` en el `{TRACKERLIST}` al ID real de tu tracker.
+
+Ver [opt/visualizacion-tiki.md](opt/visualizacion-tiki.md) para la documentación completa y código de las plantillas.
+
+---
 
 | Problema | Qué hacer |
 |---|---|

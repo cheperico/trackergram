@@ -39,7 +39,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 | | |
 |---|---|
-| **Versión** | v0.2.2 |
+| **Versión** | v0.2.3 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
 
@@ -54,11 +54,19 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 - ✅ Creación automática de trackers en TikiWiki
 - ✅ Panel de administración web (clásico + moderno con progress bar)
 - ✅ Deduplicación de mensajes
-- ✅ Seguridad: CSRF, rate limiting, hash de contraseñas, path traversal protection
+- ✅ Seguridad: CSRF, rate limiting, hash de contraseñas, path traversal protection, XSS fix (innerHTML→textContent), DoS protection, 20MB real download limit, token leak fix
 - ✅ Reacciones formateadas como texto legible (👍 3 · ❤️ 1)
+- ✅ Álbumes/grupos de medios (mediaGroup) en webhook
+- ✅ Auto-reparación de galería (repairFgGallery)
+- ✅ Webhook Secret obligatorio (rechaza 500 si vacío)
+- ✅ Cache de topics por chatId:threadId
+- ✅ Cache de gallery ID por tracker ($mediaGalleryIdCache[$trackerId])
+- ✅ Import chunked (extract + process con NDJSON, barra de progreso)
+- ✅ displayName unificado entre webhook e import
+- ✅ change_password funcional (fuera de checkAuth, sin duplicados)
 - ✅ Links clickeables en text_entities (importación de exports)
-- ✅ log_message() siempre escribe a debug.log con rotación automática
-- ✅ Pretty Tracker template (PRETTY_TRACKER.md)
+- ✅ log_message() respeta DEBUG_MODE: debug.log solo si DEBUG_MODE=true o $force=true (error crítico). Sistema (error_log) siempre.
+- ✅ Pretty Tracker template (opt/visualizacion-tiki.md)
 - ✅ Vista wiki tipo feed con TRACKERLIST + template Smarty personalizado (burbujas de chat)
 - ✅ MediaUrl poblado automáticamente en webhook e import
 - ✅ Parseo robusto de galleryId desde options del campo FG (múltiples formatos API + endpoint `/fields` correcto)
@@ -146,7 +154,7 @@ Todos los archivos en la raíz. No hay subdirectorios de código.
 | `.env.example` | Plantilla de variables de entorno |
 | `.htaccess` | Apache: seguridad, rewrite, límites PHP |
 | `topic_names.json` | Cache local de nombres de topics (auto-generado) |
-| `debug.log` | Logs de debug (rotación automática a 10MB, siempre escribe) |
+| `debug.log` | Logs de debug (rotación automática a 10MB, escribe solo si DEBUG_MODE=true o error crítico con $force=true) |
 
 #### Documentación
 
@@ -158,7 +166,8 @@ Todos los archivos en la raíz. No hay subdirectorios de código.
 | `AGENTS.md` | **Este archivo** — contexto para agentes de IA |
 | `roadmap.md` | Pendientes, prioridades, bugs conocidos |
 | `CAMBIOS.md` | Historial de cambios por versión |
-| `PRETTY_TRACKER.md` | Guía de instalación y template para Pretty Tracker en TikiWiki |
+| `opt/visualizacion-tiki.md` | Feed tipo chat en TikiWiki (investigación + template Smarty) — específico de wiki.chela.org.ar |
+| `opt/telegram_bots.md` | Tokens de bots de Telegram — **NO versionar** (archivo local) |
 
 ### Orden recomendado de lectura del código
 
@@ -303,24 +312,28 @@ ALLOWED_CHAT_IDS=...
 ### Constantes definidas en config.php
 
 | Constante | Valor |
-|---|---|
+|---|---|---|
 | `TELEGRAM_BOT_TOKEN` | del .env |
 | `TELEGRAM_API_URL` | `https://api.telegram.org/bot{token}/` |
 | `TELEGRAM_WEBHOOK_SECRET` | del .env |
 | `TIKIWIKI_API_URL` | del .env |
 | `TIKIWIKI_TOKEN` | del .env |
-| `TIKIWIKI_TRACKER_ID` | del .env (default 12) |
+| `TIKIWIKI_TRACKER_ID` | del .env (default 1) |
 | `TIMEOUT_TIKIWIKI_API` | 30 segundos |
+| `TIMEOUT_TIKIWIKI_UPLOAD` | 60 segundos |
 | `TIMEOUT_TELEGRAM_API` | 5 segundos |
+| `TIMEOUT_TELEGRAM_DOWNLOAD` | 10 segundos |
 | `MEDIA_DOWNLOAD_MAX_SIZE` | 20 MB |
+| `MAX_ZIP_UNCOMPRESSED_SIZE` | 500 MB |
 | `RETRY_MAX_ATTEMPTS` | 2 |
 | `RETRY_DELAY_MICROSECONDS` | 100000 (0.1s) |
+| `CACHE_ENABLED` | true |
 
 ### Servidores conocidos
 
 | Servicio | URL |
 |---|---|
-| trackerGram webhook | https://trackergram.chelachela.duckdns.org |
+| trackerGram webhook (prod) | https://trackergram2.cheps.chela.org.ar/api.php |
 | TikiWiki API | https://wiki.chela.org.ar/api/ |
 | TikiWiki (web) | https://wiki.chela.org.ar |
 
@@ -388,30 +401,7 @@ ALLOWED_CHAT_IDS=...
 
 ## 10. Roadmap
 
-### Prioridad Alta
-
-- [ ] **Mini App para reportes estructurados**: Interfaz web dentro de Telegram para crear items con texto + fotos + audio + ubicación en un solo envío
-- [ ] **Mensajes estructurados con prefijos**: Detectar y parsear mensajes con prefijos especiales (ej: GPS, alertas)
-- [x] **Inyección de dependencias**: Refactorizar clases estáticas en instanciables ✅
-- [x] **Unificar parsers de mensajes**: Definir modelo intermedio único (NormalizedMessage) ✅
-- [x] **Gallery resolution via endpoint correcto**: Usar `/fields` en vez de `/trackers/{id}` ✅
-- [x] **Timeouts separados upload/api**: 60s upload, 30s api, configurados vía constantes ✅
-- [ ] **Estandarizar manejo de errores**: Excepciones de dominio
-
-### Prioridad Media
-
-- [ ] Sistema de etiquetas (hashtags)
-- [ ] Mensajes editados/borrados
-- [ ] Importación asíncrona para exports grandes
-- [ ] Múltiples chats con trackers separados
-- [ ] Tests unitarios
-- [ ] PSR-4 autoloading
-
-### Service Messages pendientes
-
-- [ ] `new_chat_photo` / `delete_chat_photo` en importación
-- [ ] `remove_members` en webhook
-- [ ] `joined` en webhook
+Ver [roadmap.md](roadmap.md) para el **roadmap unificado** (consolidado de reports + roadmap anterior). Prioridades reales ordenadas por fase.
 
 ---
 
@@ -423,7 +413,7 @@ Ver [CAMBIOS.md](CAMBIOS.md) para el detalle completo por versión.
 
 | Versión | Cambio principal |
 |---|---|---|
-| v0.2.2 | Fix galleryId endpoint `/trackers/{id}/fields` (no más fallback `?? 29`), timeouts separados upload (60s) / API (30s), admin con límites dinámicos, batch import size 50, ZIP logging, Wiki Feed template docs |
+| v0.2.3 | log_message() ahora respeta DEBUG_MODE (debug.log solo cuando DEBUG_MODE=true o $force=true en errores críticos), documentación completa auditada y sincronizada |
 | v0.2.1 | Vista wiki tipo feed con TRACKERLIST + template Smarty, multimedia HTML5 nativo, mediaUrl auto-populado |
 | v0.1.9 | Fix galería (parseo multi-formato de options FG), fix usuario import (firstName completo, userId por regex), uploadedFileIds como array, createTracker() con galería + count=0 |
 | v0.1.8 | Reactions formateadas, links clickeables en imports, messageDate tipo Date, log_message() siempre escribe, Pretty Tracker template |
