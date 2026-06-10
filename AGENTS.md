@@ -428,6 +428,42 @@ Ver [CAMBIOS.md](CAMBIOS.md) para el detalle completo por versión.
 
 ---
 
+## 12. Flujo de Git y Versionado
+
+### Ramas y Tags
+
+| Nombre | Tipo | Propósito |
+|--------|------|-----------|
+| `main` | branch | Desarrollo activo de nuevas features |
+| `qpch` | tag | **Versión estable en producción**. No se mueve. |
+| `qpch-vX.Y.Z` | tag | Hotfixes sobre qpch (ej: `qpch-v0.3.1`) |
+
+### Cómo trabajar
+
+**Para desarrollo de features nuevas:**
+```bash
+git checkout main
+# ... desarrollar, commit, push ...
+```
+
+**Para arreglar un bug en producción (qpch):**
+```bash
+git checkout qpch                 # snapshot del código de producción
+git checkout -b fix/qpch-algo     # branch temporal para el fix
+# ... arreglar, commit ...
+git tag -a qpch-v0.3.1 -m "descripción"
+git push origin qpch-v0.3.1
+# Opcional: mergear el fix también a main
+```
+
+**Reglas:**
+- `qpch` es un tag, no se modifica ni se borra
+- Los hotfixes van con tag `qpch-vX.Y.Z` incremental
+- `main` es donde se hace todo el desarrollo nuevo
+- No hay branches `develop`, `staging`, etc. — simpleza sobre complejidad
+
+---
+
 ## Mantenimiento de Este Archivo
 
 Actualizar cuando:
