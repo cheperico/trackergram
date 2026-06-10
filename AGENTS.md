@@ -435,7 +435,7 @@ Ver [CAMBIOS.md](CAMBIOS.md) para el detalle completo por versión.
 | Nombre | Tipo | Propósito |
 |--------|------|-----------|
 | `main` | branch | Desarrollo activo de nuevas features |
-| `qpch` | tag | **Versión estable en producción**. No se mueve. |
+| `qpch` | tag | **Versión estable en producción** para el grupo "Qué pasa cheLA?" (qpch). Hace lo que necesita ese grupo: importar historial + webhook en vivo + multimedia + reacciones. No requiere más features, solo mantenimiento de bugs. No se mueve. |
 | `qpch-vX.Y.Z` | tag | Hotfixes sobre qpch (ej: `qpch-v0.3.1`) |
 
 ### Cómo trabajar
