@@ -80,7 +80,7 @@ class WebhookHandler
             return null;
         }
 
-        $tempFile = tempnam(sys_get_temp_dir(), 'tg_media_');
+        $tempFile = tempnam(TEMP_DIR, 'tg_media_');
         $fp = fopen($tempFile, 'wb');
         if (!$fp) {
             log_message("trackerGram: Cannot create temp file for download", true);
@@ -371,6 +371,12 @@ class WebhookHandler
      */
     public function processUpdate(array $update): void
     {
+        // Detectar si el bot fue agregado a un chat no autorizado (my_chat_member)
+        if (isset($update['my_chat_member'])) {
+            $this->processMyChatMember($update['my_chat_member']);
+            return;
+        }
+
         if (isset($update['message'])) {
             $this->processMessage($update['message']);
         } elseif (isset($update['message_reaction'])) {
@@ -378,6 +384,44 @@ class WebhookHandler
         } elseif (isset($update['message_reaction_count'])) {
             $this->processMessageReactionCount($update['message_reaction_count']);
         }
+    }
+
+    /**
+     * Procesar update my_chat_member — detecta cuando el bot es agregado/removido de un chat.
+     * Si el chat no está en ALLOWED_CHAT_IDS, el bot abandona el chat automáticamente.
+     */
+    public function processMyChatMember(array $myChatMember): void
+    {
+        $chat = $myChatMember['chat'] ?? [];
+        $chatId = $chat['id'] ?? 0;
+        $chatTitle = $chat['title'] ?? $chat['username'] ?? 'Chat ' . $chatId;
+        $chatType = $chat['type'] ?? 'unknown';
+        $from = $myChatMember['from'] ?? [];
+        $fromName = $from['first_name'] ?? ($from['username'] ?? 'desconocido');
+        $fromId = $from['id'] ?? 0;
+        $newStatus = $myChatMember['new_chat_member']['status'] ?? 'unknown';
+        $oldStatus = $myChatMember['old_chat_member']['status'] ?? 'unknown';
+
+        log_message("trackerGram: my_chat_member — chat={$chatId} ({$chatTitle}), de {$oldStatus} → {$newStatus}, por {$fromName} (id={$fromId})");
+
+        // Solo nos interesa cuando el bot es agregado a un chat (status → member/administrator)
+        $isBeingAdded = in_array($newStatus, ['member', 'administrator'])
+            && in_array($oldStatus, ['left', 'kicked', 'restricted']);
+
+        if (!$isBeingAdded) {
+            return;
+        }
+
+        // Verificar si el chat está autorizado
+        $allowed = defined('ALLOWED_CHAT_IDS') ? ALLOWED_CHAT_IDS : [];
+        if (!empty($allowed) && in_array($chatId, $allowed)) {
+            log_message("trackerGram: Bot agregado a chat AUTORIZADO: {$chatTitle} ({$chatId})");
+            return;
+        }
+
+        // Chat no autorizado — salir y loguear
+        log_message("trackerGram: ⚠️ Bot agregado a chat NO AUTORIZADO: {$chatTitle} ({$chatId}, {$chatType}) por {$fromName} (id={$fromId})", true);
+        $this->telegramClient->leaveChat($chatId);
     }
 
     // ──────────────────────────────────────────────

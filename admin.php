@@ -57,7 +57,7 @@ function checkRateLimit() {
     $maxAttempts = 5;
     $lockoutTime = 15 * 60;
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-    $rateFile = sys_get_temp_dir() . '/tg_admin_rate_' . md5($ip);
+    $rateFile = TEMP_DIR . '/tg_admin_rate_' . md5($ip);
     
     $data = ['attempts' => 0, 'first_attempt' => time()];
     if (file_exists($rateFile)) {
@@ -80,7 +80,7 @@ function checkRateLimit() {
 
 function incrementFailedLogin() {
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-    $rateFile = sys_get_temp_dir() . '/tg_admin_rate_' . md5($ip);
+    $rateFile = TEMP_DIR . '/tg_admin_rate_' . md5($ip);
     $data = ['attempts' => 0, 'first_attempt' => time()];
     if (file_exists($rateFile)) {
         $content = @file_get_contents($rateFile);
@@ -94,7 +94,7 @@ function incrementFailedLogin() {
 
 function resetFailedLogin() {
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-    $rateFile = sys_get_temp_dir() . '/tg_admin_rate_' . md5($ip);
+    $rateFile = TEMP_DIR . '/tg_admin_rate_' . md5($ip);
     $data = ['attempts' => 0, 'first_attempt' => time()];
     @file_put_contents($rateFile, json_encode($data));
 }
@@ -396,6 +396,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
+// Health check (AJAX)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'health_check') {
+    validateCSRFToken($_POST['csrf_token'] ?? '');
+    header('Content-Type: application/json');
+
+    $target = $_POST['target'] ?? '';
+    if ($target === 'telegram') {
+        $result = $telegramClient->testConnection();
+    } elseif ($target === 'tikiwiki') {
+        $result = $tikiWikiClient->testConnection();
+    } else {
+        $result = ['ok' => false, 'message' => 'Target inválido'];
+    }
+
+    echo json_encode($result);
+    exit;
+}
+
 // Cargar configuración actual
 $env = loadEnvFromFile();
 $config = [
@@ -575,6 +593,9 @@ if (isset($_GET['ui'])) {
         </a>
         <a href="#section-tracker" style="text-decoration:none;color:inherit;">
             <div class="card"><div class="card-icon">➕</div><div class="card-title">Tracker</div><div class="card-desc">Crear tracker nuevo</div></div>
+        </a>
+        <a href="#section-health" style="text-decoration:none;color:inherit;">
+            <div class="card"><div class="card-icon">🩺</div><div class="card-title">Diagnóstico</div><div class="card-desc">Probar conexiones</div></div>
         </a>
     </div>
 
@@ -886,6 +907,24 @@ if (isset($_GET['ui'])) {
                 <?php endif; ?>
             </div>
             
+            <?php if (ASYNC_PROCESSING): ?>
+                <?php
+                $bufferDir = TEMP_DIR . '/buffer';
+                $pendingCount = is_dir($bufferDir) ? count(glob($bufferDir . '/event_*.json')) : 0;
+                $doneCount = is_dir($bufferDir) ? count(glob($bufferDir . '/event_*.json.done')) : 0;
+                ?>
+                <div style="background:var(--bg);padding:12px 16px;border-radius:8px;margin-bottom:12px;border:1px solid var(--border);">
+                    <div style="font-weight:500;margin-bottom:4px;">⏳ Buffer Async</div>
+                    <div style="font-size:0.9em;color:var(--text-secondary);">
+                        <?php echo $pendingCount; ?> eventos pendientes
+                        · <?php echo $doneCount; ?> procesados (última hora)
+                        · <span style="color:<?php echo $pendingCount > 0 ? 'var(--error)' : '#2e7d32'; ?>">
+                            <?php echo $pendingCount > 0 ? '⚠️ Worker atrasado' : '✅ Al día'; ?>
+                        </span>
+                    </div>
+                </div>
+            <?php endif; ?>
+            
             <form method="post">
                 <input type="hidden" name="action" value="update_webhook">
                 <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
@@ -916,6 +955,75 @@ if (isset($_GET['ui'])) {
             </form>
             
             <div class="hint" style="margin-top:8px;">El tracker creado puede usarse como tracker en directo o para importar mensajes.</div>
+        </div>
+    </div>
+
+    <!-- 5. Diagnóstico / Health Check -->
+    <div class="section" id="section-health">
+        <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            🩺 Diagnóstico <span class="arrow">▼</span>
+        </div>
+        <div class="section-content">
+            <p style="margin-bottom:16px;">
+                Probá la conectividad con Telegram y TikiWiki para verificar que las credenciales funcionan correctamente.
+            </p>
+            
+            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+                <button type="button" class="btn btn-primary" onclick="healthCheck('telegram')" id="btn-health-telegram">
+                    🤖 Probar Telegram
+                </button>
+                <button type="button" class="btn btn-primary" onclick="healthCheck('tikiwiki')" id="btn-health-tikiwiki">
+                    🌐 Probar TikiWiki
+                </button>
+            </div>
+            
+            <div id="health-result"></div>
+            
+            <script>
+            function healthCheck(target) {
+                var btn = document.getElementById('btn-health-' + target);
+                var resultDiv = document.getElementById('health-result');
+                
+                btn.disabled = true;
+                btn.textContent = '⏳ Probando...';
+                resultDiv.textContent = '';
+                
+                var data = new URLSearchParams();
+                data.append('action', 'health_check');
+                data.append('target', target);
+                data.append('csrf_token', '<?php echo generateCSRFToken(); ?>');
+                
+                fetch('admin.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: data.toString()
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(result) {
+                    if (result.ok) {
+                        resultDiv.innerHTML = '<div class="alert alert-success"><span class="alert-icon">✅</span> ' + 
+                            escapeHtml(result.message) + '</div>';
+                    } else {
+                        resultDiv.innerHTML = '<div class="alert alert-error"><span class="alert-icon">❌</span> ' + 
+                            escapeHtml(result.message) + '</div>';
+                    }
+                })
+                .catch(function(err) {
+                    resultDiv.innerHTML = '<div class="alert alert-error"><span class="alert-icon">❌</span> Error de red: ' + 
+                        escapeHtml(err.message) + '</div>';
+                })
+                .finally(function() {
+                    btn.disabled = false;
+                    btn.textContent = target === 'telegram' ? '🤖 Probar Telegram' : '🌐 Probar TikiWiki';
+                });
+            }
+            
+            function escapeHtml(str) {
+                var div = document.createElement('div');
+                div.textContent = str;
+                return div.innerHTML;
+            }
+            </script>
         </div>
     </div>
 

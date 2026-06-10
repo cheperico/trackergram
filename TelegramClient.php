@@ -105,6 +105,82 @@ class TelegramClient
         return null;
     }
 
+    /**
+     * Probar conexión con la API de Telegram (getMe)
+     * @return array{ok: bool, message: string}
+     */
+    public function testConnection(): array
+    {
+        $url = $this->baseUrl . '/bot' . $this->botToken . '/getMe';
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlError) {
+            return ['ok' => false, 'message' => "Error de red: {$curlError}"];
+        }
+
+        if ($httpCode !== 200) {
+            return ['ok' => false, 'message' => "HTTP {$httpCode} — la API de Telegram no respondió correctamente"];
+        }
+
+        $data = json_decode($response, true);
+        if (!$data || !isset($data['ok']) || !$data['ok']) {
+            $desc = $data['description'] ?? 'respuesta inválida';
+            return ['ok' => false, 'message' => "Telegram rechazó la conexión: {$desc}"];
+        }
+
+        $botName = $data['result']['username'] ?? 'desconocido';
+        return ['ok' => true, 'message' => "Conectado como @{$botName}"];
+    }
+
+    /**
+     * Hacer que el bot abandone un chat (grupo, supergrupo, canal)
+     * @param int $chatId ID del chat a abandonar
+     * @return bool True si el bot salió exitosamente
+     */
+    public function leaveChat(int $chatId): bool
+    {
+        $url = $this->baseUrl . '/bot' . $this->botToken . '/leaveChat';
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query(['chat_id' => $chatId]));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200) {
+            log_message("trackerGram: leaveChat({$chatId}) falló — HTTP {$httpCode}", true);
+            return false;
+        }
+
+        $data = json_decode($response, true);
+        $ok = isset($data['ok']) && $data['ok'] === true;
+
+        if ($ok) {
+            log_message("trackerGram: Bot salió del chat {$chatId} exitosamente");
+        } else {
+            $desc = $data['description'] ?? 'sin descripción';
+            log_message("trackerGram: leaveChat({$chatId}) rechazado por Telegram: {$desc}", true);
+        }
+
+        return $ok;
+    }
+
     public function getTopicNameFromMessage(array $message, int $chatId): string
     {
         if (($message['type'] ?? '') === 'service' && ($message['action'] ?? '') === 'topic_created') {

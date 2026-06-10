@@ -106,7 +106,7 @@ function handleExtract(): void
         jsonError('El archivo debe ser un ZIP');
     }
 
-    $tempDir = sys_get_temp_dir() . '/trackergram_import_' . time();
+    $tempDir = TEMP_DIR . '/trackergram_import_' . time();
     if (!mkdir($tempDir, 0777, true)) {
         jsonError('No se pudo crear directorio temporal');
     }
@@ -291,7 +291,7 @@ function handleProcess(): void
         jsonError('ID de extracción inválido');
     }
 
-    $tempDir = sys_get_temp_dir() . '/' . $extractId;
+    $tempDir = TEMP_DIR . '/' . $extractId;
     if (!is_dir($tempDir)) {
         log_message("trackerGram import: Extract not found: {$extractId}", true);
         jsonError('La sesión de importación expiró. Por favor, suba el archivo nuevamente.');
@@ -518,7 +518,7 @@ function handleFull(): void
         jsonError('El archivo debe ser un ZIP');
     }
 
-    $tempDir = sys_get_temp_dir() . '/trackergram_import_' . time();
+    $tempDir = TEMP_DIR . '/trackergram_import_' . time();
     if (!mkdir($tempDir, 0777, true)) {
         jsonError('No se pudo crear directorio temporal');
     }

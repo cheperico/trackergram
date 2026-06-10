@@ -27,7 +27,7 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
 
     // 2. Rate limiting ANTES de parsear JSON (previene DoS con parsing pesado)
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-    $rateFile = sys_get_temp_dir() . '/tg_rate_' . md5($ip);
+    $rateFile = TEMP_DIR . '/tg_rate_' . md5($ip);
     $window = 60;
     $maxRequests = 30;
     $now = time();
@@ -64,6 +64,22 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
         die(json_encode(['error' => 'Invalid JSON']));
     }
 
-    $webhookHandler->processUpdate($update);
-    echo json_encode(['status' => 'ok']);
+    if (ASYNC_PROCESSING) {
+        // Modo async: escribir a buffer y responder rápido
+        $bufferDir = TEMP_DIR . '/buffer';
+        if (!is_dir($bufferDir)) {
+            @mkdir($bufferDir, 0700, true);
+        }
+        $bufferFile = $bufferDir . '/event_' . time() . '_' . bin2hex(random_bytes(4)) . '.json';
+        $written = @file_put_contents($bufferFile, $input, LOCK_EX);
+        if ($written === false) {
+            log_message("trackerGram: No se pudo escribir buffer async — procesando sincrónicamente", true);
+            $webhookHandler->processUpdate($update);
+        }
+        echo json_encode(['status' => 'ok']);
+    } else {
+        // Modo sync: procesar inmediatamente (legacy)
+        $webhookHandler->processUpdate($update);
+        echo json_encode(['status' => 'ok']);
+    }
 }

@@ -429,6 +429,52 @@ class TikiWikiClient
         return $galleryId; // retornar la galería igual, por si el update falla pero la galería existe
     }
 
+    /**
+     * Probar conexión con la API de TikiWiki
+     * Intenta acceder al endpoint de trackers y verifica que la API responda.
+     * @return array{ok: bool, message: string}
+     */
+    public function testConnection(): array
+    {
+        $url = $this->apiUrl . 'trackers';
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Authorization: Bearer " . $this->token,
+            "User-Agent: Mozilla/5.0"
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlError) {
+            return ['ok' => false, 'message' => "Error de red: {$curlError}"];
+        }
+
+        if ($httpCode === 401 || $httpCode === 403) {
+            return ['ok' => false, 'message' => "HTTP {$httpCode} — Token de API inválido o sin permisos"];
+        }
+
+        if ($httpCode !== 200) {
+            return ['ok' => false, 'message' => "HTTP {$httpCode} — la API de TikiWiki no respondió correctamente"];
+        }
+
+        $data = json_decode($response, true);
+        if ($data === null) {
+            return ['ok' => false, 'message' => 'Respuesta no es JSON válido — verificar que TIKIWIKI_API_URL apunte a /api/'];
+        }
+
+        $trackerCount = isset($data['data']) ? count($data['data']) : (isset($data['trackers']) ? count($data['trackers']) : 0);
+        return ['ok' => true, 'message' => "API responde correctamente ({$trackerCount} trackers encontrados)"];
+    }
+
     public function createTracker(string $trackerName): ?int
     {
         $url = $this->apiUrl . "trackers";

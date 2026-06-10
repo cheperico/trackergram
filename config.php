@@ -80,6 +80,16 @@ define('MAX_ZIP_UNCOMPRESSED_SIZE', 500 * 1024 * 1024);
 // Configuración de caché
 define('CACHE_ENABLED', true);
 
+// Procesamiento asíncrono: si es true, api.php encola eventos y worker.php los procesa
+// Si es false (default), api.php procesa sincrónicamente (legacy)
+define('ASYNC_PROCESSING', getenv('ASYNC_PROCESSING') === 'true' ? true : false);
+
+// Directorio temporal propio (aislado de sys_get_temp_dir para shared hosting)
+define('TEMP_DIR', __DIR__ . '/tmp');
+if (!is_dir(TEMP_DIR)) {
+    @mkdir(TEMP_DIR, 0700, true);
+}
+
 // Deshabilitar visualización de errores en producción
 error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE);
 ini_set('display_errors', 0);
@@ -137,8 +147,8 @@ function log_message(string $message, bool $force = false): void
     // ── Escribir ──
     $written = @file_put_contents($logFile, $logLine, FILE_APPEND | LOCK_EX);
     if ($written === false) {
-        // Fallback 1: temp del sistema
-        $tempLog = sys_get_temp_dir() . '/trackergram_debug.log';
+        // Fallback 1: directorio temporal propio
+        $tempLog = TEMP_DIR . '/debug_fallback.log';
         $written = @file_put_contents($tempLog, $logLine, FILE_APPEND | LOCK_EX);
     }
     if ($written === false) {
