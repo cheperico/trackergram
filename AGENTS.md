@@ -124,7 +124,15 @@ El director (cheperico) no es programador profesional. Usa agentes de IA para im
 
 ### trackerGram (raíz)
 
-Todos los archivos en la raíz. No hay subdirectorios de código.
+La mayoría de los archivos están en la raíz. Subdirectorios:
+
+| Directorio | Contenido |
+|---|---|
+| `opt/` | Investigaciones, templates Smarty, archivos opcionales |
+| `tmp/` | Archivos temporales (rate limiting, buffers async, etc.) |
+| `reports/` | Reportes históricos de auditoría (referencia) |
+| `design/` | **📐 Documentos de diseño** — captura de decisiones, exploraciones y discusiones antes de implementar. **Leer antes de arrancar una feature nueva** para entender el contexto completo, alternativas consideradas y por qué se tomaron ciertas decisiones. Contiene: `001-configuracion-inversa-via-telegram.md`, `002-MiniApp.md`. |
+| `.opencode/` | Configuración de opencode (agentes, skills) |
 
 #### Entry Points HTTP
 
@@ -168,6 +176,7 @@ Todos los archivos en la raíz. No hay subdirectorios de código.
 | `CAMBIOS.md` | Historial de cambios por versión |
 | `opt/visualizacion-tiki.md` | Feed tipo chat en TikiWiki (investigación + template Smarty) — específico de wiki.chela.org.ar |
 | `opt/telegram_bots.md` | Tokens de bots de Telegram — **NO versionar** (archivo local) |
+| `design/*` | **📐 Documentos de diseño** — captura de decisiones, alternativas discutidas y arquitectura exploratoria antes de implementar. Leer siempre antes de arrancar una feature nueva (`001-configuracion-inversa-via-telegram.md`, `002-MiniApp.md`). Este archivo se actualiza. |
 
 ### Orden recomendado de lectura del código
 
