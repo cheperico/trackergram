@@ -42,6 +42,8 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 | **Versión** | v0.2.3 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
+| **Branch estable** | `qpch` — monoTiki (un solo TikiWiki, un solo grupo, un solo bot) |
+| **Branch desarrollo** | `main` — nueva arquitectura multi-grupo |
 
 ### Qué funciona
 
@@ -443,32 +445,37 @@ Ver [CAMBIOS.md](CAMBIOS.md) para el detalle completo por versión.
 
 | Nombre | Tipo | Propósito |
 |--------|------|-----------|
-| `main` | branch | Desarrollo activo de nuevas features |
-| `qpch` | tag | **Versión estable en producción** para el grupo "Qué pasa cheLA?" (qpch). Hace lo que necesita ese grupo: importar historial + webhook en vivo + multimedia + reacciones. No requiere más features, solo mantenimiento de bugs. No se mueve. |
-| `qpch-vX.Y.Z` | tag | Hotfixes sobre qpch (ej: `qpch-v0.3.1`) |
+| `main` | branch | **Desarrollo de nueva arquitectura** — router multi-grupo, Mini App, mensajes prefijados, async worker, etc. Todo lo nuevo va acá. |
+| `qpch` | branch | **Versión monoTiki estable** — un solo TikiWiki, un solo grupo Telegram, un solo bot. Para el grupo "Qué pasa cheLA?". Solo bugfixes y parches menores. |
+| `qpch` | tag | Referencia histórica del punto exacto donde se creó el branch `qpch`. No se mueve. |
+| `qpch-vX.Y.Z` | tag | Hotfixes sobre qpch branch (ej: `qpch-v0.3.1`) |
 
 ### Cómo trabajar
 
-**Para desarrollo de features nuevas:**
+**Para desarrollo de features nuevas (arquitectura multi-grupo, etc.):**
 ```bash
 git checkout main
 # ... desarrollar, commit, push ...
 ```
 
-**Para arreglar un bug en producción (qpch):**
+**Para arreglar un bug en producción (qpch branch):**
 ```bash
-git checkout qpch                 # snapshot del código de producción
+git checkout qpch
 git checkout -b fix/qpch-algo     # branch temporal para el fix
 # ... arreglar, commit ...
-git tag -a qpch-v0.3.1 -m "descripción"
+git tag -a qpch-v0.3.1 -m "descripción del hotfix"
 git push origin qpch-v0.3.1
+git checkout qpch
+git merge fix/qpch-algo           # mergear el fix al branch qpch
+git push origin qpch
+git branch -d fix/qpch-algo       # limpiar branch temporal
 # Opcional: mergear el fix también a main
 ```
 
 **Reglas:**
-- `qpch` es un tag, no se modifica ni se borra
-- Los hotfixes van con tag `qpch-vX.Y.Z` incremental
-- `main` es donde se hace todo el desarrollo nuevo
+- `qpch` (branch) es la versión estable monoTiki — solo bugfixes, sin features nuevas
+- Los hotfixes se taggean como `qpch-vX.Y.Z` incremental
+- `main` es donde se desarrolla todo lo nuevo
 - No hay branches `develop`, `staging`, etc. — simpleza sobre complejidad
 
 ---
