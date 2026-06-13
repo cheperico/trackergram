@@ -1,0 +1,15 @@
+{
+    "version": 2,
+    "connections": {
+        "default": {
+            "name": "default",
+            "enabled": true,
+            "bot_token": "8723630198:AAHsSWnot0M4YTg-ET2nAlZjFi-cfe-q_Tg",
+            "webhook_secret": "u0cZivT82VdWMt2p2ezSjHIUngBS9Bu8",
+            "chat_id": 0,
+            "tiki_api_url": "https://wiki.chela.org.ar/api/",
+            "tiki_api_token": "4ab84393ae91a83c3fb2d1cbaa67385072f4d2510d8440c393030b14630ca2c6",
+            "tracker_id": 12
+        }
+    }
+}

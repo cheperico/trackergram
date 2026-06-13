@@ -1,9 +1,10 @@
 <?php
 /**
- * worker.php — Procesador async de eventos de Telegram
+ * worker.php — Procesador async de eventos de Telegram (multi-conexión)
  * 
  * Lee los eventos buffereados por api.php (cuando ASYNC_PROCESSING=true)
- * y los procesa uno por uno: descarga media, sube a TikiWiki, crea items.
+ * y los procesa uno por uno. Cada evento incluye connection_slug para
+ * usar las credenciales correctas de TikiWiki y Telegram.
  * 
  * Uso:
  *   php worker.php                     # procesar todos los eventos pendientes
@@ -13,11 +14,10 @@
  * 
  * Se recomienda cron cada 1-2 minutos:
  *   * * * * * php /ruta/a/worker.php --max=50 >> /dev/null 2>&1
- * O cada minuto directamente:
- *   * * * * * php /ruta/a/worker.php >> /dev/null 2>&1
  */
 
 require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/ConfigManager.php';
 
 // ── Parámetros ──
 $maxEvents = PHP_INT_MAX;
@@ -38,15 +38,16 @@ if (!is_dir($bufferDir)) {
     exit(0);
 }
 
+$configManager = new ConfigManager();
+$messageMapper = new MessageMapper();
 $exitCode = 0;
 
 do {
-    $processed = processBatch($bufferDir, $maxEvents, $webhookHandler);
+    $processed = processBatch($bufferDir, $maxEvents, $configManager, $messageMapper);
     if ($processed === 0) {
         if (!$forever) {
             break;
         }
-        // En modo forever, esperar antes de reintentar
         sleep(10);
     }
 } while ($forever);
@@ -58,7 +59,7 @@ exit($exitCode);
 /**
  * Procesar un lote de eventos buffereados
  */
-function processBatch(string $bufferDir, int $maxEvents, WebhookHandler $webhookHandler): int
+function processBatch(string $bufferDir, int $maxEvents, ConfigManager $configManager, MessageMapper $messageMapper): int
 {
     $files = glob($bufferDir . '/event_*.json');
     if (empty($files)) {
@@ -66,7 +67,7 @@ function processBatch(string $bufferDir, int $maxEvents, WebhookHandler $webhook
         return 0;
     }
 
-    // Ordenar por nombre (que incluye timestamp) para procesar en orden FIFO
+    // FIFO por nombre (incluye timestamp)
     sort($files);
 
     $processed = 0;
@@ -79,12 +80,12 @@ function processBatch(string $bufferDir, int $maxEvents, WebhookHandler $webhook
         }
 
         $baseName = basename($file);
-        
-        // Saltar archivos que ya están siendo procesados por otro worker
+
+        // Lock para evitar duplicados entre workers
         $lockFile = $file . '.lock';
         $lockFp = @fopen($lockFile, 'x');
         if ($lockFp === false) {
-            continue; // otro worker ya agarró este
+            continue;
         }
         flock($lockFp, LOCK_EX);
 
@@ -99,9 +100,9 @@ function processBatch(string $bufferDir, int $maxEvents, WebhookHandler $webhook
             continue;
         }
 
-        $update = json_decode($json, true);
-        if (!$update) {
-            echo "[" . date('Y-m-d H:i:s') . "] ERROR: JSON inválido en {$baseName}\n";
+        $bufferData = json_decode($json, true);
+        if (!$bufferData || !isset($bufferData['connection_slug']) || !isset($bufferData['update'])) {
+            echo "[" . date('Y-m-d H:i:s') . "] ERROR: Formato inválido en {$baseName}\n";
             @fclose($lockFp);
             @unlink($lockFile);
             @rename($file, $file . '.failed');
@@ -110,25 +111,58 @@ function processBatch(string $bufferDir, int $maxEvents, WebhookHandler $webhook
             continue;
         }
 
-        // Procesar
+        $connectionSlug = $bufferData['connection_slug'];
+        $update = $bufferData['update'];
+
+        // Buscar conexión por slug
+        $connection = $configManager->getConnection($connectionSlug);
+
+        if (!$connection || empty($connection['enabled'])) {
+            echo "[" . date('Y-m-d H:i:s') . "] SKIP {$baseName}: conexión '{$connectionSlug}' no encontrada o deshabilitada\n";
+            @fclose($lockFp);
+            @unlink($lockFile);
+            @rename($file, $file . '.failed');
+            $processed++;
+            $failed++;
+            continue;
+        }
+
+        // Procesar con handler per-conexión
         try {
             $startTime = microtime(true);
-            $webhookHandler->processUpdate($update);
+
+            $tikiClient = new TikiWikiClient(
+                apiUrl: $connection['tiki_api_url'],
+                token: $connection['tiki_api_token'],
+                timeout: TIMEOUT_TIKIWIKI_API,
+                uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
+            );
+            $tgClient = new TelegramClient(
+                botToken: $connection['bot_token']
+            );
+            $handler = new WebhookHandler(
+                tikiWikiClient: $tikiClient,
+                telegramClient: $tgClient,
+                messageMapper: $messageMapper,
+                trackerId: (int) $connection['tracker_id']
+            );
+
+            $handler->processUpdate($update);
+
             $elapsed = round((microtime(true) - $startTime) * 1000);
-            
-            // Éxito: renombrar a .done
+
             @fclose($lockFp);
             @unlink($lockFile);
             @rename($file, $file . '.done');
-            
-            echo "[" . date('Y-m-d H:i:s') . "] OK {$baseName} ({$elapsed}ms)\n";
+
+            echo "[" . date('Y-m-d H:i:s') . "] OK {$baseName} ({$connectionSlug}, {$elapsed}ms)\n";
             $success++;
         } catch (Throwable $e) {
             @fclose($lockFp);
             @unlink($lockFile);
             @rename($file, $file . '.failed_' . time());
-            
-            echo "[" . date('Y-m-d H:i:s') . "] ERROR {$baseName}: {$e->getMessage()}\n";
+
+            echo "[" . date('Y-m-d H:i:s') . "] ERROR {$baseName} ({$connectionSlug}): {$e->getMessage()}\n";
             $failed++;
         }
 

@@ -1,5 +1,7 @@
 # trackerGram — Guía de Instalación
 
+**Repositorio**: https://github.com/cheperico/trackergram
+
 ## Requisitos
 
 - **PHP 8.0+** con extensiones: `curl`, `json`, `mbstring`, `session`, `zip`
@@ -46,17 +48,15 @@ php -m | grep -E "(curl|json|mbstring|zip)"
    ```bash
    cp .env.example .env
    ```
-3. Editá `.env` con tus credenciales:
+3. Editá `.env` con las credenciales de admin y configuración global:
     ```env
-    TELEGRAM_BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
-    TELEGRAM_WEBHOOK_SECRET=un_token_secreto_aleatorio_de_32_caracteres
-    TIKIWIKI_API_URL=https://wiki.ejemplo.com/api/
-    TIKIWIKI_TOKEN=tu_token_de_tikiwiki
-    TIKIWIKI_TRACKER_ID=1
     ADMIN_USERNAME=admin
     ADMIN_PASSWORD=una_contraseña_segura
     DEBUG_MODE=false
-    ALLOWED_CHAT_IDS=-100123456789,-100987654321
+    ASYNC_PROCESSING=false
+    
+    # NOTA: Las credenciales de bots y wikis se configuran desde
+    # el panel de admin (setup.json). .env solo tiene config global.
     ```
 4. Configurá los permisos:
    ```bash
@@ -67,37 +67,39 @@ php -m | grep -E "(curl|json|mbstring|zip)"
 
 ---
 
-## Paso 4: Configurar el Webhook
-
-### Opción A: Panel de administración (recomendado)
+## Paso 4: Crear una Conexión en el Panel
 
 1. Accedé a `https://tu-dominio.com/trackergram/admin.php`
 2. Iniciá sesión con las credenciales del `.env`
-3. Configurá el bot token y webhook secret en "Configuración general"
-4. Hacé clic en **"Actualizar Webhook"**
+3. En la pestaña **Webhook**, hacé clic en **"+ Agregar conexión"**
+4. Completá los datos:
+   - **Nombre**: Un nombre legible (ej: "QPCH Producción")
+   - **Bot Token**: El token que te dio BotFather
+   - **Webhook Secret**: Un string secreto único para este webhook
+   - **Chat ID**: ID del grupo de Telegram (obtenelo con [@userinfobot](https://t.me/userinfobot))
+   - **TikiWiki API URL**: `https://wiki.ejemplo.com/api/`
+   - **TikiWiki Token**: Token de API de TikiWiki
+   - **Tracker ID**: ID del tracker destino
+5. Una vez creada la conexión, hacé clic en **"🌐 Webhook"** para configurar el webhook automáticamente
+6. Hacé clic en **"🧪 Test"** para verificar que todo funciona
 
-### Opción B: Manual con curl
-
-```bash
-curl "https://api.telegram.org/bot<TU_TOKEN>/setWebhook?url=https://tu-dominio.com/trackergram/api.php&secret_token=TU_SECRET"
-```
-
-### Verificar el webhook
+### Verificar el webhook manualmente
 
 ```bash
 curl "https://api.telegram.org/bot<TU_TOKEN>/getWebhookInfo"
 ```
 
-Deberías ver `"ok": true` y `"url"` con tu URL.
+Deberías ver `"ok": true` y `"url"` apuntando a `https://tu-dominio.com/trackergram/api.php`.
 
 ---
 
 ## Paso 5: Verificar que Funciona
 
-1. **Panel de admin**: Accedé a `https://tu-dominio.com/trackergram/admin.php` — deberías ver la configuración
-2. **Crear tracker** (si no tenés uno): En el panel, sección "Crear Tracker", escribí un nombre y hacé clic en crear
-3. **Enviar un mensaje de prueba**: Escribí algo en el grupo de Telegram donde está tu bot
-4. **Verificar en TikiWiki**: Abrí el tracker y deberías ver el mensaje como un nuevo item
+1. **Panel de admin**: Accedé a `https://tu-dominio.com/trackergram/admin.php` — deberías ver tus conexiones
+2. **Crear tracker** (si no tenés uno): Desde los botones de la conexión, usá **"Crear Tracker"** o hacélo manualmente en TikiWiki
+3. **Agregá el bot al grupo**: El bot debe ser miembro del grupo cuyo `chat_id` configuraste
+4. **Enviar un mensaje de prueba**: Escribí algo en el grupo de Telegram donde está tu bot
+5. **Verificar en TikiWiki**: Abrí el tracker y deberías ver el mensaje como un nuevo item
 
 ### Si no funciona
 
@@ -107,6 +109,7 @@ Deberías ver `"ok": true` y `"url"` con tu URL.
    ```bash
    sudo tail -f /var/log/apache2/error.log
    ```
+4. Probá el webhook manualmente: `curl "https://api.telegram.org/bot<TU_TOKEN>/getWebhookInfo"`
 
 ---
 
@@ -215,6 +218,7 @@ Ver [opt/visualizacion-tiki.md](opt/visualizacion-tiki.md) para la documentació
 |---|---|
 | **500 Internal Server Error** | Revisá logs de Apache y sintaxis PHP: `php -l api.php` |
 | **Webhook no responde** | Verificá que la URL sea pública con HTTPS. Probá con `curl -I https://tu-dominio.com/api.php` |
-| **Error al conectar a TikiWiki** | Probá manualmente: `curl -H "Authorization: Bearer $TOKEN" "$TIKIWIKI_API_URL/trackers/$TRACKER_ID"` |
-| **Mensajes duplicados** | Verificá que `TELEGRAM_WEBHOOK_SECRET` esté configurado correctamente |
+| **Error al conectar a TikiWiki** | Usá el botón "🧪 Test" en la conexión para verificar las credenciales |
+| **Mensajes duplicados** | Verificá que el webhook secret esté bien configurado en la conexión |
 | **Contraseña de admin olvidada** | Editá `.env` y cambiá `ADMIN_PASSWORD` manualmente |
+| **No llegan mensajes nuevos** | Verificá que el bot sea miembro del grupo y que el webhook esté activo (`getWebhookInfo`) |

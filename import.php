@@ -87,9 +87,23 @@ function handleExtract(): void
 {
     global $tikiWikiClient, $messageMapper;
 
+    // Credenciales Tiki desde el formulario (multi-conexión)
+    $tikiApiUrl = $_POST['tiki_api_url'] ?? '';
+    $tikiApiToken = $_POST['tiki_api_token'] ?? '';
     $trackerId = $_POST['tracker_id'] ?? '';
     if (!$trackerId || !ctype_digit($trackerId)) {
         jsonError('Tracker ID inválido');
+    }
+
+    // Crear TikiWikiClient local si se proporcionaron credenciales
+    $localTikiClient = null;
+    if ($tikiApiUrl !== '' && $tikiApiToken !== '') {
+        $localTikiClient = new TikiWikiClient(
+            apiUrl: $tikiApiUrl,
+            token: $tikiApiToken,
+            timeout: TIMEOUT_TIKIWIKI_API,
+            uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
+        );
     }
 
     if (!isset($_FILES['export_file'])) {
@@ -231,7 +245,10 @@ function handleExtract(): void
     }
     unset($data); // liberar resto de RAM
 
-    // Guardar metadata
+    // Determinar qué cliente Tiki usar (local o global)
+    $activeTikiClient = $localTikiClient ?? $tikiWikiClient;
+
+    // Guardar metadata (incluye credenciales Tiki para handleProcess)
     file_put_contents($tempDir . '/metadata.json', json_encode([
         'chat_id' => $chatId,
         'chat_title' => $chatTitle,
@@ -239,6 +256,8 @@ function handleExtract(): void
         'tracker_id' => (int) $trackerId,
         'total' => $totalMessages,
         'created' => time(),
+        'tiki_api_url' => $tikiApiUrl ?: '',
+        'tiki_api_token' => $tikiApiToken ?: '',
     ]));
 
     // Indexar archivos multimedia
@@ -253,7 +272,7 @@ function handleExtract(): void
     file_put_contents($tempDir . '/fileindex.json', json_encode($fileIndex));
 
     // Resolver gallery ID y persistirlo en metadata para que handleProcess lo re-use
-    $galleryId = $tikiWikiClient->getMediaGalleryId((int) $trackerId);
+    $galleryId = $activeTikiClient->getMediaGalleryId((int) $trackerId);
     if ($galleryId !== null) {
         $metadata = json_decode(file_get_contents($tempDir . '/metadata.json'), true);
         $metadata['gallery_id'] = $galleryId;
@@ -310,6 +329,20 @@ function handleProcess(): void
     $total = $metadata['total'] ?? 0;
     $trackerId = $metadata['tracker_id'] ?? 0;
 
+    // Crear TikiWikiClient local desde credenciales persistidas (si existen)
+    $tikiApiUrl = $metadata['tiki_api_url'] ?? '';
+    $tikiApiToken = $metadata['tiki_api_token'] ?? '';
+    $localTikiClient = null;
+    if ($tikiApiUrl !== '' && $tikiApiToken !== '') {
+        $localTikiClient = new TikiWikiClient(
+            apiUrl: $tikiApiUrl,
+            token: $tikiApiToken,
+            timeout: TIMEOUT_TIKIWIKI_API,
+            uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
+        );
+    }
+    $activeTikiClient = $localTikiClient ?? $tikiWikiClient;
+
     // Cargar file index
     $fileIndexPath = $tempDir . '/fileindex.json';
     $fileIndex = [];
@@ -337,7 +370,7 @@ function handleProcess(): void
     }
 
     // Procesar batch: usar galleryId de metadata (persistido desde extract) o resolver
-    $galleryId = $metadata['gallery_id'] ?? $tikiWikiClient->getMediaGalleryId((int) $trackerId);
+    $galleryId = $metadata['gallery_id'] ?? $activeTikiClient->getMediaGalleryId((int) $trackerId);
     if ($galleryId === null) {
         log_message("trackerGram import: NO HAY galleryId para tracker {$trackerId} — no se subirán archivos", true);
     }
@@ -431,7 +464,7 @@ function handleProcess(): void
                 $fileSize = @filesize($filePath);
                 if ($fileSize !== false && $fileSize <= MEDIA_DOWNLOAD_MAX_SIZE) {
                     $caption = !empty($msg['photo']) ? ($msg['photo_caption'] ?? '') : ($msg['file_caption'] ?? ($msg['caption'] ?? ''));
-                    $fileId = $tikiWikiClient->uploadFile($filePath, $fileName, $galleryId, 'import', $caption);
+                    $fileId = $activeTikiClient->uploadFile($filePath, $fileName, $galleryId, 'import', $caption);
                     if ($fileId) {
                         $uploadedFileIds[] = $fileId;
                         $mediaProcessed++;
@@ -442,10 +475,9 @@ function handleProcess(): void
             }
         }
 
-        // Crear item en TikiWiki
         $mediaUrl = '';
         if (!empty($uploadedFileIds)) {
-            $baseUrl = rtrim(str_replace('/api/', '', TIKIWIKI_API_URL), '/');
+            $baseUrl = rtrim(str_replace('/api/', '', $tikiApiUrl ?: TIKIWIKI_API_URL), '/');
             $mediaUrl = $baseUrl . '/tiki-download_file.php?fileId=' . $uploadedFileIds[0];
         }
         $context = [
@@ -460,38 +492,23 @@ function handleProcess(): void
         $normalized = $messageMapper->fromExport($msg, $context);
         $fields = $messageMapper->toWikiFields($normalized);
 
-        if ($tikiWikiClient->createTrackerItem((int) $trackerId, $fields)) {
+        if ($activeTikiClient->createTrackerItem((int) $trackerId, $fields)) {
             $imported++;
         } else {
             $skipped++;
         }
-
-        $processed++;
     }
 
-    fclose($fp);
-
-    $newOffset = $offset + $processed;
-    $more = $newOffset < $total;
-
-    // Si es el último lote, limpiar
-    if (!$more) {
-        log_message("trackerGram import: Completado — {$total} mensajes, {$imported} importados, {$mediaProcessed} archivos");
-        rrmdir($tempDir);
-    }
+    rrmdir($tempDir);
 
     echo json_encode([
-        'status' => 'processing',
+        'success' => true,
         'imported' => $imported,
         'skipped' => $skipped,
         'media_processed' => $mediaProcessed,
-        'offset' => $newOffset,
-        'total' => $total,
-        'more' => $more,
-        'progress_pct' => $total > 0 ? round(($newOffset / $total) * 100, 1) : 100,
+        'topics_found' => count($topics)
     ]);
 }
-
 /**
  * Modo legacy: todo en una request (para UI clásica)
  */
@@ -499,10 +516,25 @@ function handleFull(): void
 {
     global $tikiWikiClient, $messageMapper;
 
+    // Credenciales Tiki desde el formulario (multi-conexión)
+    $tikiApiUrl = $_POST['tiki_api_url'] ?? '';
+    $tikiApiToken = $_POST['tiki_api_token'] ?? '';
     $trackerId = $_POST['tracker_id'] ?? '';
     if (!$trackerId || !ctype_digit($trackerId)) {
         jsonError('Tracker ID inválido');
     }
+
+    // Crear TikiWikiClient local si se proporcionaron credenciales
+    $localClient = null;
+    if ($tikiApiUrl !== '' && $tikiApiToken !== '') {
+        $localClient = new TikiWikiClient(
+            apiUrl: $tikiApiUrl,
+            token: $tikiApiToken,
+            timeout: TIMEOUT_TIKIWIKI_API,
+            uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
+        );
+    }
+    $activeTikiClient = $localClient ?? $tikiWikiClient;
 
     if (!isset($_FILES['export_file'])) {
         jsonError('No se recibió archivo');
@@ -611,7 +643,7 @@ function handleFull(): void
         }
     }
 
-    $galleryId = $tikiWikiClient->getMediaGalleryId((int) $trackerId);
+    $galleryId = $activeTikiClient->getMediaGalleryId((int) $trackerId);
     if ($galleryId === null) {
         log_message("trackerGram import (full): NO HAY galleryId para tracker {$trackerId} — no se subirán archivos", true);
     }
@@ -705,7 +737,7 @@ function handleFull(): void
                 $fileSize = @filesize($filePath);
                 if ($fileSize !== false && $fileSize <= MEDIA_DOWNLOAD_MAX_SIZE) {
                     $caption = !empty($msg['photo']) ? ($msg['photo_caption'] ?? '') : ($msg['file_caption'] ?? ($msg['caption'] ?? ''));
-                    $fileId = $tikiWikiClient->uploadFile($filePath, $fileName, $galleryId, 'import', $caption);
+                    $fileId = $activeTikiClient->uploadFile($filePath, $fileName, $galleryId, 'import', $caption);
                     if ($fileId) {
                         $uploadedFileIds[] = $fileId;
                         $mediaProcessed++;
@@ -718,7 +750,7 @@ function handleFull(): void
 
         $mediaUrl = '';
         if (!empty($uploadedFileIds)) {
-            $baseUrl = rtrim(str_replace('/api/', '', TIKIWIKI_API_URL), '/');
+            $baseUrl = rtrim(str_replace('/api/', '', $tikiApiUrl ?: TIKIWIKI_API_URL), '/');
             $mediaUrl = $baseUrl . '/tiki-download_file.php?fileId=' . $uploadedFileIds[0];
         }
         $context = [
@@ -733,7 +765,7 @@ function handleFull(): void
         $normalized = $messageMapper->fromExport($msg, $context);
         $fields = $messageMapper->toWikiFields($normalized);
 
-        if ($tikiWikiClient->createTrackerItem((int) $trackerId, $fields)) {
+        if ($activeTikiClient->createTrackerItem((int) $trackerId, $fields)) {
             $imported++;
         } else {
             $skipped++;

@@ -1,0 +1,296 @@
+<?php
+/**
+ * ConfigManager - Gestor de configuración multi-conexión (setup.json)
+ * Maneja CRUD de conexiones, migración desde .env y persistencia atómica.
+ */
+class ConfigManager
+{
+    private string $configPath;
+    private array $data = ['version' => 2, 'connections' => []];
+    private bool $loaded = false;
+
+    public function __construct(?string $configPath = null)
+    {
+        $this->configPath = $configPath ?? __DIR__ . '/setup.json';
+    }
+
+    // --- Carga y persistencia ---
+
+    public function load(): bool
+    {
+        if ($this->loaded) {
+            return true;
+        }
+
+        if (!file_exists($this->configPath)) {
+            $this->tryMigrateFromEnv();
+            $this->loaded = true;
+            return true;
+        }
+
+        $content = @file_get_contents($this->configPath);
+        if ($content === false) {
+            return false;
+        }
+
+        $decoded = json_decode($content, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            log_message("ConfigManager: JSON inválido en {$this->configPath}: " . json_last_error_msg(), true);
+            return false;
+        }
+
+        if (!is_array($decoded)) {
+            log_message("ConfigManager: Estructura inválida en {$this->configPath}", true);
+            return false;
+        }
+
+        $this->data = $decoded + ['version' => 2, 'connections' => []];
+        if (!isset($this->data['connections']) || !is_array($this->data['connections'])) {
+            $this->data['connections'] = [];
+        }
+
+        $this->loaded = true;
+        return true;
+    }
+
+    public function save(): bool
+    {
+        if (!$this->loaded) {
+            $this->load();
+        }
+
+        $json = json_encode($this->data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($json === false) {
+            log_message("ConfigManager: Error al codificar JSON: " . json_last_error_msg(), true);
+            return false;
+        }
+
+        $written = @file_put_contents($this->configPath, $json, LOCK_EX);
+        if ($written === false) {
+            log_message("ConfigManager: No se pudo escribir {$this->configPath}", true);
+            return false;
+        }
+
+        // Intentar permisos restrictivos (no aplica en Windows, pero no falla)
+        @chmod($this->configPath, 0600);
+
+        return true;
+    }
+
+    // --- Migración desde .env ---
+
+    private function tryMigrateFromEnv(): void
+    {
+        $envPath = __DIR__ . '/.env';
+        if (!file_exists($envPath)) {
+            return;
+        }
+
+        $env = $this->parseEnvFile($envPath);
+        $botToken = $env['TELEGRAM_BOT_TOKEN'] ?? '';
+        $tikiApiUrl = $env['TIKIWIKI_API_URL'] ?? '';
+
+        if ($botToken === '' || $tikiApiUrl === '') {
+            return;
+        }
+
+        $connection = [
+            'name' => 'default',
+            'enabled' => true,
+            'bot_token' => $botToken,
+            'webhook_secret' => $env['TELEGRAM_WEBHOOK_SECRET'] ?? '',
+            'chat_id' => 0,
+            'tiki_api_url' => rtrim($tikiApiUrl, '/') . '/',
+            'tiki_api_token' => $env['TIKIWIKI_TOKEN'] ?? '',
+            'tracker_id' => (int) ($env['TIKIWIKI_TRACKER_ID'] ?? 1),
+        ];
+
+        $slug = $this->generateSlug($connection['name']);
+        $this->data['connections'][$slug] = $connection;
+
+        // Marcar como cargado ANTES de save() para evitar recursión infinita
+        $this->loaded = true;
+        $this->save();
+
+        log_message("ConfigManager: Migración automática desde .env → setup.json (slug: {$slug})");
+    }
+
+    private function parseEnvFile(string $path): array
+    {
+        $result = [];
+        $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if ($lines === false) {
+            return $result;
+        }
+
+        foreach ($lines as $line) {
+            if (strlen($line) > 2 && ord($line[0]) === 0xEF && ord($line[1]) === 0xBB && ord($line[2]) === 0xBF) {
+                $line = substr($line, 3);
+            }
+            $trimmed = trim($line);
+            if ($trimmed === '' || strpos($trimmed, '#') === 0) {
+                continue;
+            }
+            if (strpos($trimmed, '=') !== false) {
+                [$name, $value] = explode('=', $trimmed, 2);
+                $result[trim($name)] = trim($value);
+            }
+        }
+        return $result;
+    }
+
+    // --- CRUD de conexiones ---
+
+    public function listConnections(): array
+    {
+        $this->load();
+        return $this->data['connections'];
+    }
+
+    public function getConnection(string $slug): ?array
+    {
+        $this->load();
+        return $this->data['connections'][$slug] ?? null;
+    }
+
+    public function findByChatId(int $chatId, ?string $botToken = null): ?array
+    {
+        $this->load();
+        foreach ($this->data['connections'] as $slug => $conn) {
+            if (($conn['chat_id'] ?? 0) === $chatId) {
+                if ($botToken === null || ($conn['bot_token'] ?? '') === $botToken) {
+                    return $conn + ['_slug' => $slug];
+                }
+            }
+        }
+        return null;
+    }
+
+    public function saveConnection(array $data): string
+    {
+        $this->load();
+
+        $this->validateConnectionData($data);
+
+        $name = trim($data['name']);
+        $slug = $data['slug'] ?? $this->generateSlug($name);
+
+        // Si el slug ya existe y no es el mismo nombre, agregar sufijo
+        $originalSlug = $slug;
+        $counter = 1;
+        while (isset($this->data['connections'][$slug]) && ($this->data['connections'][$slug]['name'] ?? '') !== $name) {
+            $counter++;
+            $slug = $originalSlug . '-' . $counter;
+        }
+
+        $now = date('c');
+        $isNew = !isset($this->data['connections'][$slug]);
+
+        $connection = [
+            'name' => $name,
+            'enabled' => $data['enabled'] ?? true,
+            'bot_token' => trim((string) ($data['bot_token'] ?? '')),
+            'webhook_secret' => trim((string) ($data['webhook_secret'] ?? '')),
+            'chat_id' => (int) ($data['chat_id'] ?? 0),
+            'tiki_api_url' => rtrim(trim((string) ($data['tiki_api_url'] ?? '')), '/') . '/',
+            'tiki_api_token' => trim((string) ($data['tiki_api_token'] ?? '')),
+            'tracker_id' => (int) ($data['tracker_id'] ?? 0),
+        ];
+
+        if ($isNew) {
+            $connection['created_at'] = $now;
+        } else {
+            $connection['created_at'] = $this->data['connections'][$slug]['created_at'] ?? $now;
+        }
+        $connection['updated_at'] = $now;
+
+        $this->data['connections'][$slug] = $connection;
+        $this->save();
+
+        return $slug;
+    }
+
+    public function deleteConnection(string $slug): bool
+    {
+        $this->load();
+        if (!isset($this->data['connections'][$slug])) {
+            return false;
+        }
+        unset($this->data['connections'][$slug]);
+        return $this->save();
+    }
+
+    // --- Estado ---
+
+    public function enableConnection(string $slug): bool
+    {
+        $this->load();
+        if (!isset($this->data['connections'][$slug])) {
+            return false;
+        }
+        $this->data['connections'][$slug]['enabled'] = true;
+        $this->data['connections'][$slug]['updated_at'] = date('c');
+        return $this->save();
+    }
+
+    public function disableConnection(string $slug): bool
+    {
+        $this->load();
+        if (!isset($this->data['connections'][$slug])) {
+            return false;
+        }
+        $this->data['connections'][$slug]['enabled'] = false;
+        $this->data['connections'][$slug]['updated_at'] = date('c');
+        return $this->save();
+    }
+
+    // --- Validación ---
+
+    private function validateConnectionData(array $data): void
+    {
+        $errors = [];
+
+        if (!isset($data['name']) || trim($data['name']) === '') {
+            $errors[] = 'name es obligatorio';
+        }
+
+        if (!isset($data['bot_token']) || trim($data['bot_token']) === '') {
+            $errors[] = 'bot_token es obligatorio';
+        }
+
+        if (!isset($data['tiki_api_url']) || trim($data['tiki_api_url']) === '') {
+            $errors[] = 'tiki_api_url es obligatorio';
+        } elseif (!str_starts_with(trim($data['tiki_api_url']), 'http')) {
+            $errors[] = 'tiki_api_url debe empezar con http:// o https://';
+        }
+
+        if (!isset($data['tracker_id']) || !is_numeric($data['tracker_id'])) {
+            $errors[] = 'tracker_id es obligatorio y debe ser numérico';
+        }
+
+        if ($errors !== []) {
+            throw new InvalidArgumentException('Datos de conexión inválidos: ' . implode(', ', $errors));
+        }
+    }
+
+    // --- Utilidades ---
+
+    private function generateSlug(string $name): string
+    {
+        // Transliterar caracteres acentuados y especiales a ASCII
+        $translit = [
+            'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u',
+            'à' => 'a', 'è' => 'e', 'ì' => 'i', 'ò' => 'o', 'ù' => 'u',
+            'ä' => 'a', 'ë' => 'e', 'ï' => 'i', 'ö' => 'o', 'ü' => 'u',
+            'ñ' => 'n', 'ç' => 'c',
+            'Á' => 'a', 'É' => 'e', 'Í' => 'i', 'Ó' => 'o', 'Ú' => 'u',
+            'À' => 'a', 'È' => 'e', 'Ì' => 'i', 'Ò' => 'o', 'Ù' => 'u',
+            'Ä' => 'a', 'Ë' => 'e', 'Ï' => 'i', 'Ö' => 'o', 'Ü' => 'u',
+            'Ñ' => 'n', 'Ç' => 'c',
+        ];
+        $slug = strtr(strtolower(trim($name)), $translit);
+        $slug = preg_replace('/[^a-z0-9]+/', '-', $slug);
+        $slug = trim($slug, '-');
+        return $slug !== '' ? $slug : 'connection';
+    }
+}

@@ -2,6 +2,8 @@
 
 Puente entre Telegram y TikiWiki. Recibe mensajes de un grupo de Telegram y los guarda automáticamente en un tracker de TikiWiki.
 
+**Repositorio**: https://github.com/cheperico/trackergram
+
 ## Qué Hace
 
 - **Recibe mensajes en tiempo real**: Cuando alguien escribe en tu grupo de Telegram, el mensaje aparece en TikiWiki
@@ -522,11 +524,11 @@ Si no tenés nada de esto, la [guía de instalación](INSTALL.md) te explica pas
 ## Instalación Rápida
 
 1. Copiá los archivos de trackerGram a tu servidor web
-2. Copiá `.env.example` a `.env` y completá tus credenciales
+2. Copiá `.env.example` a `.env` y completá usuario/contraseña de admin
 3. Accedé al panel de administración: `https://tu-dominio.com/trackergram/admin.php`
-4. Configurá el bot token, TikiWiki URL y token
-5. Creá un tracker desde el panel (o usá uno existente)
-6. Actualizá el webhook con un clic
+4. Creá una **conexión** desde el panel: bot token, TikiWiki URL, token y tracker ID
+5. Configurá el webhook con un clic desde la misma conexión
+6. ¡Listo! Los mensajes del grupo empiezan a llegar al tracker
 
 Para instrucciones detalladas, incluyendo cómo crear el bot y configurar TikiWiki, ver [INSTALL.md](INSTALL.md).
 
@@ -538,20 +540,18 @@ No necesitás hacer nada más. Cuando alguien escriba en el grupo de Telegram do
 
 ### Panel de Administración
 
-Accedé a `https://tu-dominio.com/trackergram/admin.php` con tus credenciales de admin. El panel tiene estas secciones:
+Accedé a `https://tu-dominio.com/trackergram/admin.php` con tus credenciales de admin. El panel tiene dos pestañas:
 
-| Sección | Qué hace |
+| Pestaña | Qué hace |
 |---|---|
-| **1. Configuración general** | Token del bot, webhook secret, URL de TikiWiki |
-| **2. Importar conversaciones** | Subí un ZIP exportado de Telegram para importar mensajes antiguos |
-| **3. Tracker en directo** | Cambiá el ID del tracker que recibe los mensajes en tiempo real |
-| **4. Crear Tracker** | Creá un tracker nuevo en TikiWiki con todos los campos automáticamente |
+| **Webhook** | Administrá las conexiones: creá, editá, habilitá/deshabilitá cada vinculación entre un bot de Telegram y un tracker de TikiWiki. Configurá el webhook, probá la conexión, creá trackers automáticamente. |
+| **Importar** | Seleccioná una conexión o ingresá datos manualmente, subí un ZIP exportado de Telegram para importar mensajes antiguos al mismo tracker. |
 
 ### Importar Conversaciones Antiguas
 
 1. En Telegram: Settings > Export chat data > elegí el formato JSON
-2. En el panel de admin, sección "Importar conversaciones": seleccioná el tracker destino y subí el ZIP
-3. Esperá a que termine (puede tardar varios minutos dependiendo del tamaño)
+2. En el panel de admin, pestaña "Importar": seleccioná la conexión destino (autocompleta TikiWiki + tracker) o ingresá manualmente
+3. Subí el ZIP y esperá a que termine (barra de progreso con lotes de 50 mensajes)
 
 ## Problemas Comunes
 

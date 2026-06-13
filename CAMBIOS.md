@@ -1,5 +1,20 @@
 # Cambios - Changelog
 
+## v0.3.0
+- **Arquitectura multi-conexión**: trackerGram ahora soporta múltiples bots, wikis y trackers desde una sola instalación.
+  - Nueva unidad de configuración: **conexión** (bot_token + webhook_secret + chat_id + tiki_api_url + tiki_api_token + tracker_id + name + enabled).
+  - `setup.json` reemplaza a `.env` para la configuración de conexiones. `.env` queda solo para config global (ADMIN_, DEBUG_, ASYNC_).
+  - `ConfigManager.php`: CRUD de conexiones con slug auto-generado, migración automática desde `.env`, guardado atómico con LOCK_EX.
+- **Webhook multi-bot**: `api.php` identifica la conexión por (chat_id + X-Telegram-Bot-Api-Secret-Token header). Crea TikiWikiClient + TelegramClient + WebhookHandler por conexión.
+- **Admin panel rediseñado**: dos pestañas (Webhook + Importar). Lista de tarjetas de conexión con toggle enable/disable, botones de configuración de webhook, test, editar y eliminar. Modal de creación/edición.
+- **Import multi-conexión**: `import.php` acepta `tiki_api_url` y `tiki_api_token` por formulario (por sesión de import). Los persiste en metadata.json para el procesamiento por lotes. Ya no depende de `$tikiWikiClient` global.
+- **Worker async multi-conexión**: `worker.php` lee `connection_slug` del buffer, crea el handler per-conexión, y procesa contra la wiki/tracker correctos.
+- **Seguridad**:
+  - `.htaccess` bloquea `*.json`, fuerza HTTPS, agrega CSP header.
+  - `config.php` busca `.env` en `config/.env` → `.env` → `../.env`.
+  - `config/` directorio creado con `.htaccess` deny-all para futuro aislamiento de `setup.json`.
+- **Chore**: Política de ramas documentada: `qpch` = monoTiki estable (solo bugfixes), `main` = desarrollo multi.
+
 ## v0.2.3
 - **Fix**: `log_message()` ahora respeta `DEBUG_MODE` — solo escribe a `debug.log` cuando `DEBUG_MODE=true` o se pasa `$force=true`. Sistema (`error_log()`) siempre escribe.
 - **Feat**: Nuevo parámetro `$force` en `log_message()` — errores críticos (auth, API, ZIP, filesize) pasan `$force=true` para siempre quedar registrados.

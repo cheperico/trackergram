@@ -39,11 +39,12 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 | | |
 |---|---|
-| **Versión** | v0.2.3 |
+| **Versión** | v0.3.0 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
-| **Branch estable** | `qpch` — monoTiki (un solo TikiWiki, un solo grupo, un solo bot) |
-| **Branch desarrollo** | `main` — nueva arquitectura multi-grupo |
+| **Repositorio** | https://github.com/cheperico/trackergram |
+| **Branch estable** | `qpch` — monoTiki (un solo TikiWiki, un solo grupo, un solo bot, legacy) |
+| **Branch desarrollo** | `main` — **arquitectura multi-conexión** (múltiples bots, wikis y trackers) |
 
 ### Qué funciona
 
@@ -79,6 +80,15 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 - ✅ `uploadedFileIds` como array en NormalizedMessage
 - ✅ Límites dinámicos mostrados en admin (`upload_max_filesize`, `MAX_ZIP_UNCOMPRESSED_SIZE`)
 - ✅ Timeout específico para upload (60s) vs API general (30s) via constantes de config
+- ✅ **Arquitectura multi-conexión**: múltiples bots, wikis y trackers desde una instalación
+- ✅ `ConfigManager.php` — CRUD de conexiones persistidas en `setup.json`, slug auto-generado, migración desde `.env`
+- ✅ Admin panel rediseñado con dos pestañas (Webhook + Importar) y tarjetas de conexión
+- ✅ Conexión multi-bot identificada por `(chat_id, X-Telegram-Bot-Api-Secret-Token)`
+- ✅ Webhook handler per-conexión: cada conexión usa su propio `TikiWikiClient` + `TelegramClient`
+- ✅ Import per-conexión: acepta credenciales Tiki por formulario, las persiste en metadata.json
+- ✅ Worker async multi-conexión: lee `connection_slug` del buffer, crea handler por conexión
+- ✅ `.htaccess` bloquea `*.json`, fuerza HTTPS, agrega CSP header
+- ✅ `config/` directorio fuera del webroot con deny-all
 
 ---
 
@@ -101,6 +111,24 @@ $tikiWikiClient = new TikiWikiClient(TIKIWIKI_API_URL, TIKIWIKI_TOKEN);
 $telegramClient = new TelegramClient(TELEGRAM_BOT_TOKEN);
 $messageMapper = new MessageMapper();
 $webhookHandler = new WebhookHandler($tikiWikiClient, $telegramClient, $messageMapper, TIKIWIKI_TRACKER_ID);
+```
+
+En multi-conexión, `api.php` y `worker.php` crean instancias por conexión en lugar de usar las globales:
+```php
+$tikiClient = new TikiWikiClient(
+    apiUrl: $connection['tiki_api_url'],
+    token: $connection['tiki_api_token'],
+    timeout: TIMEOUT_TIKIWIKI_API,
+    uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
+);
+$tgClient = new TelegramClient(botToken: $connection['bot_token']);
+$handler = new WebhookHandler(
+    tikiWikiClient: $tikiClient,
+    telegramClient: $tgClient,
+    messageMapper: $messageMapper,
+    trackerId: (int) $connection['tracker_id']
+);
+$handler->processUpdate($update);
 ```
 
 Esto permite testear cada clase de forma aislada pasando mocks/stubs.
@@ -133,7 +161,7 @@ La mayoría de los archivos están en la raíz. Subdirectorios:
 | `opt/` | Investigaciones, templates Smarty, archivos opcionales |
 | `tmp/` | Archivos temporales (rate limiting, buffers async, etc.) |
 | `reports/` | Reportes históricos de auditoría (referencia) |
-| `design/` | **📐 Documentos de diseño** — captura de decisiones, exploraciones y discusiones antes de implementar. **Leer antes de arrancar una feature nueva** para entender el contexto completo, alternativas consideradas y por qué se tomaron ciertas decisiones. Contiene: `001-configuracion-inversa-via-telegram.md`, `002-MiniApp.md`. |
+| `design/` | **📐 Documentos de diseño** — captura de decisiones, exploraciones y discusiones antes de implementar. **Leer antes de arrancar una feature nueva** para entender el contexto completo, alternativas consideradas y por qué se tomaron ciertas decisiones. Contiene: `001-configuracion-inversa-via-telegram.md`, `002-MiniApp.md`, `003-arquitectura-multi.md`. |
 | `.opencode/` | Configuración de opencode (agentes, skills) |
 
 #### Entry Points HTTP
@@ -155,6 +183,7 @@ La mayoría de los archivos están en la raíz. Subdirectorios:
 | `TelegramClient.php` | API de Telegram (descargar archivos, info de chats) |
 | `MessageMapper.php` | Transforma mensajes → NormalizedMessage → campos TikiWiki |
 | `WebhookHandler.php` | Orquesta: valida, resuelve topics, descarga media, envía a TikiWiki |
+| `ConfigManager.php` | CRUD de conexiones multi-bot/wiki/tracker en `setup.json` |
 
 #### Soporte
 
@@ -164,6 +193,7 @@ La mayoría de los archivos están en la raíz. Subdirectorios:
 | `.env.example` | Plantilla de variables de entorno |
 | `.htaccess` | Apache: seguridad, rewrite, límites PHP |
 | `topic_names.json` | Cache local de nombres de topics (auto-generado) |
+| `setup.json` | Conexiones multi-bot/wiki/tracker (auto-generado por ConfigManager) — bloqueado via `.htaccess` |
 | `debug.log` | Logs de debug (rotación automática a 10MB, escribe solo si DEBUG_MODE=true o error crítico con $force=true) |
 
 #### Documentación
@@ -178,7 +208,7 @@ La mayoría de los archivos están en la raíz. Subdirectorios:
 | `CAMBIOS.md` | Historial de cambios por versión |
 | `opt/visualizacion-tiki.md` | Feed tipo chat en TikiWiki (investigación + template Smarty) — específico de wiki.chela.org.ar |
 | `opt/telegram_bots.md` | Tokens de bots de Telegram — **NO versionar** (archivo local) |
-| `design/*` | **📐 Documentos de diseño** — captura de decisiones, alternativas discutidas y arquitectura exploratoria antes de implementar. Leer siempre antes de arrancar una feature nueva (`001-configuracion-inversa-via-telegram.md`, `002-MiniApp.md`). Este archivo se actualiza. |
+| `design/*` | **📐 Documentos de diseño** — captura de decisiones, alternativas discutidas y arquitectura exploratoria antes de implementar. Leer siempre antes de arrancar una feature nueva (`001-configuracion-inversa-via-telegram.md`, `002-MiniApp.md`, `003-arquitectura-multi.md`). Este archivo se actualiza. |
 
 ### Orden recomendado de lectura del código
 
@@ -197,11 +227,24 @@ La mayoría de los archivos están en la raíz. Subdirectorios:
 
 ## 4. Flujo de Datos
 
-### Webhook (tiempo real)
+### Webhook (tiempo real) — multi-conexión
 
 ```
-Telegram → api.php → $webhookHandler->processUpdate()
-    → $webhookHandler->processMessage()
+Telegram → api.php
+    → Extraer chat_id del update + X-Telegram-Bot-Api-Secret-Token header
+    → Buscar conexión por (chat_id, webhook_secret) en ConfigManager
+    → Si hay conexión:
+        → Crear TikiWikiClient + TelegramClient + WebhookHandler per-conexión
+        → $handler->processUpdate()
+    → Si NO hay conexión (legacy):
+        → Usar $webhookHandler global (de bootstrap, config .env)
+    → Async opcional: buffer a tmp/buffer/ con connection_slug
+```
+
+**Procesamiento del handler (por conexión):**
+```
+$handler->processUpdate()
+    → $handler->processMessage()
         → $messageMapper->fromWebhook()        # detecta tipo, extrae datos → NormalizedMessage
         → $telegramClient->getFileUrl()        # si tiene media
         → $tikiWikiClient->uploadFile()        # sube a file gallery
@@ -305,19 +348,17 @@ fields[telegrammessageTelegramMessageId]=123
 
 ## 7. Entorno y Configuración
 
-### Variables de entorno (.env)
+### Variables de entorno (.env) — configuración global
 
-```
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_WEBHOOK_SECRET=...
-CUSTOM_WEBHOOK_URL=...
-TIKIWIKI_API_URL=https://wiki.chela.org.ar/api/
-TIKIWIKI_TOKEN=...
-TIKIWIKI_TRACKER_ID=12
-ADMIN_USERNAME=...
-ADMIN_PASSWORD=...
+```ini
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=$2y$10$...hash...
 DEBUG_MODE=false
-ALLOWED_CHAT_IDS=...
+ASYNC_PROCESSING=false
+
+# NOTA: Las credenciales de bots, wikis y trackers se configuran
+# desde el panel de admin y se persisten en setup.json (multi-conexión).
+# .env ya no contiene TELEGRAM_BOT_TOKEN, TIKIWIKI_API_URL, etc.
 ```
 
 ### Constantes definidas en config.php
@@ -424,6 +465,7 @@ Ver [CAMBIOS.md](CAMBIOS.md) para el detalle completo por versión.
 
 | Versión | Cambio principal |
 |---|---|---|
+| v0.3.0 | **Arquitectura multi-conexión**: ConfigManager, setup.json, admin con pestañas, webhook multi-bot, import per-sesión, worker async multi-conexión, .htaccess mejorado, config/ fuera del webroot |
 | v0.2.3 | log_message() ahora respeta DEBUG_MODE (debug.log solo cuando DEBUG_MODE=true o $force=true en errores críticos), documentación completa auditada y sincronizada |
 | v0.2.1 | Vista wiki tipo feed con TRACKERLIST + template Smarty, multimedia HTML5 nativo, mediaUrl auto-populado |
 | v0.1.9 | Fix galería (parseo multi-formato de options FG), fix usuario import (firstName completo, userId por regex), uploadedFileIds como array, createTracker() con galería + count=0 |
