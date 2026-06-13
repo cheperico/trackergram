@@ -579,17 +579,6 @@ Accedé a `https://tu-dominio.com/trackergram/admin.php` con tus credenciales de
 
 Si tu servidor tiene ModSecurity activado, puede bloquear las peticiones a TikiWiki. Contactá a tu hosting para que agreguen una excepción.
 
-## Seguridad
-
-trackerGram incluye las siguientes medidas de seguridad:
-
-- **Secret Token**: Verifica que los webhooks vengan realmente de Telegram
-- **CSRF**: Protege el panel de administración contra peticiones falsas
-- **Contraseñas con hash**: Las contraseñas de admin se almacenan encriptadas
-- **Rate limiting**: Limita la cantidad de intentos de login y peticiones al webhook
-- **Protección contra path traversal**: Valida los archivos ZIP importados
-- **Archivos sensibles protegidos**: `.env` y `config.php` bloqueados por `.htaccess`
-
 ## Documentación Completa
 
 | Documento | Para quién |
