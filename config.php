@@ -4,9 +4,23 @@
  */
 
 // Cargar variables de entorno desde .env
-function loadEnv($file = __DIR__ . '/.env') {
-    $envFile = $file;
-    if (!file_exists($envFile)) {
+// Busca en orden de preferencia: config/.env → .env → ../.env
+function loadEnv(): void {
+    $possiblePaths = [
+        __DIR__ . '/config/.env',
+        __DIR__ . '/.env',
+        __DIR__ . '/../.env',
+    ];
+
+    $envFile = null;
+    foreach ($possiblePaths as $path) {
+        if (file_exists($path)) {
+            $envFile = $path;
+            break;
+        }
+    }
+
+    if (!$envFile) {
         return;
     }
 
