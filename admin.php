@@ -227,6 +227,20 @@ if (!checkAuth()) {
 $configManager = new ConfigManager();
 $connections = $configManager->listConnections();
 
+// Versión sanitizada para el frontend (sin tokens completos)
+$connectionsSafe = [];
+foreach ($connections as $slug => $conn) {
+    $safe = $conn;
+    // Sanitizar tokens: mostrar solo últimos 4 + primeros 4 caracteres
+    foreach (['bot_token', 'tiki_api_token', 'webhook_secret'] as $field) {
+        if (!empty($safe[$field]) && strlen($safe[$field]) > 8) {
+            $val = $safe[$field];
+            $safe[$field] = substr($val, 0, 4) . '...' . substr($val, -4);
+        }
+    }
+    $connectionsSafe[$slug] = $safe;
+}
+
 // ── Procesar acciones POST ──
 
 $successMessage = '';
@@ -235,6 +249,20 @@ $errorMessage = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $csrfToken = $_POST['csrf_token'] ?? '';
     validateCSRFToken($csrfToken);
+    
+    // ── Obtener datos de conexión (AJAX, sin exponer tokens en HTML) ──
+    if ($_POST['action'] === 'get_connection') {
+        $slug = $_POST['slug'] ?? '';
+        $conn = $configManager->getConnection($slug);
+        if ($conn) {
+            header('Content-Type: application/json');
+            echo json_encode($conn);
+        } else {
+            http_response_code(404);
+            echo json_encode(['error' => 'Conexión no encontrada']);
+        }
+        exit;
+    }
     
     switch ($_POST['action']) {
         
@@ -276,11 +304,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 'tiki_api_token' => trim($_POST['tiki_api_token'] ?? ''),
                 'tracker_id' => (int) ($_POST['tracker_id'] ?? 0),
                 'enabled' => isset($_POST['enabled']),
+                'async_processing' => isset($_POST['async_processing']),
             ];
             
             // Si es edición, pasar el slug existente
             if (!empty($slug)) {
                 $data['slug'] = $slug;
+                // Preservar field_prefix existente (el form no lo incluye)
+                $existing = $configManager->getConnection($slug);
+                if ($existing && !empty($existing['field_prefix'])) {
+                    $data['field_prefix'] = $existing['field_prefix'];
+                }
             }
             
             try {
@@ -930,24 +964,38 @@ function closeModal(id) {
 }
 
 function openEditModal(slug) {
-    // Cargar datos via fetch y poblar formulario
-    var connections = <?php echo json_encode($connections); ?>;
-    var conn = connections[slug];
-    if (!conn) return;
+    // Cargar datos via AJAX (no exponer tokens en HTML/JS)
+    var data = new URLSearchParams();
+    data.append('action', 'get_connection');
+    data.append('slug', slug);
+    data.append('csrf_token', '<?php echo generateCSRFToken(); ?>');
     
-    document.getElementById('modal-title').textContent = 'Editar: ' + conn.name;
-    document.getElementById('form-slug').value = slug;
-    document.getElementById('form-name').value = conn.name;
-    document.getElementById('form-bot_token').value = conn.bot_token;
-    document.getElementById('form-webhook_secret').value = conn.webhook_secret || '';
-    document.getElementById('form-chat_id').value = conn.chat_id || 0;
-    document.getElementById('form-tracker_id').value = conn.tracker_id;
-    document.getElementById('form-tiki_api_url').value = conn.tiki_api_url;
-    document.getElementById('form-tiki_api_token').value = conn.tiki_api_token;
-    document.getElementById('form-enabled').checked = conn.enabled !== false;
-    document.getElementById('form-async_processing').checked = conn.async_processing === true;
-    
-    openModal('connection-modal');
+    fetch('admin.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: data.toString()
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(conn) {
+        if (conn.error) { alert(conn.error); return; }
+        
+        document.getElementById('modal-title').textContent = 'Editar: ' + conn.name;
+        document.getElementById('form-slug').value = slug;
+        document.getElementById('form-name').value = conn.name || '';
+        document.getElementById('form-bot_token').value = conn.bot_token || '';
+        document.getElementById('form-webhook_secret').value = conn.webhook_secret || '';
+        document.getElementById('form-chat_id').value = conn.chat_id || 0;
+        document.getElementById('form-tracker_id').value = conn.tracker_id || '';
+        document.getElementById('form-tiki_api_url').value = conn.tiki_api_url || '';
+        document.getElementById('form-tiki_api_token').value = conn.tiki_api_token || '';
+        document.getElementById('form-enabled').checked = conn.enabled !== false;
+        document.getElementById('form-async_processing').checked = conn.async_processing === true;
+        
+        openModal('connection-modal');
+    })
+    .catch(function() {
+        alert('Error al cargar datos de la conexion');
+    });
 }
 
 function togglePassword(btn) {
@@ -1027,19 +1075,18 @@ document.addEventListener('click', function(e) {
             <?php if (!empty($connections)): ?>
             <div class="form-group">
                 <label>Usar conexion existente (opcional)</label>
-                <select name="connection_slug" onchange="fillImportFromConnection(this)">
-                    <option value="">— Ingresar manual —</option>
-                    <?php foreach ($connections as $slug => $conn): ?>
-                    <option value="<?php echo escapeHtml($slug); ?>"
-                        data-tiki_url="<?php echo escapeHtml($conn['tiki_api_url']); ?>"
-                        data-tiki_token="<?php echo escapeHtml($conn['tiki_api_token']); ?>"
-                        data-tracker_id="<?php echo (int) $conn['tracker_id']; ?>"
-                        data-field_prefix="<?php echo escapeHtml($conn['field_prefix'] ?? 'telegrammessage'); ?>">
-                        <?php echo escapeHtml($conn['name']); ?>
-                        (tracker #<?php echo (int) $conn['tracker_id']; ?>)
-                    </option>
-                    <?php endforeach; ?>
-                </select>
+                    <select name="connection_slug" onchange="fillImportFromConnection(this)">
+                        <option value="">— Ingresar manual —</option>
+                        <?php foreach ($connections as $slug => $conn): ?>
+                        <option value="<?php echo escapeHtml($slug); ?>"
+                            data-tiki_url="<?php echo escapeHtml($conn['tiki_api_url']); ?>"
+                            data-tracker_id="<?php echo (int) $conn['tracker_id']; ?>"
+                            data-field_prefix="<?php echo escapeHtml($conn['field_prefix'] ?? 'telegrammessage'); ?>">
+                            <?php echo escapeHtml($conn['name']); ?>
+                            (tracker #<?php echo (int) $conn['tracker_id']; ?>)
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
                 <div class="hint">Si seleccionas una conexion, los campos Tiki se completan automaticamente</div>
             </div>
             <?php endif; ?>
@@ -1085,9 +1132,27 @@ function fillImportFromConnection(select) {
     if (option.value === '') return;
     
     document.getElementById('import-tiki_url').value = option.dataset.tiki_url;
-    document.getElementById('import-tiki_token').value = option.dataset.tiki_token;
     document.getElementById('import-tracker_id').value = option.dataset.tracker_id;
     document.getElementById('import-field_prefix').value = option.dataset.field_prefix || 'telegrammessage';
+    
+    // Fetch token desde el servidor (no se expone en HTML)
+    var data = new URLSearchParams();
+    data.append('action', 'get_connection');
+    data.append('slug', option.value);
+    data.append('csrf_token', '<?php echo generateCSRFToken(); ?>');
+    
+    fetch('admin.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: data.toString()
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(conn) {
+        if (conn.tiki_api_token) {
+            document.getElementById('import-tiki_token').value = conn.tiki_api_token;
+        }
+    })
+    .catch(function() { /* silencio — quedará vacío para llenado manual */ });
 }
 
 function startImport() {
@@ -1294,7 +1359,6 @@ function processChunks(extractId, total, chatTitle, topicsFound) {
                         <?php foreach ($connections as $slug => $conn): ?>
                         <option value="<?php echo escapeHtml($slug); ?>"
                             data-tiki_url="<?php echo escapeHtml($conn['tiki_api_url']); ?>"
-                            data-tiki_token="<?php echo escapeHtml($conn['tiki_api_token']); ?>"
                             data-prefix="<?php echo escapeHtml($conn['field_prefix'] ?? 'telegrammessage'); ?>">
                             <?php echo escapeHtml($conn['name']); ?>
                         </option>
@@ -1342,12 +1406,30 @@ function fillCreateFromConnection(select) {
     if (option.value === '') return;
     
     document.getElementById('create-tiki-url').value = option.dataset.tiki_url;
-    document.getElementById('create-tiki-token').value = option.dataset.tiki_token;
     
     var prefix = option.dataset.prefix || 'telegrammessage';
     var prefixInput = document.querySelector('input[name="field_prefix"]');
     prefixInput.value = prefix;
     updateFieldPreview(prefix);
+    
+    // Fetch token desde el servidor (no se expone en HTML)
+    var data = new URLSearchParams();
+    data.append('action', 'get_connection');
+    data.append('slug', option.value);
+    data.append('csrf_token', '<?php echo generateCSRFToken(); ?>');
+    
+    fetch('admin.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: data.toString()
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(conn) {
+        if (conn.tiki_api_token) {
+            document.getElementById('create-tiki-token').value = conn.tiki_api_token;
+        }
+    })
+    .catch(function() { /* silencio */ });
 }
 
 function updateFieldPreview(prefix) {

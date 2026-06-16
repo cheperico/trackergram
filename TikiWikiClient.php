@@ -575,7 +575,7 @@ class TikiWikiClient
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        if ($httpCode === 200) {
+        if ($httpCode === 200 || $httpCode === 201) {
             $data = json_decode($response, true);
             $trackerId = $data['id'] ?? null;
             if ($trackerId) {

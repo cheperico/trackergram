@@ -19,7 +19,7 @@ session_start();
 function handleError($errno, $errstr, $errfile, $errline) {
     log_message("import.php: ERROR $errno - $errstr in $errfile:$errline", true);
     http_response_code(500);
-    echo json_encode(['error' => "Error: $errstr"]);
+    echo json_encode(['error' => 'Error interno del servidor']);
     exit;
 }
 set_error_handler('handleError');
@@ -27,7 +27,7 @@ set_error_handler('handleError');
 function handleException($exc) {
     log_message("import.php: EXCEPTION " . $exc->getMessage() . " in " . $exc->getFile() . ":" . $exc->getLine(), true);
     http_response_code(500);
-    echo json_encode(['error' => "Exception: " . $exc->getMessage()]);
+    echo json_encode(['error' => 'Error interno del servidor']);
     exit;
 }
 set_exception_handler('handleException');
@@ -140,7 +140,14 @@ function handleExtract(): void
     $totalUncompressedSize = 0;
     for ($i = 0; $i < $zip->numFiles; $i++) {
         $entryName = $zip->getNameIndex($i);
-        if (strpos($entryName, '..') !== false || str_starts_with($entryName, '/')) {
+        // Bloquear path traversal (..), rutas absolutas Unix (/), Windows (X:\) y ADS (:)
+        $normalized = str_replace('\\', '/', $entryName);
+        if (
+            strpos($entryName, '..') !== false
+            || str_starts_with($normalized, '/')
+            || preg_match('/^[a-zA-Z]:[\/\\\\]/', $entryName)  // X:\ o X:/
+            || strpos($entryName, ':') !== false  // Alternate Data Streams
+        ) {
             $safeExtract = false;
             $badEntry = $entryName;
             break;
@@ -176,6 +183,24 @@ function handleExtract(): void
 
     $zip->extractTo($tempDir);
     $zip->close();
+
+    // Validación post-extracción: verificar que todos los archivos están dentro de $tempDir
+    $realTempDir = realpath($tempDir);
+    $allFiles = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($tempDir));
+    $pathOk = true;
+    foreach ($allFiles as $extracted) {
+        if ($extracted->isDir()) continue;
+        $realPath = realpath($extracted->getPathname());
+        if ($realPath === false || strpos($realPath, $realTempDir) !== 0) {
+            $pathOk = false;
+            log_message("trackerGram import: Path traversal detectado post-extracción: {$extracted->getPathname()}", true);
+            break;
+        }
+    }
+    if (!$pathOk) {
+        rrmdir($tempDir);
+        jsonError('El archivo ZIP contiene rutas no válidas (path traversal detectado)');
+    }
 
     // Buscar result.json
     $jsonFile = null;
@@ -254,7 +279,7 @@ function handleExtract(): void
     }
     $activeTikiClient = $localTikiClient;
 
-    // Guardar metadata (incluye credenciales Tiki para handleProcess)
+    // Guardar metadata (sin credenciales Tiki — van a session)
     file_put_contents($tempDir . '/metadata.json', json_encode([
         'chat_id' => $chatId,
         'chat_title' => $chatTitle,
@@ -262,10 +287,16 @@ function handleExtract(): void
         'tracker_id' => (int) $trackerId,
         'total' => $totalMessages,
         'created' => time(),
+        'field_prefix' => $fieldPrefix,
+    ]));
+    
+    // Guardar credenciales Tiki en session (no en disco)
+    $importSessionKey = 'import_creds_' . basename($tempDir);
+    $_SESSION[$importSessionKey] = [
         'tiki_api_url' => $tikiApiUrl ?: '',
         'tiki_api_token' => $tikiApiToken ?: '',
         'field_prefix' => $fieldPrefix,
-    ]));
+    ];
 
     // Indexar archivos multimedia
     $fileIndex = [];
@@ -336,10 +367,12 @@ function handleProcess(): void
     $total = $metadata['total'] ?? 0;
     $trackerId = $metadata['tracker_id'] ?? 0;
 
-    // Crear TikiWikiClient local desde credenciales persistidas (obligatorio)
-    $tikiApiUrl = $metadata['tiki_api_url'] ?? '';
-    $tikiApiToken = $metadata['tiki_api_token'] ?? '';
-    $fieldPrefix = $metadata['field_prefix'] ?? 'telegrammessage';
+    // Crear TikiWikiClient local desde credenciales en session (obligatorio)
+    $importSessionKey = 'import_creds_' . $extractId;
+    $creds = $_SESSION[$importSessionKey] ?? [];
+    $tikiApiUrl = $creds['tiki_api_url'] ?? '';
+    $tikiApiToken = $creds['tiki_api_token'] ?? '';
+    $fieldPrefix = $metadata['field_prefix'] ?? $creds['field_prefix'] ?? 'telegrammessage';
     $messageMapper->setFieldPrefix($fieldPrefix);
     $localTikiClient = null;
     if ($tikiApiUrl !== '' && $tikiApiToken !== '') {
@@ -352,7 +385,7 @@ function handleProcess(): void
         $localTikiClient->setFieldPrefix($fieldPrefix);
     }
     if (!$localTikiClient) {
-        jsonError('Credenciales Tiki no persistidas — re-subir el export');
+        jsonError('Credenciales Tiki no disponibles — la sesión expiró o se perdió. Re-subir el export.');
     }
     $activeTikiClient = $localTikiClient;
 
@@ -586,7 +619,14 @@ function handleFull(): void
     $maxDepth = 10;
     for ($i = 0; $i < $zip->numFiles; $i++) {
         $entryName = $zip->getNameIndex($i);
-        if (strpos($entryName, '..') !== false || str_starts_with($entryName, '/')) {
+        // Bloquear path traversal, rutas absolutas, Windows ADS
+        $normalized = str_replace('\\', '/', $entryName);
+        if (
+            strpos($entryName, '..') !== false
+            || str_starts_with($normalized, '/')
+            || preg_match('/^[a-zA-Z]:[\/\\\\]/', $entryName)
+            || strpos($entryName, ':') !== false
+        ) {
             $safeExtract = false;
             $badEntry = $entryName;
             break;
@@ -622,6 +662,24 @@ function handleFull(): void
 
     $zip->extractTo($tempDir);
     $zip->close();
+
+    // Validación post-extracción: verificar que todos los archivos están dentro de $tempDir
+    $realTempDir = realpath($tempDir);
+    $allFiles = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($tempDir));
+    $pathOk = true;
+    foreach ($allFiles as $extracted) {
+        if ($extracted->isDir()) continue;
+        $realPath = realpath($extracted->getPathname());
+        if ($realPath === false || strpos($realPath, $realTempDir) !== 0) {
+            $pathOk = false;
+            log_message("trackerGram import: Path traversal detectado post-extracción (full): {$extracted->getPathname()}", true);
+            break;
+        }
+    }
+    if (!$pathOk) {
+        rrmdir($tempDir);
+        jsonError('El archivo ZIP contiene rutas no válidas (path traversal detectado)');
+    }
 
     $jsonFile = null;
     $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($tempDir));
@@ -791,14 +849,29 @@ function handleFull(): void
         }
     }
 
-    rrmdir($tempDir);
+    // Cerrar archivo NDJSON
+    fclose($fp);
+    
+    // Determinar si hay más mensajes después de este batch
+    // Cada línea NDJSON = 1 mensaje, y conocemos el total desde metadata
+    $nextOffset = $offset + $processed;
+    $hasMore = !$isLastBatch && $nextOffset < $total;
+
+    // Limpiar tempDir solo si es el último batch
+    if (!$hasMore) {
+        rrmdir($tempDir);
+        // Limpiar credenciales de session
+        unset($_SESSION['import_creds_' . $extractId]);
+    }
 
     echo json_encode([
         'success' => true,
         'imported' => $imported,
         'skipped' => $skipped,
         'media_processed' => $mediaProcessed,
-        'topics_found' => count($topics)
+        'topics_found' => count($topics),
+        'offset' => $nextOffset,
+        'more' => $hasMore,
     ]);
 }
 

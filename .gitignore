@@ -20,6 +20,9 @@ ChatExport_*/
 # Import temp
 import_temp/
 
+# Config de conexiones multi-bot (tokens) — NO versionar
+config/setup.json
+
 # OpenCode agents config (no subir a GitHub)
 .opencode/
 

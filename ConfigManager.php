@@ -50,6 +50,22 @@ class ConfigManager
         }
 
         $this->loaded = true;
+
+        // Migración: auto-generar webhook_secret para conexiones existentes sin él
+        // (loaded=true antes para evitar recursión si save() chequea loaded)
+        $dirty = false;
+        foreach ($this->data['connections'] as $slug => &$conn) {
+            if (empty($conn['webhook_secret'])) {
+                $conn['webhook_secret'] = bin2hex(random_bytes(16));
+                log_message("ConfigManager: webhook_secret auto-generado para conexión existente '{$slug}' durante load()");
+                $dirty = true;
+            }
+        }
+        unset($conn);
+        if ($dirty) {
+            $this->save();
+        }
+
         return true;
     }
 
@@ -185,7 +201,9 @@ class ConfigManager
                 // secret incorrecto o ausente → no es match
                 continue;
             } else {
-                // La conexión no tiene secret configurado: aceptar cualquier request
+                // Conexión sin webhook_secret — aceptar el request pero advertir
+                log_message("ConfigManager: Conexión '{$slug}' sin webhook_secret — aceptando request. " .
+                    "Se recomienda editar la conexión para generar un secret automáticamente.", true);
                 return $conn + ['_slug' => $slug];
             }
         }
@@ -218,12 +236,19 @@ class ConfigManager
         $now = date('c');
         $isNew = !isset($this->data['connections'][$slug]);
 
+        // Auto-generar webhook_secret si está vacío
+        $webhookSecret = trim((string) ($data['webhook_secret'] ?? ''));
+        if ($webhookSecret === '') {
+            $webhookSecret = bin2hex(random_bytes(16));
+            log_message("ConfigManager: webhook_secret auto-generado para conexión '{$name}'");
+        }
+
         $connection = [
             'name' => $name,
             'enabled' => $data['enabled'] ?? true,
             'async_processing' => !empty($data['async_processing']),
             'bot_token' => trim((string) ($data['bot_token'] ?? '')),
-            'webhook_secret' => trim((string) ($data['webhook_secret'] ?? '')),
+            'webhook_secret' => $webhookSecret,
             'chat_id' => (int) ($data['chat_id'] ?? 0),
             'tiki_api_url' => rtrim(trim((string) ($data['tiki_api_url'] ?? '')), '/') . '/',
             'tiki_api_token' => trim((string) ($data['tiki_api_token'] ?? '')),
@@ -347,8 +372,20 @@ class ConfigManager
 
         if (!isset($data['tiki_api_url']) || trim($data['tiki_api_url']) === '') {
             $errors[] = 'tiki_api_url es obligatorio';
-        } elseif (!str_starts_with(trim($data['tiki_api_url']), 'http')) {
-            $errors[] = 'tiki_api_url debe empezar con http:// o https://';
+        } elseif (!str_starts_with(trim($data['tiki_api_url']), 'https://')) {
+            $errors[] = 'tiki_api_url debe empezar con https:// (no se permiten conexiones HTTP no seguras)';
+        } else {
+            // Validación anti-SSRF: bloquear IPs privadas/reservadas
+            $host = parse_url(trim($data['tiki_api_url']), PHP_URL_HOST);
+            if ($host !== null) {
+                $ip = gethostbyname($host);
+                if ($ip !== $host) { // si es un hostname que resuelve
+                    $isPrivate = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
+                    if ($isPrivate) {
+                        $errors[] = 'tiki_api_url no puede apuntar a una IP privada o reservada';
+                    }
+                }
+            }
         }
 
         if (!isset($data['tracker_id']) || !is_numeric($data['tracker_id'])) {

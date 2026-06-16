@@ -65,7 +65,10 @@ Options -Indexes
     Header set Referrer-Policy "strict-origin-when-cross-origin"
     
     # Content-Security-Policy
-    # Permite estilos inline (necesario para admin.php), scripts inline
-    # y conexiones HTTPS para imágenes externas (Telegram)
-    Header set Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self';"
+    # 'unsafe-inline' necesario para admin.php (inline scripts + styles).
+    # Ideal futuro: mover JS a archivos externos con nonce/hash.
+    # - object-src 'none' bloquea Flash/plugins
+    # - base-uri 'self' evita injection de base tags
+    # - form-action 'self' restringe destinos de formularios
+    Header set Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';"
 </IfModule>
