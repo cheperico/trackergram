@@ -545,14 +545,26 @@ function handleProcess(): void
         }
     }
 
-    rrmdir($tempDir);
+    // Determinar si hay más mensajes después de este batch
+    // Cada línea NDJSON = 1 mensaje, y conocemos el total desde metadata
+    $nextOffset = $offset + $processed;
+    $hasMore = $nextOffset < $total;
+
+    // Limpiar tempDir solo si es el último batch
+    if (!$hasMore) {
+        rrmdir($tempDir);
+        // Limpiar credenciales de session
+        unset($_SESSION['import_creds_' . $extractId]);
+    }
 
     echo json_encode([
         'success' => true,
         'imported' => $imported,
         'skipped' => $skipped,
         'media_processed' => $mediaProcessed,
-        'topics_found' => count($topics)
+        'topics_found' => count($topics),
+        'offset' => $nextOffset,
+        'more' => $hasMore,
     ]);
 }
 /**
@@ -849,20 +861,7 @@ function handleFull(): void
         }
     }
 
-    // Cerrar archivo NDJSON
-    fclose($fp);
-    
-    // Determinar si hay más mensajes después de este batch
-    // Cada línea NDJSON = 1 mensaje, y conocemos el total desde metadata
-    $nextOffset = $offset + $processed;
-    $hasMore = !$isLastBatch && $nextOffset < $total;
-
-    // Limpiar tempDir solo si es el último batch
-    if (!$hasMore) {
-        rrmdir($tempDir);
-        // Limpiar credenciales de session
-        unset($_SESSION['import_creds_' . $extractId]);
-    }
+    rrmdir($tempDir);
 
     echo json_encode([
         'success' => true,
@@ -870,8 +869,6 @@ function handleFull(): void
         'skipped' => $skipped,
         'media_processed' => $mediaProcessed,
         'topics_found' => count($topics),
-        'offset' => $nextOffset,
-        'more' => $hasMore,
     ]);
 }
 
