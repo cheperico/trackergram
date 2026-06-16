@@ -39,7 +39,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 | | |
 |---|---|
-| **Versión** | v0.3.0 |
+| **Versión** | v0.4.0 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
 | **Repositorio** | https://github.com/cheperico/trackergram |
@@ -89,6 +89,9 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 - ✅ Worker async multi-conexión: lee `connection_slug` del buffer, crea handler por conexión
 - ✅ `.htaccess` bloquea `*.json`, fuerza HTTPS, agrega CSP header
 - ✅ `config/` directorio fuera del webroot con deny-all
+- ✅ **Async processing per-conexión**: cada conexión tiene su propio toggle async en el admin
+- ✅ **`.env` simplificado**: solo contiene config global (admin, debug, async); credenciales bot/wiki solo en `setup.json`
+- ✅ **Sin fallback legacy**: api.php rechaza con 403 si no hay conexión en `setup.json`
 
 ---
 
@@ -102,18 +105,10 @@ trackerGram no tiene base de datos propia. TikiWiki es el almacenamiento. La con
 
 No hay Laravel, Symfony ni Composer. Archivos PHP que se incluyen directamente. La deuda técnica (sin autoloading PSR-4, sin tests unitarios fáciles) está identificada en el roadmap.
 
-### Inyección de dependencias (implementada ✅)
+### Inyección de dependencias (por conexión ✅)
 
-`TikiWikiClient`, `TelegramClient`, `WebhookHandler` y `MessageMapper` son **instanciables** con dependencias inyectadas por constructor. Bootstrap define el wiring en `bootstrap.php`:
+`TikiWikiClient`, `TelegramClient`, `WebhookHandler` y `MessageMapper` son **instanciables** con dependencias inyectadas por constructor. Ya no hay un wiring central en `bootstrap.php`. Cada entry point crea sus propios clientes por conexión desde `ConfigManager`:
 
-```php
-$tikiWikiClient = new TikiWikiClient(TIKIWIKI_API_URL, TIKIWIKI_TOKEN);
-$telegramClient = new TelegramClient(TELEGRAM_BOT_TOKEN);
-$messageMapper = new MessageMapper();
-$webhookHandler = new WebhookHandler($tikiWikiClient, $telegramClient, $messageMapper, TIKIWIKI_TRACKER_ID);
-```
-
-En multi-conexión, `api.php` y `worker.php` crean instancias por conexión en lugar de usar las globales:
 ```php
 $tikiClient = new TikiWikiClient(
     apiUrl: $connection['tiki_api_url'],
@@ -168,7 +163,7 @@ La mayoría de los archivos están en la raíz. Subdirectorios:
 
 | Archivo | Qué hace | Cuándo se ejecuta |
 |---|---|---|
-| `bootstrap.php` | Carga config + clientes + handler | Siempre, primer include |
+| `bootstrap.php` | Carga config + clases PHP (sin DI wiring central) | Siempre, primer include |
 | `api.php` | Recibe webhooks de Telegram | Cuando Telegram envía un mensaje |
 | `admin.php` | Panel de administración web | Cuando un humano abre la URL |
 | `import.php` | Procesa exports ZIP de Telegram | Cuando un humano sube un ZIP |
@@ -212,8 +207,8 @@ La mayoría de los archivos están en la raíz. Subdirectorios:
 
 ### Orden recomendado de lectura del código
 
-1. `bootstrap.php` — wiring de DI, entendés cómo se conecta todo
-2. `config.php` — cómo se leen las credenciales y constantes
+1. `config.php` — constantes globales, timeouts, log_message()
+2. `bootstrap.php` — carga de clases PHP (sin DI wiring)
 3. `NormalizedMessage.php` — el modelo intermedio único
 4. `api.php` — entry point del webhook, delega en WebhookHandler
 5. `WebhookHandler.php` — el corazón: processUpdate → processMessage → sendToTikiWiki
@@ -365,12 +360,11 @@ ASYNC_PROCESSING=false
 
 | Constante | Valor |
 |---|---|---|
-| `TELEGRAM_BOT_TOKEN` | del .env |
-| `TELEGRAM_API_URL` | `https://api.telegram.org/bot{token}/` |
-| `TELEGRAM_WEBHOOK_SECRET` | del .env |
-| `TIKIWIKI_API_URL` | del .env |
-| `TIKIWIKI_TOKEN` | del .env |
-| `TIKIWIKI_TRACKER_ID` | del .env (default 1) |
+| `ADMIN_USERNAME` | del .env |
+| `ADMIN_PASSWORD` | del .env (hash bcrypt) |
+| `DEBUG_MODE` | del .env (default false) |
+| `ASYNC_PROCESSING` | del .env (default false, sobrescribible por conexión) |
+| `ALLOWED_CHAT_IDS` | del .env (filtro global opcional) |
 | `TIMEOUT_TIKIWIKI_API` | 30 segundos |
 | `TIMEOUT_TIKIWIKI_UPLOAD` | 60 segundos |
 | `TIMEOUT_TELEGRAM_API` | 5 segundos |
@@ -427,6 +421,7 @@ ASYNC_PROCESSING=false
 - **No crear variables globales** — Usar `static` dentro de funciones o pasar por parámetros.
 - **No requerir archivos individuales** — Siempre usar `require_once 'bootstrap.php'` (en trackerGram).
 - **No duplicar lógica de parsing entre webhook e import** — Ambos convergen en `MessageMapper::toWikiFields()` vía `NormalizedMessage`. Webhook usa `fromWebhook()`, import usa `fromExport()`.
+- **No depender del modo legacy** — El modo legacy (constantes en `.env`) fue eliminado. Todas las conexiones se configuran desde el panel admin y se persisten en `setup.json`. `api.php` rechaza con 403 si no hay conexión en `setup.json`.
 
 ### Telegram
 
@@ -465,6 +460,7 @@ Ver [CAMBIOS.md](CAMBIOS.md) para el detalle completo por versión.
 
 | Versión | Cambio principal |
 |---|---|---|
+| v0.4.0 | **Async processing per-conexión + .env simplificado + adiós legacy**: toggle async por conexión en admin, api.php rechaza 403 sin conexión (sin fallback legacy), config.php sin constantes de credenciales, bootstrap.php sin DI wiring (cada entry point crea sus clientes), import.php usa MessageMapper local y requiere credenciales Tiki, TikiWikiClient.getBaseUrl() |
 | v0.3.0 | **Arquitectura multi-conexión**: ConfigManager, setup.json, admin con pestañas, webhook multi-bot, import per-sesión, worker async multi-conexión, .htaccess mejorado, config/ fuera del webroot |
 | v0.2.3 | log_message() ahora respeta DEBUG_MODE (debug.log solo cuando DEBUG_MODE=true o $force=true en errores críticos), documentación completa auditada y sincronizada |
 | v0.2.1 | Vista wiki tipo feed con TRACKERLIST + template Smarty, multimedia HTML5 nativo, mediaUrl auto-populado |

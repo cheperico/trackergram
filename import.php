@@ -85,7 +85,7 @@ exit;
  */
 function handleExtract(): void
 {
-    global $tikiWikiClient, $messageMapper;
+    $messageMapper = new MessageMapper();
 
     // Credenciales Tiki desde el formulario (multi-conexión)
     $tikiApiUrl = $_POST['tiki_api_url'] ?? '';
@@ -95,7 +95,7 @@ function handleExtract(): void
         jsonError('Tracker ID inválido');
     }
 
-    // Crear TikiWikiClient local si se proporcionaron credenciales
+    // Crear TikiWikiClient local (obligatorio — sin fallback legacy)
     $localTikiClient = null;
     if ($tikiApiUrl !== '' && $tikiApiToken !== '') {
         $localTikiClient = new TikiWikiClient(
@@ -245,8 +245,11 @@ function handleExtract(): void
     }
     unset($data); // liberar resto de RAM
 
-    // Determinar qué cliente Tiki usar (local o global)
-    $activeTikiClient = $localTikiClient ?? $tikiWikiClient;
+    // Determinar qué cliente Tiki usar (local obligatorio)
+    if (!$localTikiClient) {
+        jsonError('Credenciales Tiki no proporcionadas');
+    }
+    $activeTikiClient = $localTikiClient;
 
     // Guardar metadata (incluye credenciales Tiki para handleProcess)
     file_put_contents($tempDir . '/metadata.json', json_encode([
@@ -298,7 +301,7 @@ function handleExtract(): void
  */
 function handleProcess(): void
 {
-    global $tikiWikiClient, $messageMapper;
+    $messageMapper = new MessageMapper();
 
     $extractId = $_POST['extract_id'] ?? '';
     $offset = (int) ($_POST['offset'] ?? 0);
@@ -329,7 +332,7 @@ function handleProcess(): void
     $total = $metadata['total'] ?? 0;
     $trackerId = $metadata['tracker_id'] ?? 0;
 
-    // Crear TikiWikiClient local desde credenciales persistidas (si existen)
+    // Crear TikiWikiClient local desde credenciales persistidas (obligatorio)
     $tikiApiUrl = $metadata['tiki_api_url'] ?? '';
     $tikiApiToken = $metadata['tiki_api_token'] ?? '';
     $localTikiClient = null;
@@ -341,7 +344,10 @@ function handleProcess(): void
             uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
         );
     }
-    $activeTikiClient = $localTikiClient ?? $tikiWikiClient;
+    if (!$localTikiClient) {
+        jsonError('Credenciales Tiki no persistidas — re-subir el export');
+    }
+    $activeTikiClient = $localTikiClient;
 
     // Cargar file index
     $fileIndexPath = $tempDir . '/fileindex.json';
@@ -477,7 +483,7 @@ function handleProcess(): void
 
         $mediaUrl = '';
         if (!empty($uploadedFileIds)) {
-            $baseUrl = rtrim(str_replace('/api/', '', $tikiApiUrl ?: TIKIWIKI_API_URL), '/');
+            $baseUrl = rtrim(str_replace('/api/', '', $tikiApiUrl), '/');
             $mediaUrl = $baseUrl . '/tiki-download_file.php?fileId=' . $uploadedFileIds[0];
         }
         $context = [
@@ -514,7 +520,7 @@ function handleProcess(): void
  */
 function handleFull(): void
 {
-    global $tikiWikiClient, $messageMapper;
+    $messageMapper = new MessageMapper();
 
     // Credenciales Tiki desde el formulario (multi-conexión)
     $tikiApiUrl = $_POST['tiki_api_url'] ?? '';
@@ -524,7 +530,7 @@ function handleFull(): void
         jsonError('Tracker ID inválido');
     }
 
-    // Crear TikiWikiClient local si se proporcionaron credenciales
+    // Crear TikiWikiClient local (obligatorio — sin fallback legacy)
     $localClient = null;
     if ($tikiApiUrl !== '' && $tikiApiToken !== '') {
         $localClient = new TikiWikiClient(
@@ -534,7 +540,10 @@ function handleFull(): void
             uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
         );
     }
-    $activeTikiClient = $localClient ?? $tikiWikiClient;
+    if (!$localClient) {
+        jsonError('Credenciales Tiki no proporcionadas');
+    }
+    $activeTikiClient = $localClient;
 
     if (!isset($_FILES['export_file'])) {
         jsonError('No se recibió archivo');
@@ -750,7 +759,7 @@ function handleFull(): void
 
         $mediaUrl = '';
         if (!empty($uploadedFileIds)) {
-            $baseUrl = rtrim(str_replace('/api/', '', $tikiApiUrl ?: TIKIWIKI_API_URL), '/');
+            $baseUrl = rtrim(str_replace('/api/', '', $tikiApiUrl), '/');
             $mediaUrl = $baseUrl . '/tiki-download_file.php?fileId=' . $uploadedFileIds[0];
         }
         $context = [

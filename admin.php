@@ -710,6 +710,12 @@ if (isset($_GET['edit'])) {
                     <input type="checkbox" name="enabled" id="form-enabled" checked>
                     <label for="form-enabled">Activa</label>
                 </div>
+                
+                <div class="checkbox-row">
+                    <input type="checkbox" name="async_processing" id="form-async_processing">
+                    <label for="form-async_processing">Procesamiento asincrono (buffer + worker)</label>
+                    <div class="hint" style="margin-left:24px;">api.php responde 200 al instante, worker.php procesa en background (requiere cron)</div>
+                </div>
             </div>
             
             <div class="modal-footer">
@@ -745,6 +751,7 @@ function openEditModal(slug) {
     document.getElementById('form-tiki_api_url').value = conn.tiki_api_url;
     document.getElementById('form-tiki_api_token').value = conn.tiki_api_token;
     document.getElementById('form-enabled').checked = conn.enabled !== false;
+    document.getElementById('form-async_processing').checked = conn.async_processing === true;
     
     openModal('connection-modal');
 }

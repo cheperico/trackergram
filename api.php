@@ -3,8 +3,8 @@
  * trackerGram - Webhook endpoint para Telegram → TikiWiki
  * 
  * Punto de entrada HTTP para webhooks de Telegram.
- * Busca la conexión configurada por chat_id y usa sus credenciales.
- * Si no encuentra conexión, fallback al modo legacy (constantes globales).
+ * Busca la conexión configurada por chat_id + secret token.
+ * Si no encuentra conexión, rechaza con 403.
  */
 
 require_once 'bootstrap.php';
@@ -64,56 +64,26 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
         $chatId = $update['my_chat_member']['chat']['id'];
     }
 
-    // 5. Buscar conexión por chat_id
+    // 5. Buscar conexión por chat_id + webhook_secret
     $secretToken = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '';
     $configManager = new ConfigManager();
-    $connection = null;
-    $connectionSlug = null;
+    $found = $chatId ? $configManager->findByChatId((int) $chatId, $secretToken) : null;
 
-    if ($chatId) {
-        // Buscar entre todas las conexiones una que coincida con chat_id
-        foreach ($configManager->listConnections() as $slug => $conn) {
-            if ((int) ($conn['chat_id'] ?? 0) === $chatId && !empty($conn['enabled'])) {
-                // Si hay secret_token en el header, verificar que coincida
-                if ($secretToken !== '' && !empty($conn['webhook_secret'])) {
-                    if (hash_equals($conn['webhook_secret'], $secretToken)) {
-                        $connection = $conn;
-                        $connectionSlug = $slug;
-                        break;
-                    }
-                } else {
-                    // Sin secret token, tomar la primera coincidencia por chat_id
-                    $connection = $conn;
-                    $connectionSlug = $slug;
-                    break;
-                }
-            }
-        }
+    // 6. Sin conexión = rechazar
+    if ($found === null) {
+        log_message("trackerGram: chat_id {$chatId} sin conexión habilitada — rechazando", true);
+        http_response_code(403);
+        die(json_encode(['error' => 'Forbidden: no connection for this chat']));
     }
 
-    // 6. Si no se encontró conexión, intentar modo legacy (constantes globales)
-    $useConnection = $connection !== null;
+    $connection = $found;
+    $connectionSlug = $found['_slug'];
+    unset($connection['_slug']);
 
-    if (!$useConnection) {
-        // Legacy: verificar secret token global
-        if (defined('TELEGRAM_WEBHOOK_SECRET') && TELEGRAM_WEBHOOK_SECRET !== '') {
-            if (!hash_equals(TELEGRAM_WEBHOOK_SECRET, $secretToken)) {
-                log_message("trackerGram: Acceso denegado — secret token no coincide (ni conexión ni legacy)", true);
-                http_response_code(403);
-                die(json_encode(['error' => 'Acceso denegado']));
-            }
-        } else {
-            // No hay secret global configurado
-            if (empty($secretToken)) {
-                log_message("trackerGram: WEBHOOK_SECRET no configurado y sin conexión — rechazando", true);
-                http_response_code(500);
-                die(json_encode(['error' => 'Webhook secret no configurado']));
-            }
-        }
-    }
-
-    // 7. Procesar el update
-    if (ASYNC_PROCESSING) {
+    // 7. Procesar el update (async per-conexión o global)
+    $messageMapper = new MessageMapper();
+    $useAsync = $connection['async_processing'] ?? ASYNC_PROCESSING;
+    if ($useAsync) {
         // Modo async: escribir a buffer y responder rápido
         $bufferDir = TEMP_DIR . '/buffer';
         if (!is_dir($bufferDir)) {
@@ -128,41 +98,39 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
         $written = @file_put_contents($bufferFile, json_encode($bufferData), LOCK_EX);
         if ($written === false) {
             log_message("trackerGram: No se pudo escribir buffer async — procesando sincrónicamente", true);
-            processUpdate($update, $connection, $connectionSlug, $webhookHandler, $messageMapper);
+            processUpdate($update, $connection, $connectionSlug, $messageMapper);
         }
         echo json_encode(['status' => 'ok']);
     } else {
         // Modo sync: procesar inmediatamente
-        processUpdate($update, $connection, $connectionSlug, $webhookHandler, $messageMapper);
+        processUpdate($update, $connection, $connectionSlug, $messageMapper);
         echo json_encode(['status' => 'ok']);
     }
 }
 
 /**
- * Procesar un update de Telegram usando la conexión encontrada o el handler legacy
+ * Procesar un update de Telegram usando la conexión encontrada
  */
-function processUpdate(array $update, ?array $connection, ?string $connectionSlug, WebhookHandler $legacyHandler, MessageMapper $messageMapper): void
+function processUpdate(array $update, array $connection, string $connectionSlug, MessageMapper $messageMapper): void
 {
-    if ($connection !== null) {
-        // Usar credenciales de la conexión
-        $tikiClient = new TikiWikiClient(
-            apiUrl: $connection['tiki_api_url'],
-            token: $connection['tiki_api_token'],
-            timeout: TIMEOUT_TIKIWIKI_API,
-            uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
-        );
-        $tgClient = new TelegramClient(
-            botToken: $connection['bot_token']
-        );
-        $handler = new WebhookHandler(
-            tikiWikiClient: $tikiClient,
-            telegramClient: $tgClient,
-            messageMapper: $messageMapper,
-            trackerId: (int) $connection['tracker_id']
-        );
-        $handler->processUpdate($update);
-    } else {
-        // Fallback legacy: usar el handler de bootstrap
-        $legacyHandler->processUpdate($update);
+    // Extraer solo los campos de la conexión (por si pasan con _slug)
+    if (isset($connection['_slug'])) {
+        unset($connection['_slug']);
     }
+    $tikiClient = new TikiWikiClient(
+        apiUrl: $connection['tiki_api_url'],
+        token: $connection['tiki_api_token'],
+        timeout: TIMEOUT_TIKIWIKI_API,
+        uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
+    );
+    $tgClient = new TelegramClient(
+        botToken: $connection['bot_token']
+    );
+    $handler = new WebhookHandler(
+        tikiWikiClient: $tikiClient,
+        telegramClient: $tgClient,
+        messageMapper: $messageMapper,
+        trackerId: (int) $connection['tracker_id']
+    );
+    $handler->processUpdate($update);
 }

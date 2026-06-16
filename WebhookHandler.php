@@ -265,8 +265,7 @@ class WebhookHandler
             log_message("trackerGram: {$logType} upload result: " . ($uploadedFileId ?? 'null'));
             $msg->uploadedFileIds = $uploadedFileId ? [$uploadedFileId] : [];
             if ($uploadedFileId) {
-                $baseUrl = rtrim(str_replace('/api/', '', TIKIWIKI_API_URL), '/');
-                $msg->mediaUrl = $baseUrl . '/tiki-download_file.php?fileId=' . $uploadedFileId;
+                $msg->mediaUrl = $this->tikiWikiClient->getBaseUrl() . '/tiki-download_file.php?fileId=' . $uploadedFileId;
             }
         }
 

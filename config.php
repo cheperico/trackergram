@@ -47,17 +47,13 @@ function loadEnv(): void {
 
 loadEnv();
 
-// Token del bot de Telegram (obtenido de @BotFather)
-define('TELEGRAM_BOT_TOKEN', getenv('TELEGRAM_BOT_TOKEN') ?: '');
-define('TELEGRAM_API_URL', 'https://api.telegram.org/bot' . TELEGRAM_BOT_TOKEN . '/');
-
-// Secret token para webhook de Telegram (opcional pero recomendado)
-define('TELEGRAM_WEBHOOK_SECRET', getenv('TELEGRAM_WEBHOOK_SECRET') ?: '');
-
-// Configuración de TikiWiki
-define('TIKIWIKI_API_URL', getenv('TIKIWIKI_API_URL') ?: '');
-define('TIKIWIKI_TOKEN', getenv('TIKIWIKI_TOKEN') ?: '');
-define('TIKIWIKI_TRACKER_ID', getenv('TIKIWIKI_TRACKER_ID') ?: 1);
+// ──────────────────────────────────────────────
+// NOTA: Las credenciales de bots, wikis y trackers
+// se configuran desde el panel de admin y se
+// persisten en setup.json (multi-conexión).
+// Las constantes legacy TELEGRAM_BOT_TOKEN,
+// TIKIWIKI_API_URL, etc. fueron eliminadas.
+// ──────────────────────────────────────────────
 
 // Configuración de la aplicación
 define('APP_NAME', 'trackerGram');

@@ -25,9 +25,14 @@ class TikiWikiClient
         $this->uploadTimeout = $uploadTimeout;
     }
 
+    public function getBaseUrl(): string
+    {
+        return rtrim(str_replace('/api/', '', $this->apiUrl), '/');
+    }
+
     public function getMediaGalleryId(?int $trackerId = null): ?int
     {
-        $trackerId ??= (int) getenv('TIKIWIKI_TRACKER_ID') ?: 12;
+        $trackerId ??= 12; // fallback default tracker ID
 
         if (isset($this->mediaGalleryIdCache[$trackerId])) {
             return $this->mediaGalleryIdCache[$trackerId];

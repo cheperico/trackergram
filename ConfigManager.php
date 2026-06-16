@@ -97,6 +97,7 @@ class ConfigManager
         $connection = [
             'name' => 'default',
             'enabled' => true,
+            'async_processing' => !empty($env['ASYNC_PROCESSING']) && $env['ASYNC_PROCESSING'] === 'true',
             'bot_token' => $botToken,
             'webhook_secret' => $env['TELEGRAM_WEBHOOK_SECRET'] ?? '',
             'chat_id' => 0,
@@ -153,14 +154,39 @@ class ConfigManager
         return $this->data['connections'][$slug] ?? null;
     }
 
-    public function findByChatId(int $chatId, ?string $botToken = null): ?array
+    /**
+     * Buscar conexión por chat_id con validación de webhook_secret y enabled.
+     * 
+     * @param int $chatId Chat ID de Telegram
+     * @param string|null $webhookSecret Secret token del request (opcional)
+     * @return array|null Conexión + '_slug' o null si no hay match
+     */
+    public function findByChatId(int $chatId, ?string $webhookSecret = null): ?array
     {
         $this->load();
         foreach ($this->data['connections'] as $slug => $conn) {
-            if (($conn['chat_id'] ?? 0) === $chatId) {
-                if ($botToken === null || ($conn['bot_token'] ?? '') === $botToken) {
+            // Solo conexiones habilitadas
+            if (empty($conn['enabled'])) {
+                continue;
+            }
+            // Debe coincidir chat_id
+            if (($conn['chat_id'] ?? 0) !== $chatId) {
+                continue;
+            }
+
+            $hasConnSecret = !empty($conn['webhook_secret']);
+            $hasReqSecret = $webhookSecret !== null && $webhookSecret !== '';
+
+            if ($hasConnSecret) {
+                // La conexión requiere validación: el request debe tener el secret correcto
+                if ($hasReqSecret && hash_equals($conn['webhook_secret'], $webhookSecret)) {
                     return $conn + ['_slug' => $slug];
                 }
+                // secret incorrecto o ausente → no es match
+                continue;
+            } else {
+                // La conexión no tiene secret configurado: aceptar cualquier request
+                return $conn + ['_slug' => $slug];
             }
         }
         return null;
@@ -189,6 +215,7 @@ class ConfigManager
         $connection = [
             'name' => $name,
             'enabled' => $data['enabled'] ?? true,
+            'async_processing' => !empty($data['async_processing']),
             'bot_token' => trim((string) ($data['bot_token'] ?? '')),
             'webhook_secret' => trim((string) ($data['webhook_secret'] ?? '')),
             'chat_id' => (int) ($data['chat_id'] ?? 0),
