@@ -199,14 +199,20 @@ class ConfigManager
         $this->validateConnectionData($data);
 
         $name = trim($data['name']);
-        $slug = $data['slug'] ?? $this->generateSlug($name);
+        $slug = $data['slug'] ?? '';
 
-        // Si el slug ya existe y no es el mismo nombre, agregar sufijo
-        $originalSlug = $slug;
-        $counter = 1;
-        while (isset($this->data['connections'][$slug]) && ($this->data['connections'][$slug]['name'] ?? '') !== $name) {
-            $counter++;
-            $slug = $originalSlug . '-' . $counter;
+        if ($slug !== '' && isset($this->data['connections'][$slug])) {
+            // Edición: mantener el slug original, aunque el nombre haya cambiado
+            $slug = $data['slug'];
+        } else {
+            // Creación: generar slug desde el nombre, evitando colisiones
+            $slug = $this->generateSlug($name);
+            $originalSlug = $slug;
+            $counter = 1;
+            while (isset($this->data['connections'][$slug]) && ($this->data['connections'][$slug]['name'] ?? '') !== $name) {
+                $counter++;
+                $slug = $originalSlug . '-' . $counter;
+            }
         }
 
         $now = date('c');
