@@ -253,6 +253,40 @@ class ConfigManager
         return $this->save();
     }
 
+    /**
+     * Duplicar una conexión existente con nombre modificado.
+     * La copia se crea deshabilitada para que el usuario la configure antes de activar.
+     */
+    public function duplicateConnection(string $slug): ?string
+    {
+        $this->load();
+        $original = $this->data['connections'][$slug] ?? null;
+        if (!$original) {
+            return null;
+        }
+
+        // Nombre: "Original (copia)" o "Original (copia 2)" si ya existe
+        $baseName = $original['name'];
+        $counter = 1;
+        do {
+            $newName = $baseName . ' (copia' . ($counter > 1 ? ' ' . $counter : '') . ')';
+            $newSlug = $this->generateSlug($newName);
+            $counter++;
+        } while (isset($this->data['connections'][$newSlug]));
+
+        $now = date('c');
+        $dupe = $original;
+        $dupe['name'] = $newName;
+        $dupe['enabled'] = false; // deshabilitada por defecto
+        $dupe['created_at'] = $now;
+        $dupe['updated_at'] = $now;
+
+        $this->data['connections'][$newSlug] = $dupe;
+        $this->save();
+
+        return $newSlug;
+    }
+
     // --- Estado ---
 
     public function enableConnection(string $slug): bool

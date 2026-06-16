@@ -302,6 +302,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
             break;
         
+        // ── Duplicar conexión ──
+        case 'duplicate_connection':
+            $slug = $_POST['slug'] ?? '';
+            $newSlug = $configManager->duplicateConnection($slug);
+            if ($newSlug) {
+                $successMessage = 'Conexión duplicada como "' . escapeHtml($configManager->getConnection($newSlug)['name'] ?? $newSlug) . '"';
+                $connections = $configManager->listConnections();
+            } else {
+                $errorMessage = 'Error al duplicar conexión';
+            }
+            break;
+        
         // ── Activar/Desactivar conexión ──
         case 'toggle_connection':
             $slug = $_POST['slug'] ?? '';
@@ -609,6 +621,13 @@ if (isset($_GET['edit'])) {
                             <input type="hidden" name="tab" value="webhook">
                             <input type="hidden" name="edit" value="<?php echo escapeHtml($slug); ?>">
                             <button type="submit" class="btn btn-outline btn-sm" onclick="event.preventDefault(); openEditModal('<?php echo escapeHtml($slug); ?>')">Editar</button>
+                        </form>
+                        
+                        <form method="post" class="inline-form">
+                            <input type="hidden" name="action" value="duplicate_connection">
+                            <input type="hidden" name="slug" value="<?php echo escapeHtml($slug); ?>">
+                            <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+                            <button type="submit" class="btn btn-outline btn-sm">Duplicar</button>
                         </form>
                         
                         <form method="post" class="inline-form">
