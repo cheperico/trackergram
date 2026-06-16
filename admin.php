@@ -40,6 +40,7 @@ if (!isset($_SESSION['last_regeneration'])) {
 
 require_once 'bootstrap.php';
 require_once 'ConfigManager.php';
+require_once 'detect_helper.php';
 
 // ── Helpers ──
 
@@ -409,6 +410,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             header('Content-Type: application/json');
             echo json_encode($results);
             exit;
+        
+        // ── Asignar chat detectado a conexión ──
+        case 'assign_chat':
+            $slug = $_POST['slug'] ?? '';
+            $chatId = (int) ($_POST['chat_id'] ?? 0);
+            if (empty($slug) || !$chatId) {
+                $errorMessage = 'Datos inválidos para asignar chat';
+            } else {
+                $result = assignDetection($slug, $chatId);
+                if ($result['success']) {
+                    $successMessage = $result['message'];
+                    $connections = $configManager->listConnections();
+                } else {
+                    $errorMessage = $result['message'];
+                }
+            }
+            break;
+        
+        // ── Ignorar chat detectado ──
+        case 'ignore_chat':
+            $slug = $_POST['slug'] ?? '';
+            $chatId = (int) ($_POST['chat_id'] ?? 0);
+            if (empty($slug) || !$chatId) {
+                $errorMessage = 'Datos inválidos para ignorar chat';
+            } elseif (ignoreChat($slug, $chatId)) {
+                $successMessage = 'Chat #' . $chatId . ' ignorado';
+            } else {
+                $errorMessage = 'Error al ignorar chat';
+            }
+            break;
     }
 }
 
@@ -662,6 +693,64 @@ if (isset($_GET['edit'])) {
         <?php endif; ?>
     </div>
 </div>
+
+<?php
+// ── Chats detectados ──
+$detections = getDetections();
+$detectionsBySlug = [];
+foreach ($detections as $det) {
+    $detectionsBySlug[$det['slug']][] = $det;
+}
+?>
+<?php if (!empty($detectionsBySlug)): ?>
+<div class="section">
+    <div class="section-header">📡 Chats detectados</div>
+    <div class="section-content">
+        <p style="font-size:0.85em;color:var(--text-secondary);margin-bottom:16px;">
+            El bot recibió mensajes de chats que aún no tienen un chat_id asignado.
+            Verificá que sea el grupo correcto y asignalo a la conexión correspondiente.
+        </p>
+        <?php foreach ($detectionsBySlug as $slug => $chats): 
+            $conn = $configManager->getConnection($slug);    
+        ?>
+        <div style="margin-bottom:16px;padding:12px;border:1px solid var(--border);border-radius:8px;background:#fefefe;">
+            <div style="font-weight:600;font-size:0.9em;margin-bottom:8px;">
+                Conexión: <?php echo escapeHtml($conn['name'] ?? $slug); ?>
+                <span style="font-weight:400;color:var(--text-secondary);">(slug: <?php echo escapeHtml($slug); ?>)</span>
+            </div>
+            <?php foreach ($chats as $det): ?>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;margin-bottom:6px;background:#fff8e1;border-radius:6px;border:1px solid #ffe082;">
+                <div>
+                    <strong><?php echo escapeHtml($det['chat_title']); ?></strong><br>
+                    <span style="font-size:0.85em;color:var(--text-secondary);">
+                        ID: <?php echo (int) $det['chat_id']; ?> — 
+                        Detectado: <?php echo date('Y-m-d H:i', strtotime($det['detected_at'])); ?>
+                        (<?php echo (int) ($det['detected_count'] ?? 1); ?> veces)
+                    </span>
+                </div>
+                <div style="display:flex;gap:6px;flex-shrink:0;">
+                    <form method="post" style="display:inline;">
+                        <input type="hidden" name="action" value="assign_chat">
+                        <input type="hidden" name="slug" value="<?php echo escapeHtml($slug); ?>">
+                        <input type="hidden" name="chat_id" value="<?php echo (int) $det['chat_id']; ?>">
+                        <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+                        <button type="submit" class="btn btn-success btn-sm">Asignar</button>
+                    </form>
+                    <form method="post" style="display:inline;">
+                        <input type="hidden" name="action" value="ignore_chat">
+                        <input type="hidden" name="slug" value="<?php echo escapeHtml($slug); ?>">
+                        <input type="hidden" name="chat_id" value="<?php echo (int) $det['chat_id']; ?>">
+                        <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+                        <button type="submit" class="btn btn-outline btn-sm">Ignorar</button>
+                    </form>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- Modal: Crear/Editar conexion -->
 <div class="modal-overlay" id="connection-modal">

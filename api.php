@@ -9,6 +9,7 @@
 
 require_once 'bootstrap.php';
 require_once 'ConfigManager.php';
+require_once 'detect_helper.php';
 
 // Manejar webhook de Telegram
 // solo se ejecuta si api.php es el entry point directo
@@ -69,7 +70,33 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
     $configManager = new ConfigManager();
     $found = $chatId ? $configManager->findByChatId((int) $chatId, $secretToken) : null;
 
-    // 6. Sin conexión = rechazar
+    // 6. Sin conexión: detectar pasivamente si es un chat del bot sin asignar
+    if ($found === null && $chatId && $secretToken !== '') {
+        $pendingConn = $configManager->findByWebhookSecretPending($secretToken);
+        if ($pendingConn !== null) {
+            $chatTitle = '';
+            if (isset($update['message']['chat']['title'])) {
+                $chatTitle = $update['message']['chat']['title'];
+            } elseif (isset($update['message']['chat']['username'])) {
+                $chatTitle = '@' . $update['message']['chat']['username'];
+            } elseif (isset($update['my_chat_member']['chat']['title'])) {
+                $chatTitle = $update['my_chat_member']['chat']['title'];
+            }
+            if ($chatTitle === '') {
+                $chatTitle = 'Chat ' . $chatId;
+            }
+
+            $slug = $pendingConn['_slug'];
+            addDetection($slug, (int) $chatId, $chatTitle);
+            log_message("trackerGram: Chat detectado '{$chatTitle}' ({$chatId}) para conexión '{$slug}'");
+
+            // Responder 200 para no saturar logs de errores en Telegram
+            http_response_code(200);
+            die(json_encode(['status' => 'detected', 'slug' => $slug]));
+        }
+    }
+
+    // 7. Sin conexión = rechazar
     if ($found === null) {
         log_message("trackerGram: chat_id {$chatId} sin conexión habilitada — rechazando", true);
         http_response_code(403);

@@ -254,6 +254,25 @@ class ConfigManager
     }
 
     /**
+     * Buscar conexión incompleta (chat_id=0) por webhook_secret.
+     * Se usa en detección pasiva: el admin creó la conexión sin chat_id,
+     * el bot recibe mensajes y avisa qué chats detectó.
+     */
+    public function findByWebhookSecretPending(string $secret): ?array
+    {
+        $this->load();
+        foreach ($this->data['connections'] as $slug => $conn) {
+            if (!empty($conn['webhook_secret']) && hash_equals($conn['webhook_secret'], $secret)) {
+                // Debe tener chat_id vacío/cero (pendiente de asignar)
+                if (empty($conn['chat_id'])) {
+                    return $conn + ['_slug' => $slug];
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
      * Duplicar una conexión existente con nombre modificado.
      * La copia se crea deshabilitada para que el usuario la configure antes de activar.
      */
