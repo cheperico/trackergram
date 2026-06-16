@@ -440,12 +440,97 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $errorMessage = 'Error al ignorar chat';
             }
             break;
+        
+        // ── Crear tracker en TikiWiki ──
+        case 'create_tracker':
+            $trackerName = trim($_POST['tracker_name'] ?? '');
+            $trackerDesc = trim($_POST['tracker_description'] ?? '');
+            $rawPrefix = trim($_POST['field_prefix'] ?? 'telegrammessage');
+            $connectionSlug = trim($_POST['connection_slug'] ?? '');
+            $tikiApiUrl = trim($_POST['tiki_api_url'] ?? '');
+            $tikiApiToken = trim($_POST['tiki_api_token'] ?? '');
+            
+            // Validar nombre
+            if ($trackerName === '') {
+                $errorMessage = 'El nombre del tracker es obligatorio';
+                break;
+            }
+            
+            // Validar y normalizar prefix
+            $cleanPrefix = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $rawPrefix));
+            if ($cleanPrefix === '' || !ctype_alpha($cleanPrefix[0])) {
+                $errorMessage = 'El field prefix debe comenzar con una letra y contener solo caracteres alfanuméricos';
+                break;
+            }
+            if (strlen($cleanPrefix) > 16) {
+                $errorMessage = 'El field prefix no puede tener más de 16 caracteres';
+                break;
+            }
+            
+            // Obtener credenciales Tiki
+            if ($connectionSlug !== '') {
+                $conn = $configManager->getConnection($connectionSlug);
+                if (!$conn) {
+                    $errorMessage = 'Conexión no encontrada';
+                    break;
+                }
+                $tikiApiUrl = $conn['tiki_api_url'];
+                $tikiApiToken = $conn['tiki_api_token'];
+            }
+            
+            if ($tikiApiUrl === '' || $tikiApiToken === '') {
+                $errorMessage = 'Se requiere Tiki API URL y Token (o seleccionar una conexión)';
+                break;
+            }
+            
+            try {
+                $tikiClient = new TikiWikiClient(
+                    apiUrl: $tikiApiUrl,
+                    token: $tikiApiToken,
+                    timeout: TIMEOUT_TIKIWIKI_API,
+                    uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
+                );
+                $newTrackerId = $tikiClient->createTracker($trackerName, $trackerDesc, $cleanPrefix);
+                
+                if ($newTrackerId === null) {
+                    $errorMessage = 'Error al crear el tracker en TikiWiki. Verificar credenciales y revisar debug.log.';
+                    break;
+                }
+                
+                // Auto-asignar a conexión si se seleccionó una
+                if ($connectionSlug !== '') {
+                    $connData = [
+                        'slug' => $connectionSlug,
+                        'name' => $conn['name'],
+                        'bot_token' => $conn['bot_token'],
+                        'webhook_secret' => $conn['webhook_secret'],
+                        'chat_id' => $conn['chat_id'] ?? 0,
+                        'tiki_api_url' => $tikiApiUrl,
+                        'tiki_api_token' => $tikiApiToken,
+                        'tracker_id' => $newTrackerId,
+                        'field_prefix' => $cleanPrefix,
+                        'enabled' => $conn['enabled'] ?? true,
+                        'async_processing' => $conn['async_processing'] ?? false,
+                    ];
+                    $configManager->saveConnection($connData);
+                    $connections = $configManager->listConnections();
+                }
+                
+                $msg = "Tracker \"{$trackerName}\" creado exitosamente (ID: {$newTrackerId}, prefix: {$cleanPrefix})";
+                if ($connectionSlug !== '') {
+                    $msg .= " y asignado a la conexión \"{$conn['name']}\"";
+                }
+                $successMessage = $msg;
+            } catch (Exception $e) {
+                $errorMessage = 'Error al crear tracker: ' . $e->getMessage();
+            }
+            break;
     }
 }
 
 // ── Determinar tab activa ──
 $activeTab = $_GET['tab'] ?? 'webhook';
-if (!in_array($activeTab, ['webhook', 'import'])) {
+if (!in_array($activeTab, ['webhook', 'import', 'create'])) {
     $activeTab = 'webhook';
 }
 
@@ -602,6 +687,7 @@ if (isset($_GET['edit'])) {
 <div class="tabs">
     <a href="?tab=webhook" class="tab <?php echo $activeTab === 'webhook' ? 'active' : ''; ?>">Webhook</a>
     <a href="?tab=import" class="tab <?php echo $activeTab === 'import' ? 'active' : ''; ?>">Importar</a>
+    <a href="?tab=create" class="tab <?php echo $activeTab === 'create' ? 'active' : ''; ?>">Crear Tracker</a>
 </div>
 
 <div class="container">
@@ -947,7 +1033,8 @@ document.addEventListener('click', function(e) {
                     <option value="<?php echo escapeHtml($slug); ?>"
                         data-tiki_url="<?php echo escapeHtml($conn['tiki_api_url']); ?>"
                         data-tiki_token="<?php echo escapeHtml($conn['tiki_api_token']); ?>"
-                        data-tracker_id="<?php echo (int) $conn['tracker_id']; ?>">
+                        data-tracker_id="<?php echo (int) $conn['tracker_id']; ?>"
+                        data-field_prefix="<?php echo escapeHtml($conn['field_prefix'] ?? 'telegrammessage'); ?>">
                         <?php echo escapeHtml($conn['name']); ?>
                         (tracker #<?php echo (int) $conn['tracker_id']; ?>)
                     </option>
@@ -970,6 +1057,7 @@ document.addEventListener('click', function(e) {
                     </div>
                 </div>
             </div>
+            <input type="hidden" name="field_prefix" id="import-field_prefix" value="telegrammessage">
             
             <div class="form-row">
                 <div class="form-group">
@@ -999,6 +1087,7 @@ function fillImportFromConnection(select) {
     document.getElementById('import-tiki_url').value = option.dataset.tiki_url;
     document.getElementById('import-tiki_token').value = option.dataset.tiki_token;
     document.getElementById('import-tracker_id').value = option.dataset.tracker_id;
+    document.getElementById('import-field_prefix').value = option.dataset.field_prefix || 'telegrammessage';
 }
 
 function startImport() {
@@ -1158,6 +1247,118 @@ function processChunks(extractId, total, chatTitle, topicsFound) {
     
     return nextChunk();
 }
+</script>
+
+<?php elseif ($activeTab === 'create'): ?>
+
+<!-- ===== TAB: CREAR TRACKER ===== -->
+
+<div class="section">
+    <div class="section-header">Crear tracker en TikiWiki</div>
+    <div class="section-content">
+        <p style="margin-bottom:16px;">
+            Crea un tracker completo en TikiWiki con todos los campos necesarios
+            para recibir mensajes de Telegram. Se crea automáticamente la galería
+            de medios y se configura el campo FG.
+        </p>
+        
+        <form method="post">
+            <input type="hidden" name="action" value="create_tracker">
+            <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+            
+            <div class="form-group">
+                <label>Nombre del tracker *</label>
+                <input type="text" name="tracker_name" required placeholder="Ej: QPCH Produccion">
+                <div class="hint">Este nombre se usará como nombre del tracker en TikiWiki</div>
+            </div>
+            
+            <div class="form-group">
+                <label>Descripción (opcional)</label>
+                <input type="text" name="tracker_description" placeholder="Breve descripción del tracker">
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Field prefix</label>
+                    <input type="text" name="field_prefix" value="telegrammessage" placeholder="telegrammessage" pattern="[a-z][a-z0-9]*" maxlength="16">
+                    <div class="hint">
+                        Prefijo para los nombres de campo (permNames). 
+                        Solo minúsculas + números, máximo 16 caracteres.
+                        Ej: <code>qpch</code>, <code>soporte</code>, <code>chelapedia</code>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Asignar a conexión (opcional)</label>
+                    <select name="connection_slug" id="create-connection-slug" onchange="fillCreateFromConnection(this)">
+                        <option value="">— Solo crear tracker —</option>
+                        <?php foreach ($connections as $slug => $conn): ?>
+                        <option value="<?php echo escapeHtml($slug); ?>"
+                            data-tiki_url="<?php echo escapeHtml($conn['tiki_api_url']); ?>"
+                            data-tiki_token="<?php echo escapeHtml($conn['tiki_api_token']); ?>"
+                            data-prefix="<?php echo escapeHtml($conn['field_prefix'] ?? 'telegrammessage'); ?>">
+                            <?php echo escapeHtml($conn['name']); ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <div class="hint">Si seleccionás una conexión, se auto-asignará el tracker_id y el prefix</div>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Tiki API URL <span id="create-url-required" style="color:var(--error);">*</span></label>
+                    <input type="text" name="tiki_api_url" id="create-tiki-url" required placeholder="https://wiki.ejemplo.org/api/">
+                </div>
+                <div class="form-group">
+                    <label>Tiki API Token <span id="create-token-required" style="color:var(--error);">*</span></label>
+                    <div class="input-wrapper">
+                        <input type="password" name="tiki_api_token" id="create-tiki-token" required placeholder="Token de TikiWiki">
+                        <button type="button" class="icon-btn" onclick="togglePassword(this)">Mostrar</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:12px 16px;font-size:0.85em;color:#6d4c00;">
+                    <strong>📋 Vista previa de campos que se crearán:</strong>
+                    <div style="margin-top:6px;font-family:monospace;font-size:0.9em;" id="field-preview">
+                        <span id="preview-prefix">telegrammessage</span>TelegramMessageId,
+                        <span id="preview-prefix2">telegrammessage</span>ChatId,
+                        <span id="preview-prefix3">telegrammessage</span>Text, ...
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top:16px;">
+                <button type="submit" class="btn btn-primary">Crear Tracker</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function fillCreateFromConnection(select) {
+    var option = select.options[select.selectedIndex];
+    if (option.value === '') return;
+    
+    document.getElementById('create-tiki-url').value = option.dataset.tiki_url;
+    document.getElementById('create-tiki-token').value = option.dataset.tiki_token;
+    
+    var prefix = option.dataset.prefix || 'telegrammessage';
+    var prefixInput = document.querySelector('input[name="field_prefix"]');
+    prefixInput.value = prefix;
+    updateFieldPreview(prefix);
+}
+
+function updateFieldPreview(prefix) {
+    var els = document.querySelectorAll('[id^="preview-prefix"]');
+    els.forEach(function(el) { el.textContent = prefix; });
+}
+
+document.querySelector('input[name="field_prefix"]').addEventListener('input', function() {
+    var val = this.value || 'telegrammessage';
+    updateFieldPreview(val);
+});
 </script>
 
 <?php endif; ?>

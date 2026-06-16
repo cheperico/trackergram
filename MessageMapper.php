@@ -9,6 +9,16 @@
  */
 class MessageMapper
 {
+    private string $fieldPrefix = 'telegrammessage';
+
+    /**
+     * Setear field prefix para los permNames de campos
+     */
+    public function setFieldPrefix(string $prefix): void
+    {
+        $this->fieldPrefix = $prefix;
+    }
+
     /**
      * Procesar mensaje de webhook de Telegram
      * Sin efectos secundarios (no upload, no cache)
@@ -425,42 +435,44 @@ class MessageMapper
      */
     public function toWikiFields(NormalizedMessage $msg): array
     {
+        $p = $this->fieldPrefix;
+
         $fields = [
-            'fields[telegrammessageTelegramMessageId]' => $msg->messageId,
-            'fields[telegrammessageChatId]' => $msg->chatId,
-            'fields[telegrammessageChatTitle]' => htmlspecialchars($msg->chatTitle, ENT_QUOTES, 'UTF-8'),
-            'fields[telegrammessageTopicId]' => $msg->topicId,
-            'fields[telegrammessageTopicTitle]' => htmlspecialchars($msg->topicTitle, ENT_QUOTES, 'UTF-8'),
-            'fields[telegrammessageUserId]' => $msg->userId,
-            'fields[telegrammessageUsername]' => htmlspecialchars($msg->username, ENT_QUOTES, 'UTF-8'),
-            'fields[telegrammessageFirstName]' => htmlspecialchars($msg->firstName, ENT_QUOTES, 'UTF-8'),
-            'fields[telegrammessageLastName]' => htmlspecialchars($msg->lastName, ENT_QUOTES, 'UTF-8'),
-            'fields[telegrammessageDisplayName]' => htmlspecialchars($msg->displayName, ENT_QUOTES, 'UTF-8'),
-            'fields[telegrammessageMessageType]' => $msg->messageType,
-            'fields[telegrammessageText]' => htmlspecialchars($msg->text, ENT_QUOTES, 'UTF-8'),
-            'fields[telegrammessageLocation]' => $msg->location,
-            'fields[telegrammessageMediaType]' => $msg->mediaType,
-            'fields[telegrammessageMediaSize]' => $msg->mediaSize,
-            'fields[telegrammessageMediaWidth]' => $msg->width,
-            'fields[telegrammessageMediaHeight]' => $msg->height,
-            'fields[telegrammessageMediaDuration]' => $msg->duration,
-            'fields[telegrammessageMediaCaption]' => htmlspecialchars($msg->mediaCaption, ENT_QUOTES, 'UTF-8'),
-            'fields[telegrammessageMessageDate]' => $msg->date,
-            'fields[telegrammessageEditedDate]' => $msg->editedDate,
-            'fields[telegrammessageReplyToId]' => $msg->replyToId,
-            'fields[telegrammessageReactions]' => htmlspecialchars($msg->reactions, ENT_QUOTES, 'UTF-8'),
+            "fields[{$p}TelegramMessageId]" => $msg->messageId,
+            "fields[{$p}ChatId]" => $msg->chatId,
+            "fields[{$p}ChatTitle]" => htmlspecialchars($msg->chatTitle, ENT_QUOTES, 'UTF-8'),
+            "fields[{$p}TopicId]" => $msg->topicId,
+            "fields[{$p}TopicTitle]" => htmlspecialchars($msg->topicTitle, ENT_QUOTES, 'UTF-8'),
+            "fields[{$p}UserId]" => $msg->userId,
+            "fields[{$p}Username]" => htmlspecialchars($msg->username, ENT_QUOTES, 'UTF-8'),
+            "fields[{$p}FirstName]" => htmlspecialchars($msg->firstName, ENT_QUOTES, 'UTF-8'),
+            "fields[{$p}LastName]" => htmlspecialchars($msg->lastName, ENT_QUOTES, 'UTF-8'),
+            "fields[{$p}DisplayName]" => htmlspecialchars($msg->displayName, ENT_QUOTES, 'UTF-8'),
+            "fields[{$p}MessageType]" => $msg->messageType,
+            "fields[{$p}Text]" => htmlspecialchars($msg->text, ENT_QUOTES, 'UTF-8'),
+            "fields[{$p}Location]" => $msg->location,
+            "fields[{$p}MediaType]" => $msg->mediaType,
+            "fields[{$p}MediaSize]" => $msg->mediaSize,
+            "fields[{$p}MediaWidth]" => $msg->width,
+            "fields[{$p}MediaHeight]" => $msg->height,
+            "fields[{$p}MediaDuration]" => $msg->duration,
+            "fields[{$p}MediaCaption]" => htmlspecialchars($msg->mediaCaption, ENT_QUOTES, 'UTF-8'),
+            "fields[{$p}MessageDate]" => $msg->date,
+            "fields[{$p}EditedDate]" => $msg->editedDate,
+            "fields[{$p}ReplyToId]" => $msg->replyToId,
+            "fields[{$p}Reactions]" => htmlspecialchars($msg->reactions, ENT_QUOTES, 'UTF-8'),
         ];
 
         if (!empty($msg->uploadedFileIds)) {
-            $fields['fields[telegrammessageMedia]'] = implode(',', $msg->uploadedFileIds);
+            $fields["fields[{$p}Media]"] = implode(',', $msg->uploadedFileIds);
         }
 
         if ($msg->mediaUrl !== '') {
-            $fields['fields[telegrammessageMediaUrl]'] = $msg->mediaUrl;
+            $fields["fields[{$p}MediaUrl]"] = $msg->mediaUrl;
         }
 
         if ($msg->fileUrl !== '') {
-            $fields['fields[telegrammessageFileUrl]'] = $msg->fileUrl;
+            $fields["fields[{$p}FileUrl]"] = $msg->fileUrl;
         }
 
         return $fields;

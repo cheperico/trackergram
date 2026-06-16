@@ -109,6 +109,7 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
 
     // 7. Procesar el update (async per-conexión o global)
     $messageMapper = new MessageMapper();
+    $messageMapper->setFieldPrefix($connection['field_prefix'] ?? 'telegrammessage');
     $useAsync = $connection['async_processing'] ?? ASYNC_PROCESSING;
     if ($useAsync) {
         // Modo async: escribir a buffer y responder rápido
@@ -150,6 +151,7 @@ function processUpdate(array $update, array $connection, string $connectionSlug,
         timeout: TIMEOUT_TIKIWIKI_API,
         uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
     );
+    $tikiClient->setFieldPrefix($connection['field_prefix'] ?? 'telegrammessage');
     $tgClient = new TelegramClient(
         botToken: $connection['bot_token']
     );

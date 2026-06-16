@@ -140,6 +140,8 @@ function processBatch(string $bufferDir, int $maxEvents, ConfigManager $configMa
                 timeout: TIMEOUT_TIKIWIKI_API,
                 uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
             );
+            $tikiClient->setFieldPrefix($connection['field_prefix'] ?? 'telegrammessage');
+            $messageMapper->setFieldPrefix($connection['field_prefix'] ?? 'telegrammessage');
             $tgClient = new TelegramClient(
                 botToken: $connection['bot_token']
             );

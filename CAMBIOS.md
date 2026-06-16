@@ -1,5 +1,20 @@
 # Cambios - Changelog
 
+## v0.5.0
+- **Feat**: Nueva pestaña "Crear Tracker" en el panel admin.
+  - Crea tracker completo en TikiWiki con nombre, descripción y field prefix personalizable.
+  - Galería de medios y campo FG creados automáticamente.
+  - Vista previa en vivo de los campos generados.
+  - Auto-asignación a conexión existente (actualiza tracker_id + field_prefix).
+- **Feat**: Field prefix personalizable (≤16 caracteres, `[a-z][a-z0-9]*`).
+  - `TikiWikiClient`, `MessageMapper`: soporte completo de field prefix dinámico.
+  - `ConfigManager`: persiste `field_prefix` en cada conexión.
+  - Todos los flujos (webhook, import, async worker) usan el field prefix de la conexión.
+  - Backward compatible — conexiones existentes usan `telegrammessage` por defecto.
+- **Fix**: `MessageMapper::toWikiFields()` ahora usa field prefix dinámico (no hardcodeado).
+- **Fix**: `worker.php` setea field prefix por conexión en cada evento.
+- **Docs**: AGENTS.md actualizado con nota sobre field prefix dinámico.
+
 ## v0.3.0
 - **Arquitectura multi-conexión**: trackerGram ahora soporta múltiples bots, wikis y trackers desde una sola instalación.
   - Nueva unidad de configuración: **conexión** (bot_token + webhook_secret + chat_id + tiki_api_url + tiki_api_token + tracker_id + name + enabled).

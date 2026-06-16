@@ -294,6 +294,15 @@ El tracker por defecto tiene estos campos (permNames):
 | `telegrammessageReplyToId` | t (text) | ID del mensaje al que responde (con link a vista filtrada via Pretty Tracker) |
 | `telegrammessageReactions` | t (text) | Reacciones formateadas como texto legible (👍 3 · ❤️ 1) |
 
+### Nota sobre field prefix
+
+Los permNames de los campos ya **no están hardcodeados** como `telegrammessage*`. Ahora se genera dinámicamente desde el `field_prefix` de la conexión (ej: `qpch`, `soporte`, `telegrammessage`).
+
+- El prefix se configura al crear el tracker desde el panel admin (pestaña "Crear Tracker").
+- Máximo 16 caracteres, solo `[a-z][a-z0-9]*`, debe comenzar con letra.
+- Conexiones existentes sin prefix usan `telegrammessage` por defecto (backward compatible).
+- Todos los flujos (webhook, import, async) usan el field prefix de la conexión.
+
 ### Tipos de campo en TikiWiki
 
 | Código | Tipo | Uso |

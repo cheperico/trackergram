@@ -91,6 +91,8 @@ function handleExtract(): void
     $tikiApiUrl = $_POST['tiki_api_url'] ?? '';
     $tikiApiToken = $_POST['tiki_api_token'] ?? '';
     $trackerId = $_POST['tracker_id'] ?? '';
+    $fieldPrefix = $_POST['field_prefix'] ?? 'telegrammessage';
+    $messageMapper->setFieldPrefix($fieldPrefix);
     if (!$trackerId || !ctype_digit($trackerId)) {
         jsonError('Tracker ID inválido');
     }
@@ -104,6 +106,7 @@ function handleExtract(): void
             timeout: TIMEOUT_TIKIWIKI_API,
             uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
         );
+        $localTikiClient->setFieldPrefix($fieldPrefix);
     }
 
     if (!isset($_FILES['export_file'])) {
@@ -261,6 +264,7 @@ function handleExtract(): void
         'created' => time(),
         'tiki_api_url' => $tikiApiUrl ?: '',
         'tiki_api_token' => $tikiApiToken ?: '',
+        'field_prefix' => $fieldPrefix,
     ]));
 
     // Indexar archivos multimedia
@@ -335,6 +339,8 @@ function handleProcess(): void
     // Crear TikiWikiClient local desde credenciales persistidas (obligatorio)
     $tikiApiUrl = $metadata['tiki_api_url'] ?? '';
     $tikiApiToken = $metadata['tiki_api_token'] ?? '';
+    $fieldPrefix = $metadata['field_prefix'] ?? 'telegrammessage';
+    $messageMapper->setFieldPrefix($fieldPrefix);
     $localTikiClient = null;
     if ($tikiApiUrl !== '' && $tikiApiToken !== '') {
         $localTikiClient = new TikiWikiClient(
@@ -343,6 +349,7 @@ function handleProcess(): void
             timeout: TIMEOUT_TIKIWIKI_API,
             uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
         );
+        $localTikiClient->setFieldPrefix($fieldPrefix);
     }
     if (!$localTikiClient) {
         jsonError('Credenciales Tiki no persistidas — re-subir el export');
@@ -526,6 +533,8 @@ function handleFull(): void
     $tikiApiUrl = $_POST['tiki_api_url'] ?? '';
     $tikiApiToken = $_POST['tiki_api_token'] ?? '';
     $trackerId = $_POST['tracker_id'] ?? '';
+    $fieldPrefix = $_POST['field_prefix'] ?? 'telegrammessage';
+    $messageMapper->setFieldPrefix($fieldPrefix);
     if (!$trackerId || !ctype_digit($trackerId)) {
         jsonError('Tracker ID inválido');
     }
@@ -539,6 +548,7 @@ function handleFull(): void
             timeout: TIMEOUT_TIKIWIKI_API,
             uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
         );
+        $localClient->setFieldPrefix($fieldPrefix);
     }
     if (!$localClient) {
         jsonError('Credenciales Tiki no proporcionadas');

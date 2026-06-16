@@ -9,9 +9,18 @@ class TikiWikiClient
     private string $token;
     private int $timeout;
     private int $uploadTimeout;
+    private string $fieldPrefix = 'telegrammessage';
     private array $mediaGalleryIdCache = [];
     /** Trackers where repairFgGallery was already attempted (prevents loops) */
     private array $repairedTrackers = [];
+
+    /**
+     * Setear field prefix para todos los permNames (ej: 'qpch', 'soporte')
+     */
+    public function setFieldPrefix(string $prefix): void
+    {
+        $this->fieldPrefix = $prefix;
+    }
 
     public function __construct(
         string $apiUrl,
@@ -58,7 +67,7 @@ class TikiWikiClient
             $data = json_decode($response, true);
             if (isset($data['fields'])) {
                 foreach ($data['fields'] as $field) {
-                    if (($field['type'] ?? '') === 'FG' && ($field['permName'] ?? '') === 'telegrammessageMedia') {
+                    if (($field['type'] ?? '') === 'FG' && ($field['permName'] ?? '') === $this->fieldPrefix . 'Media') {
                         $options = $field['options'] ?? null;
                         $galleryId = $this->extractGalleryIdFromOptions($options);
                         if ($galleryId !== null) {
@@ -263,10 +272,10 @@ class TikiWikiClient
 
     public function messageExists(int $trackerId, int $messageId, ?int $chatId = null): int
     {
-        $url = $this->apiUrl . "trackers/$trackerId/items?filter[fields][telegrammessageTelegramMessageId]=$messageId";
+        $url = $this->apiUrl . "trackers/$trackerId/items?filter[fields][" . $this->fieldPrefix . "TelegramMessageId]=$messageId";
 
         if ($chatId !== null) {
-            $url .= "&filter[fields][telegrammessageChatId]=$chatId";
+            $url .= "&filter[fields][" . $this->fieldPrefix . "ChatId]=$chatId";
         }
 
         $ch = curl_init();
@@ -336,8 +345,10 @@ class TikiWikiClient
      * Actualizar las options de un campo FG (File Gallery) en un tracker existente.
      * Usado para asignar galería y configurar count=0 (ilimitado).
      */
-    public function updateFgFieldOptions(int $trackerId, int $galleryId, string $excessBehavior = 'discard'): bool
+    public function updateFgFieldOptions(int $trackerId, int $galleryId, string $excessBehavior = 'discard', ?string $fgPermName = null): bool
     {
+        $fgPermName ??= $this->fieldPrefix . 'Media';
+
         // Obtener fieldId del campo FG desde GET /api/trackers/{id}/fields
         $url = $this->apiUrl . "trackers/{$trackerId}/fields";
 
@@ -364,7 +375,7 @@ class TikiWikiClient
         $fieldId = null;
         if (isset($data['fields'])) {
             foreach ($data['fields'] as $field) {
-                if (($field['permName'] ?? '') === 'telegrammessageMedia') {
+                if (($field['permName'] ?? '') === $fgPermName) {
                     $fieldId = $field['fieldId'] ?? $field['id'] ?? null;
                     break;
                 }
@@ -372,7 +383,7 @@ class TikiWikiClient
         }
 
         if ($fieldId === null) {
-            log_message("TikiWikiClient: No se encontró el campo telegrammessageMedia en tracker {$trackerId}", true);
+            log_message("TikiWikiClient: No se encontró el campo {$fgPermName} en tracker {$trackerId}", true);
             return false;
         }
 
@@ -413,8 +424,9 @@ class TikiWikiClient
      * Reparar campo FG de un tracker: crea galería y actualiza options
      * Se llama automáticamente cuando getMediaGalleryId() no encuentra galleryId
      */
-    private function repairFgGallery(int $trackerId): ?int
+    private function repairFgGallery(int $trackerId, ?string $fgPermName = null): ?int
     {
+        $fgPermName ??= $this->fieldPrefix . 'Media';
         $trackerName = 'Tracker ' . $trackerId;
 
         // Crear galería
@@ -425,7 +437,7 @@ class TikiWikiClient
         }
 
         // Actualizar el campo FG
-        if ($this->updateFgFieldOptions($trackerId, $galleryId)) {
+        if ($this->updateFgFieldOptions($trackerId, $galleryId, 'discard', $fgPermName)) {
             log_message("TikiWikiClient: repairFgGallery — galería {$galleryId} asignada a tracker {$trackerId}");
             return $galleryId;
         }
@@ -480,18 +492,31 @@ class TikiWikiClient
         return ['ok' => true, 'message' => "API responde correctamente ({$trackerCount} trackers encontrados)"];
     }
 
-    public function createTracker(string $trackerName): ?int
+    public function createTracker(string $trackerName, string $description = '', string $prefix = 'telegrammessage'): ?int
     {
+        // Validar prefix
+        $prefix = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $prefix));
+        if ($prefix === '' || !ctype_alpha($prefix[0])) {
+            log_message("TikiWikiClient: createTracker — prefix inválido '{$prefix}'", true);
+            return null;
+        }
+        if (strlen($prefix) > 16) {
+            log_message("TikiWikiClient: createTracker — prefix '{$prefix}' excede 16 caracteres", true);
+            return null;
+        }
+
         $url = $this->apiUrl . "trackers";
+        $desc = $description ?: 'Tracker automático creado por trackerGram';
 
         // 1. Crear galería de medios asociada
         $galleryId = $this->createGallery($trackerName . ' Media');
 
         // 2. Armar definición del campo FG con options si tenemos galería
+        $fgPermName = $prefix . 'Media';
         $fgField = [
-            'name' => 'telegrammessageMedia',
+            'name' => $fgPermName,
             'type' => 'FG',
-            'permName' => 'telegrammessageMedia',
+            'permName' => $fgPermName,
         ];
         if ($galleryId !== null) {
             $fgField['options'] = [
@@ -503,34 +528,34 @@ class TikiWikiClient
 
         $fields = [
             'name' => $trackerName,
-            'description' => 'Tracker automático creado por trackerGram',
+            'description' => $desc,
             'fields' => [
-                ['name' => 'telegrammessageTelegramMessageId', 'type' => 't', 'permName' => 'telegrammessageTelegramMessageId'],
-                ['name' => 'telegrammessageChatId', 'type' => 't', 'permName' => 'telegrammessageChatId'],
-                ['name' => 'telegrammessageChatTitle', 'type' => 't', 'permName' => 'telegrammessageChatTitle'],
-                ['name' => 'telegrammessageTopicId', 'type' => 't', 'permName' => 'telegrammessageTopicId'],
-                ['name' => 'telegrammessageTopicTitle', 'type' => 't', 'permName' => 'telegrammessageTopicTitle'],
-                ['name' => 'telegrammessageUserId', 'type' => 't', 'permName' => 'telegrammessageUserId'],
-                ['name' => 'telegrammessageUsername', 'type' => 't', 'permName' => 'telegrammessageUsername'],
-                ['name' => 'telegrammessageFirstName', 'type' => 't', 'permName' => 'telegrammessageFirstName'],
-                ['name' => 'telegrammessageLastName', 'type' => 't', 'permName' => 'telegrammessageLastName'],
-                ['name' => 'telegrammessageDisplayName', 'type' => 't', 'permName' => 'telegrammessageDisplayName'],
-                ['name' => 'telegrammessageMessageType', 'type' => 't', 'permName' => 'telegrammessageMessageType'],
-                ['name' => 'telegrammessageText', 'type' => 'a', 'permName' => 'telegrammessageText'],
-                ['name' => 'telegrammessageLocation', 'type' => 'G', 'permName' => 'telegrammessageLocation'],
-                ['name' => 'telegrammessageMediaType', 'type' => 't', 'permName' => 'telegrammessageMediaType'],
-                ['name' => 'telegrammessageMediaSize', 'type' => 'n', 'permName' => 'telegrammessageMediaSize'],
-                ['name' => 'telegrammessageMediaCaption', 'type' => 't', 'permName' => 'telegrammessageMediaCaption'],
-                ['name' => 'telegrammessageMessageDate', 'type' => 'f', 'permName' => 'telegrammessageMessageDate'],
+                ['name' => $prefix . 'TelegramMessageId', 'type' => 't', 'permName' => $prefix . 'TelegramMessageId'],
+                ['name' => $prefix . 'ChatId', 'type' => 't', 'permName' => $prefix . 'ChatId'],
+                ['name' => $prefix . 'ChatTitle', 'type' => 't', 'permName' => $prefix . 'ChatTitle'],
+                ['name' => $prefix . 'TopicId', 'type' => 't', 'permName' => $prefix . 'TopicId'],
+                ['name' => $prefix . 'TopicTitle', 'type' => 't', 'permName' => $prefix . 'TopicTitle'],
+                ['name' => $prefix . 'UserId', 'type' => 't', 'permName' => $prefix . 'UserId'],
+                ['name' => $prefix . 'Username', 'type' => 't', 'permName' => $prefix . 'Username'],
+                ['name' => $prefix . 'FirstName', 'type' => 't', 'permName' => $prefix . 'FirstName'],
+                ['name' => $prefix . 'LastName', 'type' => 't', 'permName' => $prefix . 'LastName'],
+                ['name' => $prefix . 'DisplayName', 'type' => 't', 'permName' => $prefix . 'DisplayName'],
+                ['name' => $prefix . 'MessageType', 'type' => 't', 'permName' => $prefix . 'MessageType'],
+                ['name' => $prefix . 'Text', 'type' => 'a', 'permName' => $prefix . 'Text'],
+                ['name' => $prefix . 'Location', 'type' => 'G', 'permName' => $prefix . 'Location'],
+                ['name' => $prefix . 'MediaType', 'type' => 't', 'permName' => $prefix . 'MediaType'],
+                ['name' => $prefix . 'MediaSize', 'type' => 'n', 'permName' => $prefix . 'MediaSize'],
+                ['name' => $prefix . 'MediaCaption', 'type' => 't', 'permName' => $prefix . 'MediaCaption'],
+                ['name' => $prefix . 'MessageDate', 'type' => 'f', 'permName' => $prefix . 'MessageDate'],
                 $fgField,
-                ['name' => 'telegrammessageMediaUrl', 'type' => 't', 'permName' => 'telegrammessageMediaUrl'],
-                ['name' => 'telegrammessageFileUrl', 'type' => 't', 'permName' => 'telegrammessageFileUrl'],
-                ['name' => 'telegrammessageMediaWidth', 'type' => 'n', 'permName' => 'telegrammessageMediaWidth'],
-                ['name' => 'telegrammessageMediaHeight', 'type' => 'n', 'permName' => 'telegrammessageMediaHeight'],
-                ['name' => 'telegrammessageMediaDuration', 'type' => 'DUR', 'permName' => 'telegrammessageMediaDuration'],
-                ['name' => 'telegrammessageEditedDate', 'type' => 't', 'permName' => 'telegrammessageEditedDate'],
-                ['name' => 'telegrammessageReplyToId', 'type' => 't', 'permName' => 'telegrammessageReplyToId'],
-                ['name' => 'telegrammessageReactions', 'type' => 'a', 'permName' => 'telegrammessageReactions']
+                ['name' => $prefix . 'MediaUrl', 'type' => 't', 'permName' => $prefix . 'MediaUrl'],
+                ['name' => $prefix . 'FileUrl', 'type' => 't', 'permName' => $prefix . 'FileUrl'],
+                ['name' => $prefix . 'MediaWidth', 'type' => 'n', 'permName' => $prefix . 'MediaWidth'],
+                ['name' => $prefix . 'MediaHeight', 'type' => 'n', 'permName' => $prefix . 'MediaHeight'],
+                ['name' => $prefix . 'MediaDuration', 'type' => 'DUR', 'permName' => $prefix . 'MediaDuration'],
+                ['name' => $prefix . 'EditedDate', 'type' => 't', 'permName' => $prefix . 'EditedDate'],
+                ['name' => $prefix . 'ReplyToId', 'type' => 't', 'permName' => $prefix . 'ReplyToId'],
+                ['name' => $prefix . 'Reactions', 'type' => 'a', 'permName' => $prefix . 'Reactions']
             ]
         ];
 
@@ -557,7 +582,7 @@ class TikiWikiClient
                 // 3. Si la galería se creó pero el FG field inline no tomó las options,
                 //    hacemos un update explícito
                 if ($galleryId !== null) {
-                    $this->updateFgFieldOptions((int) $trackerId, $galleryId);
+                    $this->updateFgFieldOptions((int) $trackerId, $galleryId, 'discard', $fgPermName);
                 }
                 return (int) $trackerId;
             }
