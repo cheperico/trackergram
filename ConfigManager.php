@@ -11,7 +11,28 @@ class ConfigManager
 
     public function __construct(?string $configPath = null)
     {
-        $this->configPath = $configPath ?? __DIR__ . '/setup.json';
+        $defaultPath = __DIR__ . '/config/setup.json';
+        $oldPath = __DIR__ . '/setup.json';
+
+        if ($configPath !== null) {
+            $this->configPath = $configPath;
+        } elseif (file_exists($oldPath) && !file_exists($defaultPath)) {
+            // Migración automática: setup.json en raíz → config/setup.json
+            $configDir = __DIR__ . '/config';
+            if (!is_dir($configDir)) {
+                @mkdir($configDir, 0755, true);
+            }
+            if (@rename($oldPath, $defaultPath)) {
+                log_message("ConfigManager: setup.json migrado de raíz a config/");
+            } else {
+                log_message("ConfigManager: No se pudo migrar setup.json a config/ — usando raíz", true);
+                $this->configPath = $oldPath;
+                return;
+            }
+            $this->configPath = $defaultPath;
+        } else {
+            $this->configPath = $defaultPath;
+        }
     }
 
     // --- Carga y persistencia ---

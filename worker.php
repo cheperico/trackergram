@@ -43,6 +43,9 @@ $messageMapper = new MessageMapper();
 $exitCode = 0;
 
 do {
+    // Limpiar archivos .done viejos siempre (incluso si no hay eventos)
+    cleanupDoneFiles($bufferDir, 3600);
+
     $processed = processBatch($bufferDir, $maxEvents, $configManager, $messageMapper);
     if ($processed === 0) {
         if (!$forever) {
@@ -168,9 +171,6 @@ function processBatch(string $bufferDir, int $maxEvents, ConfigManager $configMa
 
         $processed++;
     }
-
-    // Limpiar archivos .done viejos (>1 hora)
-    cleanupDoneFiles($bufferDir, 3600);
 
     $total = $success + $failed;
     echo "[" . date('Y-m-d H:i:s') . "] Resumen: {$total} procesados, {$success} ok, {$failed} errores\n";
