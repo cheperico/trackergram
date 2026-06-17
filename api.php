@@ -70,10 +70,18 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
     $configManager = new ConfigManager();
     $found = $chatId ? $configManager->findByChatId((int) $chatId, $secretToken) : null;
 
-    // 6. Sin conexión: detectar pasivamente si es un chat del bot sin asignar
+    // 6. Sin conexión por chat_id: detectar pasivamente
     if ($found === null && $chatId && $secretToken !== '') {
-        $pendingConn = $configManager->findByWebhookSecretPending($secretToken);
-        if ($pendingConn !== null) {
+        // 6a. Buscar conexión pendiente (chat_id=0)
+        $detectedConn = $configManager->findByWebhookSecretPending($secretToken);
+        
+        // 6b. Si no hay pendiente, buscar cualquier conexión con este webhook_secret
+        //    (mismo bot agregado a un grupo NUEVO)
+        if ($detectedConn === null) {
+            $detectedConn = $configManager->findByWebhookSecret($secretToken);
+        }
+        
+        if ($detectedConn !== null) {
             $chatTitle = '';
             if (isset($update['message']['chat']['title'])) {
                 $chatTitle = $update['message']['chat']['title'];
@@ -86,7 +94,7 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
                 $chatTitle = 'Chat ' . $chatId;
             }
 
-            $slug = $pendingConn['_slug'];
+            $slug = $detectedConn['_slug'];
             addDetection($slug, (int) $chatId, $chatTitle);
             log_message("trackerGram: Chat detectado '{$chatTitle}' ({$chatId}) para conexión '{$slug}'");
 
@@ -94,6 +102,9 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
             http_response_code(200);
             die(json_encode(['status' => 'detected', 'slug' => $slug]));
         }
+        
+        // 6c. Si no matchea ninguna conexión, el webhook_secret es desconocido
+        log_message("trackerGram: webhook_secret desconocido para chat {$chatId} — ¿bot token filtrado?", true);
     }
 
     // 7. Sin conexión = rechazar

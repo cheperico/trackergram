@@ -299,6 +299,22 @@ class ConfigManager
     }
 
     /**
+     * Buscar cualquier conexión por webhook_secret, independientemente de chat_id.
+     * Sirve para detectar cuando un bot conocido (con secret válido) es agregado
+     * a un grupo nuevo que aún no está configurado.
+     */
+    public function findByWebhookSecret(string $secret): ?array
+    {
+        $this->load();
+        foreach ($this->data['connections'] as $slug => $conn) {
+            if (!empty($conn['webhook_secret']) && hash_equals($conn['webhook_secret'], $secret)) {
+                return $conn + ['_slug' => $slug];
+            }
+        }
+        return null;
+    }
+
+    /**
      * Duplicar una conexión existente con nombre modificado.
      * La copia se crea deshabilitada para que el usuario la configure antes de activar.
      */
