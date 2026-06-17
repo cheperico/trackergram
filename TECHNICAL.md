@@ -32,25 +32,40 @@ Las opciones son:
 - Un túnel como ngrok o Cloudflare Tunnel para desarrollo local
 - DuckDNS u otro servicio de DNS dinámico con Let's Encrypt
 
-### Cómo recibe el mensaje trackerGram
+### Cómo recibe el mensaje trackerGram (v0.4.0+ — multi-conexión)
 
-El archivo `api.php` es el punto de entrada. Es intencionalmente simple:
+El archivo `api.php` es el punto de entrada. Ahora busca una **conexión** configurada en `setup.json`:
 
 ```php
 require_once 'bootstrap.php';
+require_once 'ConfigManager.php';
 
-// Validar secret token
-$secretToken = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '';
-if (!hash_equals(TELEGRAM_WEBHOOK_SECRET, $secretToken)) {
+// Buscar conexión por (chat_id, X-Telegram-Bot-Api-Secret-Token)
+$configManager = new ConfigManager();
+$connection = $configManager->findByChat($chatId, $secretToken);
+
+if (!$connection) {
     http_response_code(403);
-    die(json_encode(['error' => 'Acceso denegado']));
+    die(json_encode(['error' => 'Forbidden: no connection for this chat']));
 }
 
-// Rate limiting
-// ...
+// Crear clientes per-conexión (inyección de dependencias)
+$tikiClient = new TikiWikiClient(
+    apiUrl: $connection['tiki_api_url'],
+    token: $connection['tiki_api_token'],
+    timeout: TIMEOUT_TIKIWIKI_API,
+    uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
+);
+$tgClient = new TelegramClient(botToken: $connection['bot_token']);
 
-// Delegar en WebhookHandler (inyectado en bootstrap.php)
-$webhookHandler->processUpdate($update);
+$handler = new WebhookHandler(
+    tikiWikiClient: $tikiClient,
+    telegramClient: $tgClient,
+    messageMapper: new MessageMapper(),
+    trackerId: (int) $connection['tracker_id']
+);
+
+$handler->processUpdate($update);
 ```
 
 **Por qué está así**: `api.php` no tiene lógica de negocio. Solo valida que la petición venga de Telegram (secret token), limita la cantidad de peticiones (rate limiting), y delega en `WebhookHandler`. Esto se hizo en la refactorización v0.1.7 — antes, `api.php` tenía cientos de líneas de lógica mezclada.
@@ -134,10 +149,12 @@ $fields = [
 `$tikiWikiClient->createTrackerItem()` hace el POST a la API (o `createTrackerItemWithMedia()` si incluye archivos multimedia):
 
 ```php
-$url = TIKIWIKI_API_URL . "trackers/$trackerId/items";
+$url = $this->apiUrl . "trackers/$trackerId/items";
 // POST con http_build_query($fields)
 // Header: Authorization: Bearer $TOKEN
 ```
+
+> (En el código original esto era `TIKIWIKI_API_URL`, una constante global. Desde v0.4.0, la URL de la API viene de la conexión en `setup.json` y se inyecta en `TikiWikiClient`.)
 
 **Lección aprendida**: TikiWiki a veces devuelve errores PHP como HTML con status 200. Por eso verificamos que la respuesta tenga `itemId` en JSON — si no lo tiene, algo falló aunque el HTTP diga 200.
 
@@ -234,10 +251,12 @@ Telegram puede enviar el mismo webhook dos veces. Si no verificamos, terminamos 
 Antes de crear un item, verificamos si ya existe:
 
 ```php
-if ($tikiWikiClient->messageExists(TIKIWIKI_TRACKER_ID, $message['message_id'], $chatId) > 0) {
+if ($tikiWikiClient->messageExists($trackerId, $message['message_id'], $chatId) > 0) {
     return; // Ya existe, saltar
 }
 ```
+
+> (El `$trackerId` viene de la conexión; antes era la constante global `TIKIWIKI_TRACKER_ID`.)
 
 `messageExists` hace un GET a la API de TikiWiki filtrando por `telegrammessageTelegramMessageId` Y `telegrammessageChatId`. Retorna la cantidad de items encontrados.
 
@@ -355,26 +374,33 @@ WebhookHandler::processMessage()
 6. sendToTikiWikiWithRetries() → crear item con reintentos
 ```
 
-### Cómo se relacionan los archivos
+### Cómo se relacionan los archivos (v0.4.0+)
 
 ```
 bootstrap.php
-    ├── config.php          → carga .env, define constantes
+    ├── config.php          → carga .env, define constantes globales
+    ├── NormalizedMessage.php
     ├── TikiWikiClient.php  → comunicación con TikiWiki
     ├── TelegramClient.php  → comunicación con Telegram
     ├── MessageMapper.php   → transformación de datos
     └── WebhookHandler.php  → orquesta todo
 
-api.php → bootstrap.php → $webhookHandler->processUpdate()
-admin.php → bootstrap.php → $tikiWikiClient->createTracker()
-import.php → bootstrap.php → $messageMapper->toWikiFields() + $tikiWikiClient
+api.php → ConfigManager → clientes por conexión → WebhookHandler::processUpdate()
+admin.php → ConfigManager → clientes por conexión (test, create)
+import.php → clientes locales desde formulario → MessageMapper::toWikiFields()
+worker.php → ConfigManager → clientes por conexión → WebhookHandler
 ```
 
-### Deuda técnica (actual — v0.2.2)
+**No hay un wiring central**. Cada entry point crea sus propios clientes desde las credenciales de la conexión en `setup.json`. Esto permite tener múltiples bots, wikis y trackers desde una misma instalación.
 
-Items **ya resueltos** en versiones recientes:
-- ✅ **Inyección de dependencias**: `TikiWikiClient`, `TelegramClient`, `WebhookHandler` y `MessageMapper` son instanciables con dependencias inyectadas por constructor. Ver `bootstrap.php` para el wiring.
-- ✅ **Modelo intermedio único**: `NormalizedMessage` es el modelo único entre ambos parsers. Webhook usa `fromWebhook()`, import usa `fromExport()`, ambos convergen en `toWikiFields()`.
+### Deuda técnica (v0.4.0)
+
+Items **ya resueltos**:
+- ✅ **Inyección de dependencias**: Clases instanciables con dependencias inyectadas por constructor, sin wiring central en bootstrap.
+- ✅ **Modelo intermedio único**: `NormalizedMessage` entre ambos parsers.
+- ✅ **Multi-conexión**: Múltiples bots, wikis y trackers desde una instalación.
+- ✅ **Async per-conexión**: Cada conexión puede procesar síncrona o asíncronamente.
+- ✅ **Sin modo legacy**: No hay constantes de credenciales en `.env`; todo viaja en `setup.json`.
 
 Items aún pendientes:
 - ⬜ **Manejo de errores inconsistente**: Algunas funciones retornan `null`, otras `false`, otras usan `die()`. Pendiente migrar a excepciones de dominio (ver roadmap).

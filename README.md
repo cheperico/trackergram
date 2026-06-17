@@ -515,22 +515,25 @@ Podés copiar todo este bloque y pegarlo en **Admin → Trackers → Importar ca
 
 ## Qué Necesitás Antes de Empezar
 
-1. **Un bot de Telegram** — Se crea gratis hablando con [@BotFather](https://t.me/BotFather)
-2. **Un TikiWiki 21.x+** — Con la API habilitada y un token de acceso
-3. **Un servidor con PHP 8.0+** — Apache o Nginx, accesible desde internet con HTTPS
+1. **Un bot de Telegram** — Se crea gratis hablando con [@BotFather](https://t.me/BotFather). Necesitás el token.
+2. **Un TikiWiki 21.x+** — Con la API habilitada, un token de acceso y un tracker (o dejá que trackerGram lo cree automáticamente).
+3. **Un servidor con PHP 8.0+** — Apache o Nginx, accesible desde internet con HTTPS.
 
-Si no tenés nada de esto, la [guía de instalación](INSTALL.md) te explica paso a paso cómo conseguirlo.
+Cada vinculación (bot + wiki + tracker) se configura desde el panel de admin. Podés tener múltiples bots y wikis desde una misma instalación.
+
+Si no tenés nada de esto, la [guía de instalación](INSTALL.md) te explica paso a paso.
 
 ## Instalación Rápida
 
 1. Copiá los archivos de trackerGram a tu servidor web
-2. Copiá `.env.example` a `.env` y completá usuario/contraseña de admin
+2. Copiá `.env.example` a `.env` y completá solo usuario/contraseña de admin
 3. Accedé al panel de administración: `https://tu-dominio.com/trackergram/admin.php`
-4. Creá una **conexión** desde el panel: bot token, TikiWiki URL, token y tracker ID
-5. Configurá el webhook con un clic desde la misma conexión
-6. ¡Listo! Los mensajes del grupo empiezan a llegar al tracker
+4. Creá una **conexión** desde el panel: nombre, bot token, webhook secret, TikiWiki URL, token y tracker ID
+5. Configurá el webhook con un clic desde la misma conexión (botón "🌐 Webhook")
+6. Verificá que funcione con el botón "🧪 Test"
+7. Agregá el bot al grupo de Telegram — ¡los mensajes empiezan a llegar al tracker automáticamente!
 
-Para instrucciones detalladas, incluyendo cómo crear el bot y configurar TikiWiki, ver [INSTALL.md](INSTALL.md).
+Para instrucciones detalladas, incluyendo cómo crear el bot y configurar TikiWiki por primera vez, ver [INSTALL.md](INSTALL.md).
 
 ## Uso
 
@@ -557,8 +560,8 @@ Accedé a `https://tu-dominio.com/trackergram/admin.php` con tus credenciales de
 
 ### Los mensajes no llegan a TikiWiki
 
-1. Verificá que el webhook esté activo: accedé a `https://api.telegram.org/bot<TU_TOKEN>/getWebhookInfo`
-2. Revisá que el tracker ID sea correcto en el panel de admin
+1. Verificá que el webhook esté activo: accedé al panel de admin y usá el botón "🌐 Webhook" o consultá manualmente: `https://api.telegram.org/bot<TU_TOKEN>/getWebhookInfo`
+2. Revisá que el tracker ID y las credenciales Tiki sean correctas en el panel de admin
 3. Activá `DEBUG_MODE=true` en `.env` y revisá `debug.log`
 
 ### Error al conectar a TikiWiki
@@ -584,10 +587,12 @@ Si tu servidor tiene ModSecurity activado, puede bloquear las peticiones a TikiW
 | Documento | Para quién |
 |---|---|
 | [INSTALL.md](INSTALL.md) | Cómo instalar paso a paso |
-| [TECHNICAL.md](TECHNICAL.md) | Cómo está construido (para desarrolladores) |
-| [AGENTS.md](AGENTS.md) | Contexto para agentes de IA (lectura obligatoria) |
-| [roadmap.md](roadmap.md) | Qué falta por hacer |
+| [TECHNICAL.md](TECHNICAL.md) | Cómo está construido (para desarrolladores y curiosos) |
+| [AGENTS.md](AGENTS.md) | Contexto para agentes de IA (lectura obligatoria para IA) |
+| [roadmap.md](roadmap.md) | Qué falta por hacer, prioridades |
 | [CAMBIOS.md](CAMBIOS.md) | Historial de cambios por versión |
+| `design/*` | Documentos de diseño exploratorio (features en discusión) |
+| `opt/visualizacion-tiki.md` | Template Smarty para feed tipo chat en TikiWiki |
 
 ## Licencia
 
