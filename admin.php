@@ -187,7 +187,7 @@ if (!checkAuth()) {
     $loginFailed = $_SERVER['REQUEST_METHOD'] === 'POST';
     ?>
     <!DOCTYPE html>
-    <html>
+    <html lang="es">
     <head>
         <title>trackerGram - Login</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -198,22 +198,23 @@ if (!checkAuth()) {
             .login-card p { margin: 0 0 20px 0; color: #65676b; font-size: 0.9em; }
             .login-card label { display: block; font-weight: 500; font-size: 0.9em; margin-bottom: 4px; color: #1c1e21; }
             .login-card input { width: 100%; padding: 10px 14px; border: 1px solid #dddfe2; border-radius: 8px; font-size: 0.95em; margin-bottom: 16px; box-sizing: border-box; }
-            .login-card input:focus { outline: none; border-color: #4a76a8; box-shadow: 0 0 0 3px rgba(74,118,168,0.12); }
+            .login-card input:focus { outline: 2px solid #4a76a8; outline-offset: 1px; border-color: #4a76a8; }
             .login-card button { width: 100%; padding: 10px; background: #4a76a8; color: white; border: none; border-radius: 8px; font-size: 1em; font-weight: 600; cursor: pointer; }
             .login-card button:hover { background: #345583; }
-            .error { color: #e74c3c; font-size: 0.9em; margin-bottom: 12px; }
+            .login-card button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+            .error { color: #c62828; font-size: 0.9em; margin-bottom: 12px; }
         </style>
     </head>
     <body>
-        <div class="login-card">
-            <h1>trackerGram</h1>
+        <div class="login-card" role="region" aria-labelledby="login-heading">
+            <h1 id="login-heading">trackerGram</h1>
             <p>Ingresá con tu usuario y contraseña</p>
-            <?php if ($loginFailed): ?><div class="error">Usuario o contraseña incorrectos</div><?php endif; ?>
+            <?php if ($loginFailed): ?><div class="error" role="alert">Usuario o contraseña incorrectos</div><?php endif; ?>
             <form method="post">
-                <label>Usuario</label>
-                <input type="text" name="login_username" required>
-                <label>Contraseña</label>
-                <input type="password" name="login_password" required>
+                <label for="login-username">Usuario</label>
+                <input type="text" name="login_username" id="login-username" required aria-required="true">
+                <label for="login-password">Contraseña</label>
+                <input type="password" name="login_password" id="login-password" required aria-required="true">
                 <button type="submit">Iniciar sesión</button>
             </form>
         </div>
@@ -321,6 +322,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $newSlug = $configManager->saveConnection($data);
                 $successMessage = 'Conexión "' . escapeHtml($data['name']) . '" guardada exitosamente (slug: ' . $newSlug . ')';
                 $connections = $configManager->listConnections(); // refrescar
+
+                // Intentar fetchear bot_name y chat_title (no crítico si falla)
+                if (!empty($data['bot_token'])) {
+                    $tgClient = new TelegramClient($data['bot_token']);
+                    $tgResult = $tgClient->testConnection();
+                    if ($tgResult['ok'] && !empty($tgResult['bot_name'])) {
+                        $configManager->updateConnectionFields($newSlug, ['bot_name' => $tgResult['bot_name']]);
+                        $connections = $configManager->listConnections(); // refrescar de nuevo
+                    }
+                    $chatId = (int) ($data['chat_id'] ?? 0);
+                    if ($chatId > 0) {
+                        $chatInfo = $tgClient->getChat($chatId);
+                        if ($chatInfo !== null && !empty($chatInfo['title'] ?? $chatInfo['username'] ?? '')) {
+                            $chatTitle = $chatInfo['title'] ?? $chatInfo['username'] ?? '';
+                            $configManager->updateConnectionFields($newSlug, ['chat_title' => $chatTitle]);
+                            $connections = $configManager->listConnections();
+                        }
+                    }
+                }
             } catch (Exception $e) {
                 $errorMessage = 'Error al guardar conexión: ' . $e->getMessage();
             }
@@ -428,6 +448,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $tgClient = new TelegramClient($conn['bot_token']);
                 $tgResult = $tgClient->testConnection();
                 $results['telegram'] = $tgResult;
+                
+                // Si Telegram responde OK, guardar bot_name
+                if ($tgResult['ok'] && !empty($tgResult['bot_name'])) {
+                    $configManager->updateConnectionFields($slug, ['bot_name' => $tgResult['bot_name']]);
+                    $results['bot_name'] = $tgResult['bot_name'];
+                }
+                
+                // Si hay chat_id, obtener chat_title via getChat
+                $chatId = (int) ($conn['chat_id'] ?? 0);
+                if ($chatId > 0) {
+                    $chatInfo = $tgClient->getChat($chatId);
+                    if ($chatInfo !== null && !empty($chatInfo['title'] ?? $chatInfo['username'] ?? '')) {
+                        $chatTitle = $chatInfo['title'] ?? $chatInfo['username'] ?? '';
+                        $configManager->updateConnectionFields($slug, ['chat_title' => $chatTitle]);
+                        $results['chat_title'] = $chatTitle;
+                    }
+                }
             } else {
                 $results['telegram'] = ['ok' => false, 'message' => 'Sin bot_token'];
             }
@@ -435,10 +472,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             // Test TikiWiki
             if (!empty($conn['tiki_api_url']) && !empty($conn['tiki_api_token'])) {
                 $tikiClient = new TikiWikiClient($conn['tiki_api_url'], $conn['tiki_api_token']);
-                $tikiResult = $tikiClient->testConnection();
+                $tikiResult = $tikiClient->checkPermissions();
                 $results['tikiwiki'] = $tikiResult;
             } else {
-                $results['tikiwiki'] = ['ok' => false, 'message' => 'Sin API URL o token'];
+                $results['tikiwiki'] = ['ok' => false, 'api_access' => false, 'file_gallery' => false, 'upload_files' => false, 'message' => 'Sin API URL o token'];
             }
             
             header('Content-Type: application/json');
@@ -483,6 +520,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $connectionSlug = trim($_POST['connection_slug'] ?? '');
             $tikiApiUrl = trim($_POST['tiki_api_url'] ?? '');
             $tikiApiToken = trim($_POST['tiki_api_token'] ?? '');
+            $galleryId = !empty($_POST['gallery_id']) ? (int) $_POST['gallery_id'] : null;
             
             // Validar nombre
             if ($trackerName === '') {
@@ -524,7 +562,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     timeout: TIMEOUT_TIKIWIKI_API,
                     uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
                 );
-                $newTrackerId = $tikiClient->createTracker($trackerName, $trackerDesc, $cleanPrefix);
+                $newTrackerId = $tikiClient->createTracker($trackerName, $trackerDesc, $cleanPrefix, $galleryId);
                 
                 if ($newTrackerId === null) {
                     $errorMessage = 'Error al crear el tracker en TikiWiki. Verificar credenciales y revisar debug.log.';
@@ -550,11 +588,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $connections = $configManager->listConnections();
                 }
                 
-                $msg = "Tracker \"{$trackerName}\" creado exitosamente (ID: {$newTrackerId}, prefix: {$cleanPrefix})";
+                $galleryMsg = ($galleryId !== null) ? ", galería: #{$galleryId}" : "";
+                $msg = "Tracker \"{$trackerName}\" creado exitosamente (ID: {$newTrackerId}, prefix: {$cleanPrefix}{$galleryMsg})";
                 if ($connectionSlug !== '') {
                     $msg .= " y asignado a la conexión \"{$conn['name']}\"";
                 }
                 $successMessage = $msg;
+                
+                // Limpiar POST para que el form no retenga valores tras éxito
+                $_POST['tracker_name'] = '';
+                $_POST['tracker_description'] = '';
+                $_POST['tiki_api_url'] = '';
+                $_POST['tiki_api_token'] = '';
+                $_POST['field_prefix'] = 'telegrammessage';
+                $_POST['gallery_id'] = '';
             } catch (Exception $e) {
                 $errorMessage = 'Error al crear tracker: ' . $e->getMessage();
             }
@@ -575,7 +622,7 @@ if (isset($_GET['edit'])) {
 }
 ?>
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
     <title>trackerGram - Admin</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -586,16 +633,53 @@ if (isset($_GET['edit'])) {
             --bg: #f0f2f5;
             --card-bg: #ffffff;
             --text: #1c1e21;
-            --text-secondary: #65676b;
+            --text-secondary: #5f6368;
             --border: #dddfe2;
-            --success: #42b72a;
-            --error: #e74c3c;
+            --success: #2e7d32;
+            --success-bg: #e8f5e9;
+            --error: #c62828;
+            --error-bg: #ffebee;
             --radius: 12px;
             --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
             --shadow-lg: 0 4px 12px rgba(0,0,0,0.1);
+            --focus-ring: 0 0 0 3px rgba(74,118,168,0.35);
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; padding: 0; }
+
+        /* Skip link — visible only on focus for keyboard users */
+        .skip-link {
+            position: absolute;
+            top: -100%;
+            left: 8px;
+            background: var(--primary-dark);
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 0 0 8px 8px;
+            z-index: 300;
+            font-size: 0.9em;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .skip-link:focus {
+            top: 0;
+            outline: 2px solid #fff;
+            outline-offset: 2px;
+        }
+
+        /* Focus-visible: keyboard-only focus rings */
+        :focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+        :focus:not(:focus-visible) {
+            outline: none;
+        }
+        /* Restore focus for inputs that always need it */
+        input:focus, select:focus, textarea:focus {
+            outline: 2px solid var(--primary);
+            outline-offset: 1px;
+        }
         
         /* Navbar */
         .navbar { background: var(--primary); color: white; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 56px; box-shadow: var(--shadow-lg); position: sticky; top: 0; z-index: 100; }
@@ -604,19 +688,21 @@ if (isset($_GET['edit'])) {
         .navbar-actions { display: flex; align-items: center; gap: 12px; }
         .navbar a { color: white; text-decoration: none; font-size: 0.9em; padding: 6px 12px; border-radius: 6px; transition: background 0.2s; }
         .navbar a:hover { background: rgba(255,255,255,0.15); }
+        .navbar a:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
         
         /* Tabs */
         .tabs { display: flex; background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 0 24px; gap: 0; }
         .tab { padding: 14px 24px; font-weight: 500; font-size: 0.95em; color: var(--text-secondary); cursor: pointer; border-bottom: 3px solid transparent; text-decoration: none; transition: color 0.2s, border-color 0.2s; }
         .tab:hover { color: var(--text); }
         .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+        .tab:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
         
         .container { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
         
         /* Alert banners */
         .alert { padding: 14px 18px; border-radius: var(--radius); margin-bottom: 20px; font-size: 0.95em; font-weight: 500; }
-        .alert-success { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
-        .alert-error { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+        .alert-success { background: var(--success-bg); color: var(--success); border: 2px solid #a5d6a7; }
+        .alert-error { background: var(--error-bg); color: var(--error); border: 2px solid #ef9a9a; }
         
         /* Section cards */
         .section { background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 20px; overflow: hidden; border: 1px solid var(--border); }
@@ -629,7 +715,7 @@ if (isset($_GET['edit'])) {
         .conn-card:hover { box-shadow: var(--shadow-lg); }
         .conn-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
         .conn-name { font-weight: 600; font-size: 1.05em; display: flex; align-items: center; gap: 8px; }
-        .conn-status { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+        .conn-status { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
         .conn-status.active { background: var(--success); }
         .conn-status.inactive { background: var(--text-secondary); }
         .conn-details { display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.85em; color: var(--text-secondary); margin-bottom: 12px; }
@@ -645,26 +731,32 @@ if (isset($_GET['edit'])) {
         .form-group .hint { font-size: 0.8em; color: var(--text-secondary); margin-top: 2px; }
         .input-wrapper { display: flex; gap: 6px; align-items: stretch; }
         .input-wrapper input { flex: 1; }
-        input[type="text"], input[type="password"], input[type="number"] { padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95em; width: 100%; transition: border-color 0.2s; background: #fff; }
-        input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(74,118,168,0.12); }
+        input[type="text"], input[type="password"], input[type="number"], input[type="url"] { padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95em; width: 100%; background: #fff; }
+        input:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
         select { padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95em; background: #fff; width: 100%; }
+        select:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
         
-        .btn { padding: 10px 22px; border: none; border-radius: 8px; font-size: 0.9em; font-weight: 600; cursor: pointer; transition: background 0.2s, transform 0.1s; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
-        .btn:active { transform: scale(0.97); }
+        .btn { padding: 10px 22px; border: none; border-radius: 8px; font-size: 0.9em; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
         .btn-primary { background: var(--primary); color: white; }
         .btn-primary:hover { background: var(--primary-dark); }
-        .btn-outline { background: transparent; color: var(--primary); border: 1px solid var(--primary); }
+        .btn-primary:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+        .btn-outline { background: transparent; color: var(--primary); border: 2px solid var(--primary); }
         .btn-outline:hover { background: rgba(74,118,168,0.06); }
+        .btn-outline:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
         .btn-danger { background: var(--error); color: white; }
-        .btn-danger:hover { background: #c0392b; }
+        .btn-danger:hover { background: #b71c1c; }
+        .btn-danger:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
         .btn-success { background: var(--success); color: white; }
-        .btn-success:hover { background: #36a420; }
+        .btn-success:hover { background: #1b5e20; }
+        .btn-success:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
         .btn-sm { padding: 6px 12px; font-size: 0.85em; }
         .btn-warning { background: #f39c12; color: white; }
         .btn-warning:hover { background: #d68910; }
+        .btn-warning:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
         
         .icon-btn { padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 0.9em; transition: background 0.2s; }
         .icon-btn:hover { background: #e4e6e9; }
+        .icon-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
         
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         @media (max-width: 600px) { .form-row { grid-template-columns: 1fr; } }
@@ -678,8 +770,9 @@ if (isset($_GET['edit'])) {
         .modal-overlay.show { display: flex; }
         .modal { background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow-lg); max-width: 600px; width: 100%; max-height: 90vh; overflow-y: auto; }
         .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 1.1em; display: flex; justify-content: space-between; align-items: center; }
-        .modal-close { background: none; border: none; font-size: 1.5em; cursor: pointer; color: var(--text-secondary); padding: 0 4px; }
+        .modal-close { background: none; border: none; font-size: 1.5em; cursor: pointer; color: var(--text-secondary); padding: 0 4px; border-radius: 4px; }
         .modal-close:hover { color: var(--text); }
+        .modal-close:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
         .modal-body { padding: 20px; }
         .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
         
@@ -693,12 +786,22 @@ if (isset($_GET['edit'])) {
         
         /* Import */
         input[type="file"] { font-size: 0.9em; padding: 8px 0; }
+        input[type="file"]:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
         
         /* Test result */
         .test-result { margin-top: 8px; padding: 8px 12px; border-radius: 6px; font-size: 0.85em; }
-        .test-result.ok { background: #e8f5e9; color: #2e7d32; }
-        .test-result.fail { background: #ffebee; color: #c62828; }
+        .test-result.ok { background: var(--success-bg); color: var(--success); border: 1px solid #a5d6a7; }
+        .test-result.fail { background: var(--error-bg); color: var(--error); border: 1px solid #ef9a9a; }
         
+        /* Reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                transition-duration: 0.01ms !important;
+                animation-duration: 0.01ms !important;
+            }
+            .conn-card { transition: none; }
+        }
+
         @media (max-width: 600px) {
             .navbar { padding: 0 12px; }
             .navbar-brand { font-size: 1em; }
@@ -708,29 +811,32 @@ if (isset($_GET['edit'])) {
     </style>
 </head>
 <body>
+<!-- Skip link for keyboard users -->
+<a href="#main-content" class="skip-link">Saltar al contenido principal</a>
 
 <!-- Navbar -->
-<nav class="navbar">
-    <div class="navbar-brand">trackerGram <span>Admin</span></div>
+<nav class="navbar" aria-label="Navegación principal">
+    <div class="navbar-brand" aria-hidden="true">trackerGram <span>Admin</span></div>
+    <span class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">trackerGram Admin</span>
     <div class="navbar-actions">
-        <a href="?action=logout">Cerrar sesion</a>
+        <a href="?action=logout" aria-label="Cerrar sesión de administrador">Cerrar sesion</a>
     </div>
 </nav>
 
 <!-- Tabs -->
-<div class="tabs">
-    <a href="?tab=webhook" class="tab <?php echo $activeTab === 'webhook' ? 'active' : ''; ?>">Webhook</a>
-    <a href="?tab=import" class="tab <?php echo $activeTab === 'import' ? 'active' : ''; ?>">Importar</a>
-    <a href="?tab=create" class="tab <?php echo $activeTab === 'create' ? 'active' : ''; ?>">Crear Tracker</a>
-</div>
+<nav class="tabs" aria-label="Secciones de administración">
+    <a href="?tab=webhook" class="tab <?php echo $activeTab === 'webhook' ? 'active' : ''; ?>" aria-current="<?php echo $activeTab === 'webhook' ? 'page' : 'false'; ?>">Webhook</a>
+    <a href="?tab=import" class="tab <?php echo $activeTab === 'import' ? 'active' : ''; ?>" aria-current="<?php echo $activeTab === 'import' ? 'page' : 'false'; ?>">Importar</a>
+    <a href="?tab=create" class="tab <?php echo $activeTab === 'create' ? 'active' : ''; ?>" aria-current="<?php echo $activeTab === 'create' ? 'page' : 'false'; ?>">Crear Tracker</a>
+</nav>
 
-<div class="container">
+<div class="container" id="main-content" role="main">
 
 <?php if ($successMessage): ?>
-    <div class="alert alert-success"><?php echo escapeHtml($successMessage); ?></div>
+    <div class="alert alert-success" role="alert" aria-live="polite"><?php echo escapeHtml($successMessage); ?></div>
 <?php endif; ?>
 <?php if ($errorMessage): ?>
-    <div class="alert alert-error"><?php echo escapeHtml($errorMessage); ?></div>
+    <div class="alert alert-error" role="alert" aria-live="assertive"><?php echo escapeHtml($errorMessage); ?></div>
 <?php endif; ?>
 
 <?php if ($activeTab === 'webhook'): ?>
@@ -743,18 +849,18 @@ if (isset($_GET['edit'])) {
         <?php if (empty($connections)): ?>
             <div class="empty-state">
                 <p>No hay conexiones configuradas.</p>
-                <button class="btn btn-primary" onclick="openModal('connection-modal')">+ Agregar conexion</button>
+                <button class="btn btn-primary" onclick="openModal('connection-modal')" title="Agregar una nueva conexión entre un bot de Telegram y un tracker de TikiWiki">+ Agregar conexion</button>
             </div>
         <?php else: ?>
             <div style="margin-bottom:16px;">
-                <button class="btn btn-primary" onclick="openModal('connection-modal')">+ Agregar conexion</button>
+                <button class="btn btn-primary" onclick="openModal('connection-modal')" title="Agregar una nueva conexión entre un bot de Telegram y un tracker de TikiWiki">+ Agregar conexion</button>
             </div>
             <div class="conn-list">
                 <?php foreach ($connections as $slug => $conn): ?>
                 <div class="conn-card">
                     <div class="conn-header">
                         <div class="conn-name">
-                            <span class="conn-status <?php echo $conn['enabled'] ? 'active' : 'inactive'; ?>"></span>
+                            <span class="conn-status <?php echo $conn['enabled'] ? 'active' : 'inactive'; ?>" aria-label="<?php echo $conn['enabled'] ? 'Conexión activa' : 'Conexión inactiva'; ?>"></span>
                             <?php echo escapeHtml($conn['name']); ?>
                             <?php if (!$conn['enabled']): ?>
                                 <span style="font-size:0.8em;color:var(--text-secondary);font-weight:400;">(inactivo)</span>
@@ -762,8 +868,13 @@ if (isset($_GET['edit'])) {
                         </div>
                     </div>
                     <div class="conn-details">
-                        <span>Bot: <?php echo escapeHtml(substr($conn['bot_token'], 0, 20) . '...'); ?></span>
-                        <span>Chat ID: <?php echo (int) ($conn['chat_id'] ?? 0) ?: 'Pendiente'; ?></span>
+                        <span>Bot: <?php 
+                            $botDisplay = !empty($conn['bot_name']) ? '@' . escapeHtml($conn['bot_name']) : (substr($conn['bot_token'] ?? '', 0, 20) . '...');
+                            echo $botDisplay;
+                        ?></span>
+                        <span>Chat: <?php 
+                            echo !empty($conn['chat_title']) ? escapeHtml($conn['chat_title']) : ('ID ' . ((int) ($conn['chat_id'] ?? 0) ?: 'Pendiente'));
+                        ?></span>
                         <span>Tracker: #<?php echo (int) $conn['tracker_id']; ?></span>
                         <span><?php echo escapeHtml(parse_url($conn['tiki_api_url'] ?? '', PHP_URL_HOST) ?: $conn['tiki_api_url']); ?></span>
                     </div>
@@ -771,21 +882,21 @@ if (isset($_GET['edit'])) {
                         <form method="get" class="inline-form">
                             <input type="hidden" name="tab" value="webhook">
                             <input type="hidden" name="edit" value="<?php echo escapeHtml($slug); ?>">
-                            <button type="submit" class="btn btn-outline btn-sm" onclick="event.preventDefault(); openEditModal('<?php echo escapeHtml($slug); ?>')">Editar</button>
+                            <button type="submit" class="btn btn-outline btn-sm" onclick="event.preventDefault(); openEditModal('<?php echo escapeHtml($slug); ?>')" title="Editar los datos de esta conexión">Editar</button>
                         </form>
                         
                         <form method="post" class="inline-form">
                             <input type="hidden" name="action" value="duplicate_connection">
                             <input type="hidden" name="slug" value="<?php echo escapeHtml($slug); ?>">
                             <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-                            <button type="submit" class="btn btn-outline btn-sm">Duplicar</button>
+                            <button type="submit" class="btn btn-outline btn-sm" title="Duplicar esta conexión para crear una similar">Duplicar</button>
                         </form>
                         
                         <form method="post" class="inline-form">
                             <input type="hidden" name="action" value="toggle_connection">
                             <input type="hidden" name="slug" value="<?php echo escapeHtml($slug); ?>">
                             <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-                            <button type="submit" class="btn btn-sm <?php echo $conn['enabled'] ? 'btn-warning' : 'btn-success'; ?>">
+                            <button type="submit" class="btn btn-sm <?php echo $conn['enabled'] ? 'btn-warning' : 'btn-success'; ?>" title="<?php echo $conn['enabled'] ? 'Desactivar temporalmente esta conexión' : 'Activar esta conexión'; ?>">
                                 <?php echo $conn['enabled'] ? 'Desactivar' : 'Activar'; ?>
                             </button>
                         </form>
@@ -794,17 +905,17 @@ if (isset($_GET['edit'])) {
                             <input type="hidden" name="action" value="configure_webhook">
                             <input type="hidden" name="slug" value="<?php echo escapeHtml($slug); ?>">
                             <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-                            <button type="submit" class="btn btn-outline btn-sm">Configurar Webhook</button>
+                            <button type="submit" class="btn btn-outline btn-sm" title="Configurar el webhook en Telegram para recibir mensajes">Configurar Webhook</button>
                         </form>
                         
-                        <button class="btn btn-outline btn-sm" onclick="testConnection('<?php echo escapeHtml($slug); ?>', this)">Test</button>
-                        <div class="test-result" style="display:none;"></div>
+                        <button class="btn btn-outline btn-sm" onclick="testConnection('<?php echo escapeHtml($slug); ?>', this)" title="Probar conexión con Telegram y TikiWiki">Test</button>
+                        <div class="test-result" style="display:none;" aria-live="polite" aria-atomic="true"></div>
                         
                         <form method="post" class="inline-form" onsubmit="return confirm('¿Eliminar conexion \'<?php echo escapeHtml($conn['name']); ?>\'?')">
                             <input type="hidden" name="action" value="delete_connection">
                             <input type="hidden" name="slug" value="<?php echo escapeHtml($slug); ?>">
                             <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-                            <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
+                            <button type="submit" class="btn btn-danger btn-sm" title="Eliminar esta conexión permanentemente">Eliminar</button>
                         </form>
                     </div>
                 </div>
@@ -854,14 +965,14 @@ foreach ($detections as $det) {
                         <input type="hidden" name="slug" value="<?php echo escapeHtml($slug); ?>">
                         <input type="hidden" name="chat_id" value="<?php echo (int) $det['chat_id']; ?>">
                         <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-                        <button type="submit" class="btn btn-success btn-sm">Asignar</button>
+                        <button type="submit" class="btn btn-success btn-sm" title="Asignar este chat a la conexión">Asignar</button>
                     </form>
                     <form method="post" style="display:inline;">
                         <input type="hidden" name="action" value="ignore_chat">
                         <input type="hidden" name="slug" value="<?php echo escapeHtml($slug); ?>">
                         <input type="hidden" name="chat_id" value="<?php echo (int) $det['chat_id']; ?>">
                         <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-                        <button type="submit" class="btn btn-outline btn-sm">Ignorar</button>
+                        <button type="submit" class="btn btn-outline btn-sm" title="Ignorar este chat y no mostrar más esta detección">Ignorar</button>
                     </form>
                 </div>
             </div>
@@ -873,7 +984,7 @@ foreach ($detections as $det) {
 <?php endif; ?>
 
 <!-- Modal: Crear/Editar conexion -->
-<div class="modal-overlay" id="connection-modal">
+<div class="modal-overlay" id="connection-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-hidden="true">
     <div class="modal">
         <form method="post">
             <input type="hidden" name="action" value="save_connection">
@@ -882,55 +993,55 @@ foreach ($detections as $det) {
             
             <div class="modal-header">
                 <span id="modal-title">Nueva conexion</span>
-                <button type="button" class="modal-close" onclick="closeModal('connection-modal')">&times;</button>
+                <button type="button" class="modal-close" onclick="closeModal('connection-modal')" aria-label="Cerrar">&times;</button>
             </div>
             
             <div class="modal-body">
                 <div class="form-group">
-                    <label>Nombre de la conexion</label>
-                    <input type="text" name="name" id="form-name" required placeholder="Ej: QPCH Produccion">
+                    <label for="form-name">Nombre de la conexion</label>
+                    <input type="text" name="name" id="form-name" required aria-required="true" placeholder="Ej: QPCH Produccion" title="Nombre descriptivo para identificar esta conexión">
                 </div>
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Bot Token</label>
+                        <label for="form-bot_token">Bot Token</label>
                         <div class="input-wrapper">
-                            <input type="password" name="bot_token" id="form-bot_token" required placeholder="Token de @BotFather">
-                            <button type="button" class="icon-btn" onclick="togglePassword(this)">Mostrar</button>
+                            <input type="password" name="bot_token" id="form-bot_token" required aria-required="true" placeholder="Token de @BotFather" title="Token del bot de Telegram obtenido de @BotFather">
+                            <button type="button" class="icon-btn" onclick="togglePassword(this)" title="Mostrar u ocultar el token" aria-label="Mostrar contraseña">Mostrar</button>
                         </div>
                     </div>
                     <div class="form-group">
-                        <label>Webhook Secret</label>
+                        <label for="form-webhook_secret">Webhook Secret</label>
                         <div class="input-wrapper">
-                            <input type="password" name="webhook_secret" id="form-webhook_secret" placeholder="Auto-generado si se deja vacio">
-                            <button type="button" class="icon-btn" onclick="togglePassword(this)">Mostrar</button>
+                            <input type="password" name="webhook_secret" id="form-webhook_secret" placeholder="Auto-generado si se deja vacio" aria-describedby="hint-webhook_secret" title="Secreto del webhook para verificar que los mensajes vienen de Telegram">
+                            <button type="button" class="icon-btn" onclick="togglePassword(this)" title="Mostrar u ocultar el secreto" aria-label="Mostrar contraseña">Mostrar</button>
                         </div>
-                        <div class="hint">Dejar vacio para generar uno automaticamente</div>
+                        <div class="hint" id="hint-webhook_secret">Dejar vacio para generar uno automaticamente</div>
                     </div>
                 </div>
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Chat ID</label>
-                        <input type="number" name="chat_id" id="form-chat_id" value="0" placeholder="0 = pendiente">
-                        <div class="hint">Agrega el bot al grupo y revisa los logs para obtenerlo</div>
+                        <label for="form-chat_id">Chat ID</label>
+                        <input type="number" name="chat_id" id="form-chat_id" value="0" placeholder="0 = pendiente" aria-describedby="hint-chat_id" title="ID numérico del grupo o chat de Telegram">
+                        <div class="hint" id="hint-chat_id">Agrega el bot al grupo y revisa los logs para obtenerlo</div>
                     </div>
                     <div class="form-group">
-                        <label>Tracker ID</label>
-                        <input type="number" name="tracker_id" id="form-tracker_id" required placeholder="Ej: 22">
+                        <label for="form-tracker_id">Tracker ID</label>
+                        <input type="number" name="tracker_id" id="form-tracker_id" required aria-required="true" placeholder="Ej: 22" title="ID del tracker en TikiWiki donde se guardarán los mensajes">
                     </div>
                 </div>
                 
                 <div class="form-group">
-                    <label>Tiki API URL</label>
-                    <input type="text" name="tiki_api_url" id="form-tiki_api_url" required placeholder="https://wiki.ejemplo.org/api/">
+                    <label for="form-tiki_api_url">Tiki API URL</label>
+                    <input type="text" name="tiki_api_url" id="form-tiki_api_url" required aria-required="true" placeholder="https://wiki.ejemplo.org/api/" title="URL base de la API REST de TikiWiki">
                 </div>
                 
                 <div class="form-group">
-                    <label>Tiki API Token</label>
+                    <label for="form-tiki_api_token">Tiki API Token</label>
                     <div class="input-wrapper">
-                        <input type="password" name="tiki_api_token" id="form-tiki_api_token" required placeholder="Token de TikiWiki">
-                        <button type="button" class="icon-btn" onclick="togglePassword(this)">Mostrar</button>
+                        <input type="password" name="tiki_api_token" id="form-tiki_api_token" required aria-required="true" placeholder="Token de TikiWiki" title="Token de autenticación de la API de TikiWiki">
+                        <button type="button" class="icon-btn" onclick="togglePassword(this)" title="Mostrar u ocultar el token" aria-label="Mostrar contraseña">Mostrar</button>
                     </div>
                 </div>
                 
@@ -940,28 +1051,80 @@ foreach ($detections as $det) {
                 </div>
                 
                 <div class="checkbox-row">
-                    <input type="checkbox" name="async_processing" id="form-async_processing">
+                    <input type="checkbox" name="async_processing" id="form-async_processing" aria-describedby="hint-async">
                     <label for="form-async_processing">Procesamiento asincrono (buffer + worker)</label>
-                    <div class="hint" style="margin-left:24px;">api.php responde 200 al instante, worker.php procesa en background (requiere cron)</div>
+                    <div class="hint" id="hint-async" style="margin-left:24px;">api.php responde 200 al instante, worker.php procesa en background (requiere cron)</div>
                 </div>
             </div>
             
             <div class="modal-footer">
-                <button type="button" class="btn btn-outline" onclick="closeModal('connection-modal')">Cancelar</button>
-                <button type="submit" class="btn btn-primary">Guardar conexion</button>
+                <button type="button" class="btn btn-outline" onclick="closeModal('connection-modal')" title="Cancelar y cerrar">Cancelar</button>
+                <button type="submit" class="btn btn-primary" title="Guardar los datos de la conexión">Guardar conexion</button>
             </div>
         </form>
     </div>
 </div>
 
 <script>
+/**
+ * Abre un modal y maneja foco + aria-hidden
+ */
 function openModal(id) {
-    document.getElementById(id).classList.add('show');
+    var overlay = document.getElementById(id);
+    overlay.classList.add('show');
+    overlay.setAttribute('aria-hidden', 'false');
+    
+    // Mover foco al primer input o botón dentro del modal
+    var firstFocusable = overlay.querySelector('input, button, select, textarea, [tabindex]:not([tabindex="-1"])');
+    if (firstFocusable) {
+        setTimeout(function() { firstFocusable.focus(); }, 50);
+    }
 }
 
+/**
+ * Cierra un modal y restaura aria-hidden
+ */
 function closeModal(id) {
-    document.getElementById(id).classList.remove('show');
+    var overlay = document.getElementById(id);
+    overlay.classList.remove('show');
+    overlay.setAttribute('aria-hidden', 'true');
 }
+
+/**
+ * Cierra modal con tecla Escape y mantiene foco dentro (focus trap básico)
+ */
+document.addEventListener('keydown', function(e) {
+    // Escape: cerrar modal abierto
+    if (e.key === 'Escape') {
+        var openModal = document.querySelector('.modal-overlay.show');
+        if (openModal) {
+            closeModal(openModal.id);
+        }
+    }
+    
+    // Tab: mantener foco dentro del modal (focus trap)
+    if (e.key === 'Tab') {
+        var openModal = document.querySelector('.modal-overlay.show');
+        if (openModal) {
+            var focusable = openModal.querySelectorAll('input, button, select, textarea, [tabindex]:not([tabindex="-1"])');
+            if (focusable.length === 0) return;
+            var first = focusable[0];
+            var last = focusable[focusable.length - 1];
+            
+            if (e.shiftKey) {
+                if (document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                }
+            } else {
+                if (document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
+                }
+            }
+        }
+    }
+});
 
 function openEditModal(slug) {
     // Cargar datos via AJAX (no exponer tokens en HTML/JS)
@@ -999,13 +1162,15 @@ function openEditModal(slug) {
 }
 
 function togglePassword(btn) {
-    var input = btn.previousElementSibling;
-    if (input.type === 'password') {
+    var input = btn.parentElement.querySelector('input');
+    if (input && input.type === 'password') {
         input.type = 'text';
         btn.textContent = 'Ocultar';
-    } else {
+        btn.setAttribute('aria-label', 'Ocultar contraseña');
+    } else if (input) {
         input.type = 'password';
         btn.textContent = 'Mostrar';
+        btn.setAttribute('aria-label', 'Mostrar contraseña');
     }
 }
 
@@ -1029,19 +1194,69 @@ function testConnection(slug, btn) {
     .then(function(r) { return r.json(); })
     .then(function(result) {
         var lines = [];
+        var allOk = true;
+        
+        // Telegram test
         if (result.telegram) {
-            lines.push('Telegram: ' + (result.telegram.ok ? 'OK' : 'ERROR') + ' — ' + result.telegram.message);
+            var tgOk = result.telegram.ok;
+            lines.push((tgOk ? '✅' : '❌') + ' Telegram: ' + result.telegram.message);
+            if (!tgOk) allOk = false;
         }
+        
+        // TikiWiki test
         if (result.tikiwiki) {
-            lines.push('TikiWiki: ' + (result.tikiwiki.ok ? 'OK' : 'ERROR') + ' — ' + result.tikiwiki.message);
+            var twOk = result.tikiwiki.ok;
+            var twMsg = (twOk ? '✅' : '❌') + ' TikiWiki: ' + result.tikiwiki.message;
+            
+            // Agregar detalle de permisos si la API responde
+            if (result.tikiwiki.api_access) {
+                var fgOk = result.tikiwiki.file_gallery;
+                var upOk = result.tikiwiki.upload_files;
+                var permParts = [];
+                permParts.push((fgOk ? '✅' : '⚠️') + ' admin_file_galleries: ' + (fgOk ? 'OK' : 'FALTA'));
+                if (fgOk) {
+                    permParts.push((upOk ? '✅' : '⚠️') + ' upload_files: ' + (upOk ? 'OK' : 'FALTA'));
+                }
+                twMsg += ' | ' + permParts.join(' | ');
+                if (!fgOk || !upOk) allOk = false;
+            }
+            
+            lines.push(twMsg);
+            if (!twOk) allOk = false;
         }
-        var allOk = (result.telegram && result.telegram.ok) && (result.tikiwiki && result.tikiwiki.ok);
+        
         resultDiv.className = 'test-result ' + (allOk ? 'ok' : 'fail');
-        resultDiv.textContent = lines.join(' | ');
+        resultDiv.innerHTML = lines.join('<br>');
+        
+        // Actualizar card con bot_name y chat_title si llegaron
+        if (result.bot_name) {
+            var card = btn.closest('.conn-card');
+            if (card) {
+                var details = card.querySelector('.conn-details');
+                if (details) {
+                    var spans = details.querySelectorAll('span');
+                    if (spans.length > 0) {
+                        spans[0].textContent = 'Bot: @' + result.bot_name;
+                    }
+                }
+            }
+        }
+        if (result.chat_title) {
+            var card = btn.closest('.conn-card');
+            if (card) {
+                var details = card.querySelector('.conn-details');
+                if (details) {
+                    var spans = details.querySelectorAll('span');
+                    if (spans.length > 1) {
+                        spans[1].textContent = 'Chat: ' + result.chat_title;
+                    }
+                }
+            }
+        }
     })
     .catch(function(err) {
         resultDiv.className = 'test-result fail';
-        resultDiv.textContent = 'Error de red: ' + err.message;
+        resultDiv.innerHTML = 'Error de red: ' + err.message;
     })
     .finally(function() {
         btn.disabled = false;
@@ -1074,9 +1289,9 @@ document.addEventListener('click', function(e) {
             
             <?php if (!empty($connections)): ?>
             <div class="form-group">
-                <label>Usar conexion existente (opcional)</label>
-                    <select name="connection_slug" onchange="fillImportFromConnection(this)">
-                        <option value="">— Ingresar manual —</option>
+                    <label for="import-connection-slug">Usar conexion existente (opcional)</label>
+                        <select name="connection_slug" id="import-connection-slug" onchange="fillImportFromConnection(this)" title="Seleccionar una conexión existente para autocompletar los datos">
+                            <option value="">— Ingresar manual —</option>
                         <?php foreach ($connections as $slug => $conn): ?>
                         <option value="<?php echo escapeHtml($slug); ?>"
                             data-tiki_url="<?php echo escapeHtml($conn['tiki_api_url']); ?>"
@@ -1093,14 +1308,14 @@ document.addEventListener('click', function(e) {
             
             <div class="form-row">
                 <div class="form-group">
-                    <label>Tiki API URL</label>
-                    <input type="text" name="tiki_api_url" id="import-tiki_url" required placeholder="https://wiki.ejemplo.org/api/">
+                    <label for="import-tiki_url">Tiki API URL</label>
+                    <input type="text" name="tiki_api_url" id="import-tiki_url" required aria-required="true" placeholder="https://wiki.ejemplo.org/api/" title="URL base de la API REST de TikiWiki">
                 </div>
                 <div class="form-group">
-                    <label>Tiki API Token</label>
+                    <label for="import-tiki_token">Tiki API Token</label>
                     <div class="input-wrapper">
-                        <input type="password" name="tiki_api_token" id="import-tiki_token" required placeholder="Token de TikiWiki">
-                        <button type="button" class="icon-btn" onclick="togglePassword(this)">Mostrar</button>
+                        <input type="password" name="tiki_api_token" id="import-tiki_token" required aria-required="true" placeholder="Token de TikiWiki" title="Token de autenticación de la API de TikiWiki">
+                        <button type="button" class="icon-btn" onclick="togglePassword(this)" title="Mostrar u ocultar el token" aria-label="Mostrar contraseña">Mostrar</button>
                     </div>
                 </div>
             </div>
@@ -1108,21 +1323,21 @@ document.addEventListener('click', function(e) {
             
             <div class="form-row">
                 <div class="form-group">
-                    <label>Tracker ID</label>
-                    <input type="number" name="tracker_id" id="import-tracker_id" required placeholder="Ej: 22">
+                    <label for="import-tracker_id">Tracker ID</label>
+                    <input type="number" name="tracker_id" id="import-tracker_id" required aria-required="true" placeholder="Ej: 22" title="ID del tracker en TikiWiki donde se importarán los mensajes">
                 </div>
                 <div class="form-group">
-                    <label>Archivo ZIP exportado de Telegram</label>
-                    <input type="file" name="export_file" accept=".zip" required>
+                    <label for="import-export_file">Archivo ZIP exportado de Telegram</label>
+                    <input type="file" name="export_file" id="import-export_file" accept=".zip" required title="Archivo ZIP con el export de conversaciones de Telegram">
                 </div>
             </div>
             
             <div style="margin-top:16px;">
-                <button type="button" class="btn btn-primary" onclick="startImport()">Importar</button>
+                <button type="button" class="btn btn-primary" onclick="startImport()" title="Iniciar importación del archivo ZIP seleccionado">Importar</button>
             </div>
         </form>
         
-        <div id="import-result" style="margin-top:16px;"></div>
+        <div id="import-result" style="margin-top:16px;" aria-live="polite" aria-atomic="true"></div>
     </div>
 </div>
 
@@ -1188,6 +1403,12 @@ function startImport() {
         barInner.style.cssText = 'background:#4caf50;height:100%;width:' + pct + '%;transition:width 0.3s;border-radius:4px;';
         barInner.textContent = pct + '%';
         barInner.style.cssText += ';color:#fff;text-align:center;font-size:12px;line-height:20px;';
+        // ARIA progressbar
+        barInner.setAttribute('role', 'progressbar');
+        barInner.setAttribute('aria-valuenow', pct);
+        barInner.setAttribute('aria-valuemin', '0');
+        barInner.setAttribute('aria-valuemax', '100');
+        barInner.setAttribute('aria-valuetext', label + ' (' + current + ' / ' + total + ')');
         barOuter.appendChild(barInner);
         
         container.appendChild(barOuter);
@@ -1332,34 +1553,35 @@ function processChunks(extractId, total, chatTitle, topicsFound) {
             <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
             
             <div class="form-group">
-                <label>Nombre del tracker *</label>
-                <input type="text" name="tracker_name" required placeholder="Ej: QPCH Produccion">
-                <div class="hint">Este nombre se usará como nombre del tracker en TikiWiki</div>
+                <label for="create-tracker-name">Nombre del tracker *</label>
+                <input type="text" name="tracker_name" id="create-tracker-name" required aria-required="true" placeholder="Ej: QPCH Produccion" value="<?php echo escapeHtml($_POST['tracker_name'] ?? ''); ?>" aria-describedby="hint-tracker-name" title="Nombre con el que se creará el tracker en TikiWiki">
+                <div class="hint" id="hint-tracker-name">Este nombre se usará como nombre del tracker en TikiWiki</div>
             </div>
             
             <div class="form-group">
-                <label>Descripción (opcional)</label>
-                <input type="text" name="tracker_description" placeholder="Breve descripción del tracker">
+                <label for="create-tracker-desc">Descripción (opcional)</label>
+                <input type="text" name="tracker_description" id="create-tracker-desc" placeholder="Breve descripción del tracker" value="<?php echo escapeHtml($_POST['tracker_description'] ?? ''); ?>" title="Descripción opcional del tracker">
             </div>
             
             <div class="form-row">
                 <div class="form-group">
-                    <label>Field prefix</label>
-                    <input type="text" name="field_prefix" value="telegrammessage" placeholder="telegrammessage" pattern="[a-z][a-z0-9]*" maxlength="16">
-                    <div class="hint">
+                    <label for="create-field-prefix">Field prefix</label>
+                    <input type="text" name="field_prefix" id="create-field-prefix" value="<?php echo escapeHtml($_POST['field_prefix'] ?? 'telegrammessage'); ?>" placeholder="telegrammessage" pattern="[a-z][a-z0-9]*" maxlength="16" aria-describedby="hint-prefix" title="Prefijo para los nombres de campo del tracker">
+                    <div class="hint" id="hint-prefix">
                         Prefijo para los nombres de campo (permNames). 
                         Solo minúsculas + números, máximo 16 caracteres.
                         Ej: <code>qpch</code>, <code>soporte</code>, <code>chelapedia</code>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Asignar a conexión (opcional)</label>
-                    <select name="connection_slug" id="create-connection-slug" onchange="fillCreateFromConnection(this)">
+                    <label for="create-connection-slug">Asignar a conexión (opcional)</label>
+                    <select name="connection_slug" id="create-connection-slug" onchange="fillCreateFromConnection(this)" title="Si seleccionás una conexión, se auto-asignará el tracker_id y el prefix">
                         <option value="">— Solo crear tracker —</option>
                         <?php foreach ($connections as $slug => $conn): ?>
                         <option value="<?php echo escapeHtml($slug); ?>"
                             data-tiki_url="<?php echo escapeHtml($conn['tiki_api_url']); ?>"
-                            data-prefix="<?php echo escapeHtml($conn['field_prefix'] ?? 'telegrammessage'); ?>">
+                            data-prefix="<?php echo escapeHtml($conn['field_prefix'] ?? 'telegrammessage'); ?>"
+                            <?php echo ($_POST['connection_slug'] ?? '') === $slug ? 'selected' : ''; ?>>
                             <?php echo escapeHtml($conn['name']); ?>
                         </option>
                         <?php endforeach; ?>
@@ -1370,31 +1592,40 @@ function processChunks(extractId, total, chatTitle, topicsFound) {
             
             <div class="form-row">
                 <div class="form-group">
-                    <label>Tiki API URL <span id="create-url-required" style="color:var(--error);">*</span></label>
-                    <input type="text" name="tiki_api_url" id="create-tiki-url" required placeholder="https://wiki.ejemplo.org/api/">
+                    <label for="create-tiki-url">Tiki API URL <span id="create-url-required" style="color:var(--error);">*</span></label>
+                    <input type="text" name="tiki_api_url" id="create-tiki-url" required aria-required="true" placeholder="https://wiki.ejemplo.org/api/" value="<?php echo escapeHtml($_POST['tiki_api_url'] ?? ''); ?>" title="URL base de la API REST de TikiWiki">
                 </div>
                 <div class="form-group">
-                    <label>Tiki API Token <span id="create-token-required" style="color:var(--error);">*</span></label>
+                    <label for="create-tiki-token">Tiki API Token <span id="create-token-required" style="color:var(--error);">*</span></label>
                     <div class="input-wrapper">
-                        <input type="password" name="tiki_api_token" id="create-tiki-token" required placeholder="Token de TikiWiki">
-                        <button type="button" class="icon-btn" onclick="togglePassword(this)">Mostrar</button>
+                        <input type="password" name="tiki_api_token" id="create-tiki-token" required aria-required="true" placeholder="Token de TikiWiki" value="<?php echo escapeHtml($_POST['tiki_api_token'] ?? ''); ?>" title="Token de autenticación de la API de TikiWiki">
+                        <button type="button" class="icon-btn" onclick="togglePassword(this)" title="Mostrar u ocultar el token" aria-label="Mostrar contraseña">Mostrar</button>
                     </div>
                 </div>
             </div>
             
             <div class="form-group">
-                <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:12px 16px;font-size:0.85em;color:#6d4c00;">
+                <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:12px 16px;font-size:0.85em;color:#6d4c00;" aria-live="polite" aria-atomic="true">
                     <strong>📋 Vista previa de campos que se crearán:</strong>
                     <div style="margin-top:6px;font-family:monospace;font-size:0.9em;" id="field-preview">
-                        <span id="preview-prefix">telegrammessage</span>TelegramMessageId,
-                        <span id="preview-prefix2">telegrammessage</span>ChatId,
-                        <span id="preview-prefix3">telegrammessage</span>Text, ...
+                        <span id="preview-prefix"><?php echo escapeHtml($_POST['field_prefix'] ?? 'telegrammessage'); ?></span>TelegramMessageId,
+                        <span id="preview-prefix2"><?php echo escapeHtml($_POST['field_prefix'] ?? 'telegrammessage'); ?></span>ChatId,
+                        <span id="preview-prefix3"><?php echo escapeHtml($_POST['field_prefix'] ?? 'telegrammessage'); ?></span>Text, ...
                     </div>
                 </div>
             </div>
             
+            <div class="form-group">
+                <label for="create-gallery-id">Gallery ID (opcional)</label>
+                <input type="number" name="gallery_id" id="create-gallery-id" placeholder="Dejar vacío para auto-crear" value="<?php echo escapeHtml($_POST['gallery_id'] ?? ''); ?>" title="Si ya tenés una galería, ingresá su ID para usarla">
+                <div class="hint" id="hint-gallery-id">
+                    Si ya tenés una galería de archivos en TikiWiki, ingresá su ID para usarla.
+                    Si se deja vacío, trackerGram intentará crear una automáticamente.
+                </div>
+            </div>
+            
             <div style="margin-top:16px;">
-                <button type="submit" class="btn btn-primary">Crear Tracker</button>
+                <button type="submit" class="btn btn-primary" title="Crear el tracker en TikiWiki con los campos especificados">Crear Tracker</button>
             </div>
         </form>
     </div>
@@ -1408,8 +1639,7 @@ function fillCreateFromConnection(select) {
     document.getElementById('create-tiki-url').value = option.dataset.tiki_url;
     
     var prefix = option.dataset.prefix || 'telegrammessage';
-    var prefixInput = document.querySelector('input[name="field_prefix"]');
-    prefixInput.value = prefix;
+    document.getElementById('create-field-prefix').value = prefix;
     updateFieldPreview(prefix);
     
     // Fetch token desde el servidor (no se expone en HTML)
@@ -1437,7 +1667,7 @@ function updateFieldPreview(prefix) {
     els.forEach(function(el) { el.textContent = prefix; });
 }
 
-document.querySelector('input[name="field_prefix"]').addEventListener('input', function() {
+document.getElementById('create-field-prefix').addEventListener('input', function() {
     var val = this.value || 'telegrammessage';
     updateFieldPreview(val);
 });
@@ -1447,20 +1677,20 @@ document.querySelector('input[name="field_prefix"]').addEventListener('input', f
 
 <!-- Footer: configuracion global -->
 <div class="section" style="margin-top:32px;">
-    <div class="section-header" style="cursor:pointer;" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'">
+    <div class="section-header" style="cursor:pointer;" onclick="toggleGlobalConfig(this)" role="button" tabindex="0" aria-expanded="false" aria-controls="config-content" onkeydown="if(event.key==='Enter'||event.key===' ') { event.preventDefault(); toggleGlobalConfig(this); }">
         Configuracion global
     </div>
-    <div class="section-content" style="display:none;">
+    <div class="section-content" id="config-content" style="display:none;">
         <div class="form-group">
-            <label>Contraseña de admin</label>
+            <label for="admin-password-input">Contraseña de admin</label>
             <form method="post">
                 <input type="hidden" name="action" value="change_password">
                 <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
                 <div style="display:flex;gap:8px;align-items:flex-end;">
                     <div style="flex:1;">
-                        <input type="password" name="admin_password" required minlength="8" placeholder="Minimo 8 caracteres">
+                        <input type="password" name="admin_password" id="admin-password-input" required minlength="8" placeholder="Minimo 8 caracteres" title="Nueva contraseña de administrador (mínimo 8 caracteres)">
                     </div>
-                    <button type="submit" class="btn btn-outline">Cambiar</button>
+                    <button type="submit" class="btn btn-outline" title="Cambiar la contraseña de administrador">Cambiar</button>
                 </div>
             </form>
         </div>
@@ -1486,5 +1716,18 @@ document.querySelector('input[name="field_prefix"]').addEventListener('input', f
 </div>
 
 </div><!-- /container -->
+
+<script>
+/**
+ * Toggle panel de configuración global con soporte ARIA
+ */
+function toggleGlobalConfig(header) {
+    var content = document.getElementById('config-content');
+    var isHidden = content.style.display === 'none';
+    content.style.display = isHidden ? 'block' : 'none';
+    header.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+}
+</script>
+
 </body>
 </html>

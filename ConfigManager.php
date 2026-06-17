@@ -248,8 +248,10 @@ class ConfigManager
             'enabled' => $data['enabled'] ?? true,
             'async_processing' => !empty($data['async_processing']),
             'bot_token' => trim((string) ($data['bot_token'] ?? '')),
+            'bot_name' => trim((string) ($data['bot_name'] ?? '')),
             'webhook_secret' => $webhookSecret,
             'chat_id' => (int) ($data['chat_id'] ?? 0),
+            'chat_title' => trim((string) ($data['chat_title'] ?? '')),
             'tiki_api_url' => rtrim(trim((string) ($data['tiki_api_url'] ?? '')), '/') . '/',
             'tiki_api_token' => trim((string) ($data['tiki_api_token'] ?? '')),
             'tracker_id' => (int) ($data['tracker_id'] ?? 0),
@@ -267,6 +269,23 @@ class ConfigManager
         $this->save();
 
         return $slug;
+    }
+
+    /**
+     * Actualizar campos específicos de una conexión existente.
+     * Útil para bot_name, chat_title, etc. sin alterar el resto.
+     */
+    public function updateConnectionFields(string $slug, array $fields): bool
+    {
+        $this->load();
+        if (!isset($this->data['connections'][$slug])) {
+            return false;
+        }
+        foreach ($fields as $key => $value) {
+            $this->data['connections'][$slug][$key] = $value;
+        }
+        $this->data['connections'][$slug]['updated_at'] = date('c');
+        return $this->save();
     }
 
     public function deleteConnection(string $slug): bool

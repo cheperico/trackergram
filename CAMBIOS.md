@@ -1,5 +1,36 @@
 # Cambios - Changelog
 
+## v0.5.2
+- **Feat**: Accesibilidad completa del panel admin (`admin.php`).
+  - **ARIA**: `role="alert"`, `role="dialog"`, `role="progressbar"`, `role="main"`, `role="button"`, `aria-modal`, `aria-live`, `aria-atomic`, `aria-describedby`, `aria-labelledby`, `aria-required`, `aria-expanded`, `aria-controls`, `aria-hidden`, `aria-current="page"`, `aria-label`.
+  - **Tooltips**: Todos los botones y campos tienen `title` descriptivo (hover).
+  - **Landmarks**: Skip link al contenido principal (`#main-content`), navbar con `aria-label`, tabs con `aria-label`, región login con `aria-labelledby`.
+  - **Formularios**: Todos los inputs tienen `label` con `for`, campos requeridos con `aria-required="true"`, hints vinculados con `aria-describedby`.
+  - **Modal**: `role="dialog"`, `aria-modal="true"`, focus trap con Tab+Shift+Tab, cierre con Escape, `aria-hidden` toggle.
+  - **Teclado**: Sección colapsable "Configuración global" operativa con Enter/Espacio y `aria-expanded`.
+  - **Barra de progreso**: `role="progressbar"`, `aria-valuenow`, `aria-valuemin`, `aria-valuemax`, `aria-valuetext`.
+  - **Focus visible**: `:focus-visible` para keyboard-only, outline 2px en todos los elementos interactivos, sin outline en click.
+  - **Contraste**: Alertas con borde 2px de mayor contraste, colores de texto mejorados.
+  - **Reduced motion**: `@media (prefers-reduced-motion: reduce)` elimina transiciones/animaciones.
+  - **Fix**: Eliminada duplicación de campos en formulario "Crear Tracker" (gallery_id ahora insertado correctamente entre preview y botón submit).
+  - **Fix**: Event listener de `field_prefix` ahora usa `getElementById` en vez de selector de atributo frágil.
+- **Chore**: `togglePassword()` ahora actualiza `aria-label` dinámicamente.
+
+## v0.5.1
+- **Fix**: `TikiWikiClient::createTracker()` — la API REST de TikiWiki NO soporta fields inline al crear un tracker.
+  - Ahora se crea primero el tracker shell (POST `/api/trackers` solo con name + description).
+  - Luego se crea cada field individualmente vía `POST /api/trackers/{id}/fields`.
+  - Se agregaron métodos helper `createTrackerShell()` y `createTrackerField()`.
+  - **Fail-fast**: si un field falla, se aborta toda la creación (tracker parcial es peor que nada).
+- **Fix**: Código huérfano duplicado de `createTracker()` eliminado (causaba parse error).
+- **Fix**: `createGallery()` ahora parsea correctamente la respuesta (`data.info.galleryId` estaba anidado).
+  - Fallback `parentId=0` → `parentId=1` si el primero da 403 (root gallery).
+  - Mensaje de error más claro: indica que el token necesita permiso `admin_file_galleries`.
+- **Fix**: `createTrackerShell()` envía `confirm=1` explícitamente (requerido por `action_replace`).
+  - Fallback `trackerId` antes que `id` en el response parsing (el controlador devuelve `trackerId`).
+  - Loggeo extra si la respuesta no contiene `trackerId` (para diagnosticar problemas de ruteo).
+- **Fix**: `createTrackerField()` ya incluía `Content-Type: application/json` correctamente (confirmado por revisión de código).
+
 ## v0.5.0
 - **Feat**: Nueva pestaña "Crear Tracker" en el panel admin.
   - Crea tracker completo en TikiWiki con nombre, descripción y field prefix personalizable.

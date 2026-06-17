@@ -49,17 +49,17 @@ Puente entre Telegram y TikiWiki. Recibe mensajes de un grupo de Telegram y los 
 | `left_chat_member` | ✅ | ✅ | Miembro que se va |
 | `pinned_message` | ✅ | ✅ | Mensaje fijado |
 | `invite_members` / `add_members` | ✅ | ✅ | Miembros invitados |
-| `remove_members` | ⬜ | ✅ | Miembros removidos |
-| `joined` | ⬜ | ✅ | Miembro se unió (formato export) |
+| `remove_members` | ✅ | ✅ | Miembros removidos |
+| `joined` | ✅ | ✅ | Miembro se unió (formato export) |
 
 ### Reacciones
 
 | Tipo | Webhook | Import | Descripción |
-|---|---|---|---|
-| `message_reaction` | ✅ | ⬜ | Reacción a mensaje |
-| `message_reaction_count` | ✅ | ⬜ | Conteo de reacciones |
+|---|---|---|---|---|
+| `message_reaction` | ✅ | ✅ (embebidas) | Reacción a mensaje — en webhook llega como evento aparte, en import vienen dentro del mensaje |
+| `message_reaction_count` | ✅ | ✅ (embebidas) | Conteo de reacciones |
 
-Los tipos marcados como ⬜ son funcionalidades que están identificadas como pendientes en el roadmap.
+> **Nota**: Las reacciones en importación vienen embebidas como campo `reactions[]` dentro de cada mensaje, no como eventos separados. Ya se importan automáticamente con cada mensaje.
 
 ## Campos del Tracker
 
@@ -517,6 +517,8 @@ Podés copiar todo este bloque y pegarlo en **Admin → Trackers → Importar ca
 
 1. **Un bot de Telegram** — Se crea gratis hablando con [@BotFather](https://t.me/BotFather). Necesitás el token.
 2. **Un TikiWiki 21.x+** — Con la API habilitada, un token de acceso y un tracker (o dejá que trackerGram lo cree automáticamente).
+
+   > **Token API**: El token debe tener permisos para `trackers`, `tracker items` y **`admin_file_galleries** (para subir fotos, videos, etc.). El usuario del token debe tener permisos de administrador o suficientes para crear trackers y galerías.
 3. **Un servidor con PHP 8.0+** — Apache o Nginx, accesible desde internet con HTTPS.
 
 Cada vinculación (bot + wiki + tracker) se configura desde el panel de admin. Podés tener múltiples bots y wikis desde una misma instalación.

@@ -47,6 +47,7 @@
 - ✅ **Arquitectura multi-conexión**: múltiples bots/wikis/trackers desde una instalación
 - ✅ **Async processing por conexión**: toggle en admin, per-connection
 - ✅ **.env simplificado**: solo config global; credenciales en setup.json
+- ✅ **Service messages completos**: cobertura total webhook e import (incluye `remove_members`, `joined`, `new_chat_photo`, `delete_chat_photo`)
 
 ---
 
@@ -57,38 +58,38 @@
 Items con impacto inmediato en la operación del día a día.
 
 | # | Item | Esfuerzo | Por qué ahora |
-|---|------|----------|---------------|
-| 1 | **Service messages faltantes en webhook** — `remove_members`, `joined`, `new_chat_photo/delete_chat_photo` | 1 sesión | Son agujeros en el historial. El resto de service messages ya funciona. |
-| 2 | **Toggle my_chat_member en admin** — desactivar temporalmente el auto-leaveChat (ej: 10 min) para agregar el bot a un grupo nuevo | 1 sesión | Rompe el huevo y la gallina de "configurar ID vs agregar el bot". |
-| 3 | **Hashtags como etiquetas** | 1 sesión | Extraer `#tags` a campo separado. Mejora búsqueda en TikiWiki. |
+|   |------|----------|---------------|
+| 1 | **Service messages restantes** | 1 sesión | ✅ **Completado** — cobertura total webhook e import. |
+| 2 | **Hashtags como etiquetas** | 1 sesión | Extraer `#tags` a campo separado. Mejora búsqueda en TikiWiki. |
 
 ### 🟡 Fase 2: Robustez (1-2 semanas)
 
 | # | Item | Esfuerzo | Notas |
-|---|------|----------|-------|
-| 4 | **Service messages faltantes en import** — `new_chat_photo/delete_chat_photo`, `message_reaction` | 1 sesión | |
-| 5 | **Health check en admin** | 1 sesión | Estado del webhook, test conexión por conexión. |
-| 6 | **Mensajes editados/borrados** | 2 sesiones | Estrategia: archivo inmutable con eventos. Los editados/borrados son eventos adicionales. |
+|   |------|----------|-------|
+| 3 | **Service messages faltantes en import** — `new_chat_photo/delete_chat_photo`, `message_reaction` | 1 sesión | |
+| 4 | **Health check en admin** | 1 sesión | Estado del webhook, test conexión por conexión. |
+| 5 | **Mensajes editados/borrados** | 2 sesiones | Estrategia: archivo inmutable con eventos. Los editados/borrados son eventos adicionales. |
 
 ### 🟢 Fase 3: Features grandes (mediano plazo)
 
 | # | Item | Esfuerzo | Dependencias |
 |---|------|----------|--------------|
-| 7 | **Mensajes estructurados con prefijos** | 2-3 sesiones | Parser en MessageMapper para mensajes tipo `GPS user coord` o `#tag texto`. |
-| 8 | **Manejo de errores estandarizado** | 2-3 sesiones | Excepciones de dominio (`ConfigException`, `TelegramException`, `TikiWikiException`, `ImportException`). |
-| 9 | **Import CLI asíncrono** | 2 sesiones | Script CLI para exports grandes sin timeout HTTP. |
+| 6 | **Mensajes estructurados con prefijos** | 2-3 sesiones | Parser en MessageMapper para mensajes tipo `GPS user coord` o `#tag texto`. |
+| 7 | **Manejo de errores estandarizado** | 2-3 sesiones | Excepciones de dominio (`ConfigException`, `TelegramException`, `TikiWikiException`, `ImportException`). |
+| 8 | **Import CLI asíncrono** | 2 sesiones | Script CLI para exports grandes sin timeout HTTP. |
 
 ### 🔵 Fase 4: Visión (largo plazo)
 
 | # | Item | Esfuerzo | Notas |
 |---|------|----------|-------|
-| 10 | **Mini App** (Telegram Web App) | 5+ sesiones | Frontend embebido + backend. Formulario rico. Ver `design/002-MiniApp.md`. |
-| 11 | **Dashboard de métricas** | 2-3 sesiones | Mensajes procesados, errores, media subidos por conexión. |
-| 12 | **Tests unitarios** | Continuo | MessageMapper, WebhookHandler, clientes. |
-| 13 | **PSR-4 autoloading** | 1 sesión | Mover clases a `src/`, autoloader. |
-| 14 | **Transcripción de voz / OCR** | 3-4 sesiones | Whisper + OCR. Dependencias externas. |
-| 15 | **SQLite cache / dedup local** | 2 sesiones | Evaluar cuando el volumen lo justifique. |
-| 16 | **Rotación de logs por fecha** | 1 sesión | Además de por tamaño.
+| 9 | **Mini App** (Telegram Web App) | 5+ sesiones | Frontend embebido + backend. Formulario rico. Ver `design/002-MiniApp.md`. |
+| 10 | **Dashboard de métricas** | 2-3 sesiones | Mensajes procesados, errores, media subidos por conexión. |
+| 11 | **Tests unitarios** | Continuo | MessageMapper, WebhookHandler, clientes. |
+| 12 | **PSR-4 autoloading** | 1 sesión | Mover clases a `src/`, autoloader. |
+| 13 | **Transcripción de voz / OCR** | 3-4 sesiones | Whisper + OCR. Dependencias externas. |
+| 14 | **SQLite cache / dedup local** | 2 sesiones | Evaluar cuando el volumen lo justifique. |
+| 15 | **Rotación de logs por fecha** | 1 sesión | Además de por tamaño. |
+| 16 | **Expulsar bot desde admin panel** | 1 sesión | Botón para sacar el bot de un grupo directamente desde la interface, sin tener que hacerlo desde Telegram. |
 
 ---
 
@@ -104,16 +105,13 @@ Items con impacto inmediato en la operación del día a día.
 | `pinned_message` / `pin_message` | ✅ | ✅ | |
 | `group_chat_created` / `supergroup_chat_created` / `create_group` | ✅ | ✅ | |
 | `new_chat_title` / `title_edit` | ✅ | ✅ | |
-| `new_chat_photo` / `delete_chat_photo` | ✅ | ⬜ **Pendiente** | |
-| `remove_members` | ⬜ **Pendiente** | ✅ | |
-| `joined` | ⬜ **Pendiente** | ✅ | |
-| `message_reaction` / `message_reaction_count` | ✅ | ⬜ **Pendiente** | |
+| `new_chat_photo` / `delete_chat_photo` | ✅ | ✅ | |
+| `remove_members` | ✅ | ✅ | |
+| `joined` | ✅ | ✅ | |
+| `message_reaction` / `message_reaction_count` | ✅ | ✅ (embebidas) | En import vienen como campo `reactions[]` dentro del mensaje, no como evento separado. Ya se parsea en `fromExport()`. |
 
 **Pendientes:**
-- [ ] `new_chat_photo` / `delete_chat_photo` en importación
-- [ ] `remove_members` en webhook
-- [ ] `joined` en webhook
-- [ ] `message_reaction` / `message_reaction_count` en importación
+*(ninguno — cobertura completa)*
 
 ---
 

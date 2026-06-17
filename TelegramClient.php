@@ -139,8 +139,8 @@ class TelegramClient
             return ['ok' => false, 'message' => "Telegram rechazó la conexión: {$desc}"];
         }
 
-        $botName = $data['result']['username'] ?? 'desconocido';
-        return ['ok' => true, 'message' => "Conectado como @{$botName}"];
+        $botName = $data['result']['username'] ?? '';
+        return ['ok' => true, 'message' => "Conectado como @{$botName}", 'bot_name' => $botName];
     }
 
     /**

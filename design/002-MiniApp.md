@@ -328,6 +328,7 @@ Verificadas contra la documentación OpenAPI embebida en `wiki.chela.org.ar/api/
 - ¿Manejo de sesiones para wizards interactivos: archivo JSON, SQLite, o en memoria?
 - ¿Cómo se manejan ediciones a mensajes `!!!tipo` ya enviados? (edited_message → update item)
 - ¿Límite de caption de 1024 caracteres: suficiente para formularios típicos o hay que planificar workaround con archivo .txt adjunto?)
+- **Mini App viability**: El diseño original la descartó por offline poco confiable, pero `Telegram.WebApp.DeviceStorage` y `CloudStorage` ofrecen almacenamiento local + reintento. ¿Vale la pena reconsiderarla como alternativa/complemento al mensaje estructurado? **(pendiente de definición)** <!-- actualizado 16/06/2026 -->
 
 ---
 

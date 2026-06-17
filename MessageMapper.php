@@ -227,16 +227,39 @@ class MessageMapper
         }
 
         if (isset($message['new_chat_members'])) {
-            $names = array_map(fn($u) => $u['first_name'] . ' ' . ($u['last_name'] ?? ''), $message['new_chat_members']);
-            $msg->messageType = 'system';
-            $msg->text = '👤 Se unieron: ' . implode(', ', $names);
+            $fromId = $message['from']['id'] ?? null;
+            $fromName = trim(($message['from']['first_name'] ?? '') . ' ' . ($message['from']['last_name'] ?? ''));
+            $members = $message['new_chat_members'];
+            $memberNames = array_map(fn($u) => trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')), $members);
+
+            // Si from == único new_member → joined (se unió solo vía link)
+            $isSelfJoin = count($members) === 1 && $fromId !== null && $fromId === ($members[0]['id'] ?? null);
+
+            if ($isSelfJoin) {
+                $msg->messageType = 'system';
+                $msg->text = '👤 ' . $memberNames[0] . ' se unió al grupo';
+            } else {
+                $msg->messageType = 'system';
+                $msg->text = '👤 ' . $fromName . ' agregó a: ' . implode(', ', $memberNames);
+            }
             return $msg;
         }
 
         if (isset($message['left_chat_member'])) {
-            $u = $message['left_chat_member'];
-            $msg->messageType = 'system';
-            $msg->text = '🚪 ' . ($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '') . ' salió del grupo';
+            $fromId = $message['from']['id'] ?? null;
+            $leftUser = $message['left_chat_member'];
+            $leftId = $leftUser['id'] ?? null;
+            $leftName = trim(($leftUser['first_name'] ?? '') . ' ' . ($leftUser['last_name'] ?? ''));
+
+            // Si from != left_chat_member → lo eliminó un admin
+            if ($fromId !== null && $leftId !== null && $fromId !== $leftId) {
+                $fromName = trim(($message['from']['first_name'] ?? '') . ' ' . ($message['from']['last_name'] ?? ''));
+                $msg->messageType = 'system';
+                $msg->text = '🚫 ' . $fromName . ' eliminó a: ' . $leftName;
+            } else {
+                $msg->messageType = 'system';
+                $msg->text = '🚪 ' . $leftName . ' salió del grupo';
+            }
             return $msg;
         }
 
@@ -419,6 +442,8 @@ class MessageMapper
                 'joined' => '👤 ' . $firstName . ' se unió al grupo',
                 'left' => '🚪 ' . $firstName . ' salió del grupo',
                 'title_edit' => '✏️ Título cambiado a: ' . ($message['title'] ?? ''),
+                'change_photo' => '🖼️ Foto del grupo actualizada',
+                'delete_photo' => '🗑️ Foto del grupo eliminada',
                 default => '🔔 ' . $action . (!empty($message['title']) ? ': ' . $message['title'] : '')
             };
         }

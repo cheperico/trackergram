@@ -35,7 +35,10 @@ php -m | grep -E "(curl|json|mbstring|zip)"
 3. **Crear un token de API**: Admin → Security → API → crear nuevo token con permisos para:
    - `trackers` (leer/crear)
    - `tracker items` (crear)
+   - **`admin_file_galleries`** (necesario para subir fotos, videos, audios y otros archivos adjuntos)
 4. Copiá el token y la URL de la API (debe terminar en `/api/`)
+
+> **Importante**: El usuario al que pertenece el token debe tener permisos de administrador en TikiWiki (o al menos los roles necesarios para crear trackers, file galleries y subir archivos). Si el token no tiene `admin_file_galleries`, los mensajes con multimedia se guardarán **sin los archivos adjuntos**.
 
 > **Opcional**: Podés crear el tracker manualmente o dejar que trackerGram lo cree automáticamente (Paso 5).
 
@@ -162,32 +165,6 @@ Estos límites se definen como constantes en `config.php`:
 | `MAX_ZIP_UNCOMPRESSED_SIZE` | 500 MB | Máximo tamaño total descomprimido de un ZIP importado |
 | `TIMEOUT_TIKIWIKI_UPLOAD` | 60 s | Timeout para subir archivos a TikiWiki |
 | `TIMEOUT_TIKIWIKI_API` | 30 s | Timeout general para llamadas a la API de TikiWiki |
-
----
-
-## Ejecución con Docker
-
-Si usás Docker para desarrollo:
-
-```bash
-# Ver logs
-docker compose logs --tail 30
-
-# Logs en tiempo real
-docker compose logs -f
-
-# Reiniciar
-docker compose down
-docker compose up -d
-```
-
-### Permisos en Docker
-
-Si el contenedor no puede escribir archivos (`.env`, `topic_names.json`, `debug.log`):
-
-```bash
-sudo chown -R www-data:www-data /ruta/a/trackergram
-```
 
 ---
 

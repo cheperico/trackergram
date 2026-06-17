@@ -306,38 +306,51 @@ class TikiWikiClient
     {
         $url = $this->apiUrl . "galleries";
 
-        $payload = json_encode([
-            'name' => $name,
-            'description' => $description ?: 'Galería creada por trackerGram',
-            'parentId' => 0,
-        ]);
+        // Intentar con parentId=0 primero, fallback a parentId=1 (root gallery)
+        foreach ([0, 1] as $parentId) {
+            // Usamos form-urlencoded porque TikiWiki NO mergea correctamente JSON body
+            $postFields = http_build_query([
+                'name' => $name,
+                'description' => $description ?: 'Galería creada por trackerGram',
+                'parentId' => $parentId,
+            ]);
 
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Authorization: Bearer " . $this->token,
-            "Content-Type: application/json",
-            "User-Agent: Mozilla/5.0"
-        ]);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Authorization: Bearer " . $this->token,
+                "Content-Type: application/x-www-form-urlencoded",
+                "User-Agent: Mozilla/5.0"
+            ]);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
 
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
 
-        if ($httpCode === 200 || $httpCode === 201) {
-            $data = json_decode($response, true);
-            $galleryId = $data['galleryId'] ?? $data['id'] ?? null;
-            if ($galleryId) {
-                log_message("TikiWikiClient: Galería '{$name}' creada con ID {$galleryId}");
-                return (int) $galleryId;
+            if ($httpCode === 200 || $httpCode === 201) {
+                $data = json_decode($response, true);
+                // La respuesta envuelve galleryId dentro de 'info'
+                $galleryId = $data['info']['galleryId'] ?? $data['galleryId'] ?? $data['id'] ?? null;
+                if ($galleryId) {
+                    log_message("TikiWikiClient: Galería '{$name}' creada con ID {$galleryId} (parentId={$parentId})");
+                    return (int) $galleryId;
+                }
+                log_message("TikiWikiClient: createGallery respuesta inesperada — " . substr($response, 0, 300));
+            }
+
+            // Si no es 403, no tiene sentido probar con otro parentId
+            if ($httpCode !== 403) {
+                break;
             }
         }
 
-        log_message("TikiWikiClient: Error al crear galería '{$name}' (HTTP {$httpCode})", true);
+        log_message("TikiWikiClient: Error al crear galería '{$name}'. " .
+            "Verificá que el usuario del token API tenga permiso 'admin_file_galleries' " .
+            "y creá una galería manualmente desde el panel de TikiWiki.", true);
         return null;
     }
 
@@ -492,7 +505,98 @@ class TikiWikiClient
         return ['ok' => true, 'message' => "API responde correctamente ({$trackerCount} trackers encontrados)"];
     }
 
-    public function createTracker(string $trackerName, string $description = '', string $prefix = 'telegrammessage'): ?int
+    /**
+     * Verificar permisos del token de API de TikiWiki
+     * Prueba acceso a API y permisos específicos sin efectos secundarios.
+     * @return array{ok: bool, api_access: bool, file_gallery: bool, upload_files: bool, message: string}
+     */
+    public function checkPermissions(): array
+    {
+        $basic = $this->testConnection();
+        if (!$basic['ok']) {
+            return [
+                'ok' => false,
+                'api_access' => false,
+                'file_gallery' => false,
+                'upload_files' => false,
+                'message' => $basic['message'],
+            ];
+        }
+
+        // Probar admin_file_galleries: GET /api/galleries devuelve lista
+        //   200 → acceso a galerías OK (tiene al menos tiki_p_view_file_gallery)
+        //   403 → no tiene permiso
+        $hasFileGallery = false;
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $this->apiUrl . 'galleries');
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Authorization: Bearer " . $this->token,
+            "Accept: application/json",
+            "User-Agent: Mozilla/5.0"
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+        curl_exec($ch);
+        $galleriesHttp = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        $hasFileGallery = ($galleriesHttp === 200);
+        if (!$hasFileGallery) {
+            log_message("TikiWikiClient: checkPermissions — GET /api/galleries HTTP {$galleriesHttp}", true);
+        }
+
+        // Probar upload_files: POST a gallerias/upload con datos mínimos
+        //   Si no es 403, tiene permiso de upload (el error es por datos inválidos)
+        $hasUpload = false;
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $this->apiUrl . 'galleries/upload');
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Authorization: Bearer " . $this->token,
+            "Content-Type: application/x-www-form-urlencoded",
+            "User-Agent: Mozilla/5.0"
+        ]);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, 'galleryId=1');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+        curl_exec($ch);
+        $uploadHttp = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        $hasUpload = ($uploadHttp !== 403);
+        if (!$hasUpload) {
+            log_message("TikiWikiClient: checkPermissions — POST /galleries/upload HTTP {$uploadHttp} (403=no permiso)", true);
+        }
+
+        // Armar mensaje informativo
+        $parts = [];
+        if ($hasFileGallery) {
+            $parts[] = 'admin_file_galleries: OK';
+        } else {
+            $parts[] = 'admin_file_galleries: FALTA';
+        }
+        if ($hasUpload) {
+            $parts[] = 'upload_files: OK';
+        } elseif ($hasFileGallery) {
+            $parts[] = 'upload_files: FALTA — no se podrán subir archivos multimedia';
+        }
+
+        $message = 'API responde correctamente. ' . implode(' | ', $parts);
+
+        if (!$hasFileGallery) {
+            $message .= ' Agregá admin_file_galleries al token desde Admin → Security → API en TikiWiki.';
+        } elseif (!$hasUpload) {
+            $message .= ' Agregá upload_files al token desde Admin → Security → API en TikiWiki.';
+        }
+
+        return [
+            'ok' => $hasFileGallery && $hasUpload,
+            'api_access' => true,
+            'file_gallery' => $hasFileGallery,
+            'upload_files' => $hasUpload,
+            'message' => $message,
+        ];
+    }
+
+    public function createTracker(string $trackerName, string $description = '', string $prefix = 'telegrammessage', ?int $galleryId = null): ?int
     {
         // Validar prefix
         $prefix = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $prefix));
@@ -505,67 +609,95 @@ class TikiWikiClient
             return null;
         }
 
-        $url = $this->apiUrl . "trackers";
         $desc = $description ?: 'Tracker automático creado por trackerGram';
 
-        // 1. Crear galería de medios asociada
-        $galleryId = $this->createGallery($trackerName . ' Media');
-
-        // 2. Armar definición del campo FG con options si tenemos galería
-        $fgPermName = $prefix . 'Media';
-        $fgField = [
-            'name' => $fgPermName,
-            'type' => 'FG',
-            'permName' => $fgPermName,
-        ];
-        if ($galleryId !== null) {
-            $fgField['options'] = [
-                'galleryId' => $galleryId,
-                'count' => 0,
-                'excessBehavior' => 'discard',
-            ];
+        // 1. Obtener galería de medios: usar la proporcionada o intentar crear una
+        if ($galleryId === null) {
+            $galleryId = $this->createGallery($trackerName . ' Media');
+            if ($galleryId === null) {
+                log_message("TikiWikiClient: No se pudo crear galería — el tracker se creará sin campo FG vinculado. " .
+                    "El usuario puede asignar una galería manualmente desde el panel de TikiWiki.");
+            }
+        } else {
+            log_message("TikiWikiClient: Usando galería existente ID {$galleryId} para el tracker");
         }
 
-        $fields = [
-            'name' => $trackerName,
-            'description' => $desc,
-            'fields' => [
-                ['name' => $prefix . 'TelegramMessageId', 'type' => 't', 'permName' => $prefix . 'TelegramMessageId'],
-                ['name' => $prefix . 'ChatId', 'type' => 't', 'permName' => $prefix . 'ChatId'],
-                ['name' => $prefix . 'ChatTitle', 'type' => 't', 'permName' => $prefix . 'ChatTitle'],
-                ['name' => $prefix . 'TopicId', 'type' => 't', 'permName' => $prefix . 'TopicId'],
-                ['name' => $prefix . 'TopicTitle', 'type' => 't', 'permName' => $prefix . 'TopicTitle'],
-                ['name' => $prefix . 'UserId', 'type' => 't', 'permName' => $prefix . 'UserId'],
-                ['name' => $prefix . 'Username', 'type' => 't', 'permName' => $prefix . 'Username'],
-                ['name' => $prefix . 'FirstName', 'type' => 't', 'permName' => $prefix . 'FirstName'],
-                ['name' => $prefix . 'LastName', 'type' => 't', 'permName' => $prefix . 'LastName'],
-                ['name' => $prefix . 'DisplayName', 'type' => 't', 'permName' => $prefix . 'DisplayName'],
-                ['name' => $prefix . 'MessageType', 'type' => 't', 'permName' => $prefix . 'MessageType'],
-                ['name' => $prefix . 'Text', 'type' => 'a', 'permName' => $prefix . 'Text'],
-                ['name' => $prefix . 'Location', 'type' => 'G', 'permName' => $prefix . 'Location'],
-                ['name' => $prefix . 'MediaType', 'type' => 't', 'permName' => $prefix . 'MediaType'],
-                ['name' => $prefix . 'MediaSize', 'type' => 'n', 'permName' => $prefix . 'MediaSize'],
-                ['name' => $prefix . 'MediaCaption', 'type' => 't', 'permName' => $prefix . 'MediaCaption'],
-                ['name' => $prefix . 'MessageDate', 'type' => 'f', 'permName' => $prefix . 'MessageDate'],
-                $fgField,
-                ['name' => $prefix . 'MediaUrl', 'type' => 't', 'permName' => $prefix . 'MediaUrl'],
-                ['name' => $prefix . 'FileUrl', 'type' => 't', 'permName' => $prefix . 'FileUrl'],
-                ['name' => $prefix . 'MediaWidth', 'type' => 'n', 'permName' => $prefix . 'MediaWidth'],
-                ['name' => $prefix . 'MediaHeight', 'type' => 'n', 'permName' => $prefix . 'MediaHeight'],
-                ['name' => $prefix . 'MediaDuration', 'type' => 'DUR', 'permName' => $prefix . 'MediaDuration'],
-                ['name' => $prefix . 'EditedDate', 'type' => 't', 'permName' => $prefix . 'EditedDate'],
-                ['name' => $prefix . 'ReplyToId', 'type' => 't', 'permName' => $prefix . 'ReplyToId'],
-                ['name' => $prefix . 'Reactions', 'type' => 'a', 'permName' => $prefix . 'Reactions']
-            ]
+        // 2. Crear tracker SHELL (solo name + description — la API NO soporta fields inline)
+        $trackerId = $this->createTrackerShell($trackerName, $desc);
+        if ($trackerId === null) {
+            return null;
+        }
+
+        // 3. Definición de todos los campos a crear
+        $fieldDefs = [
+            ['name' => $prefix . 'TelegramMessageId', 'type' => 't', 'permName' => $prefix . 'TelegramMessageId'],
+            ['name' => $prefix . 'ChatId', 'type' => 't', 'permName' => $prefix . 'ChatId'],
+            ['name' => $prefix . 'ChatTitle', 'type' => 't', 'permName' => $prefix . 'ChatTitle'],
+            ['name' => $prefix . 'TopicId', 'type' => 't', 'permName' => $prefix . 'TopicId'],
+            ['name' => $prefix . 'TopicTitle', 'type' => 't', 'permName' => $prefix . 'TopicTitle'],
+            ['name' => $prefix . 'UserId', 'type' => 't', 'permName' => $prefix . 'UserId'],
+            ['name' => $prefix . 'Username', 'type' => 't', 'permName' => $prefix . 'Username'],
+            ['name' => $prefix . 'FirstName', 'type' => 't', 'permName' => $prefix . 'FirstName'],
+            ['name' => $prefix . 'LastName', 'type' => 't', 'permName' => $prefix . 'LastName'],
+            ['name' => $prefix . 'DisplayName', 'type' => 't', 'permName' => $prefix . 'DisplayName'],
+            ['name' => $prefix . 'MessageType', 'type' => 't', 'permName' => $prefix . 'MessageType'],
+            ['name' => $prefix . 'Text', 'type' => 'a', 'permName' => $prefix . 'Text'],
+            ['name' => $prefix . 'Location', 'type' => 'G', 'permName' => $prefix . 'Location'],
+            ['name' => $prefix . 'MediaType', 'type' => 't', 'permName' => $prefix . 'MediaType'],
+            ['name' => $prefix . 'MediaSize', 'type' => 'n', 'permName' => $prefix . 'MediaSize'],
+            ['name' => $prefix . 'MediaCaption', 'type' => 't', 'permName' => $prefix . 'MediaCaption'],
+            ['name' => $prefix . 'MessageDate', 'type' => 'f', 'permName' => $prefix . 'MessageDate'],
+            ['name' => $prefix . 'Media', 'type' => 'FG', 'permName' => $prefix . 'Media'],
+            ['name' => $prefix . 'MediaUrl', 'type' => 't', 'permName' => $prefix . 'MediaUrl'],
+            ['name' => $prefix . 'FileUrl', 'type' => 't', 'permName' => $prefix . 'FileUrl'],
+            ['name' => $prefix . 'MediaWidth', 'type' => 'n', 'permName' => $prefix . 'MediaWidth'],
+            ['name' => $prefix . 'MediaHeight', 'type' => 'n', 'permName' => $prefix . 'MediaHeight'],
+            ['name' => $prefix . 'MediaDuration', 'type' => 'DUR', 'permName' => $prefix . 'MediaDuration'],
+            ['name' => $prefix . 'EditedDate', 'type' => 't', 'permName' => $prefix . 'EditedDate'],
+            ['name' => $prefix . 'ReplyToId', 'type' => 't', 'permName' => $prefix . 'ReplyToId'],
+            ['name' => $prefix . 'Reactions', 'type' => 'a', 'permName' => $prefix . 'Reactions'],
         ];
+
+        // 4. Crear cada field individualmente vía POST /api/trackers/{trackerId}/fields
+        //    Si algún field falla, abortamos — un tracker incompleto causaría errores difíciles
+        $fgPermName = $prefix . 'Media';
+        foreach ($fieldDefs as $fd) {
+            if (! $this->createTrackerField($trackerId, $fd['name'], $fd['permName'], $fd['type'])) {
+                log_message("TikiWikiClient: createTracker — error fatal creando field '{$fd['name']}', abortando", true);
+                return null;
+            }
+        }
+
+        // 5. Si hay galería, actualizar options del campo FG
+        if ($galleryId !== null) {
+            $this->updateFgFieldOptions($trackerId, $galleryId, 'discard', $fgPermName);
+        }
+
+        return $trackerId;
+    }
+
+    /**
+     * Crea el tracker SHELL (solo nombre + descripción, sin fields)
+     */
+    private function createTrackerShell(string $name, string $description): ?int
+    {
+        $url = $this->apiUrl . "trackers";
+
+        // confirm=1 requerido por action_replace.
+        // Usamos form-urlencoded porque TikiWiki NO mergea correctamente JSON body a $_POST
+        $postFields = http_build_query([
+            'name' => $name,
+            'description' => $description,
+            'confirm' => 1,
+        ]);
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($fields));
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             "Authorization: Bearer " . $this->token,
-            "Content-Type: application/json",
+            "Content-Type: application/x-www-form-urlencoded",
             "User-Agent: Mozilla/5.0"
         ]);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -575,20 +707,56 @@ class TikiWikiClient
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
+        log_message("TikiWikiClient: createTrackerShell HTTP {$httpCode} — response: " . substr($response, 0, 300));
+
         if ($httpCode === 200 || $httpCode === 201) {
             $data = json_decode($response, true);
-            $trackerId = $data['id'] ?? null;
-            if ($trackerId) {
-                // 3. Si la galería se creó pero el FG field inline no tomó las options,
-                //    hacemos un update explícito
-                if ($galleryId !== null) {
-                    $this->updateFgFieldOptions((int) $trackerId, $galleryId, 'discard', $fgPermName);
-                }
-                return (int) $trackerId;
+            // action_replace devuelve trackerId en el root del response
+            $trackerId = $data['trackerId'] ?? $data['tracker_id'] ?? $data['id'] ?? null;
+            if ($trackerId === null) {
+                log_message("TikiWikiClient: createTrackerShell — respuesta sin trackerId. Keys: " .
+                    implode(', ', array_keys($data ?? [])), true);
             }
+            return $trackerId;
         }
 
         return null;
+    }
+
+    /**
+     * Crea un field individual en un tracker vía POST /api/trackers/{trackerId}/fields
+     */
+    private function createTrackerField(int $trackerId, string $name, string $permName, string $type): bool
+    {
+        $url = $this->apiUrl . "trackers/{$trackerId}/fields";
+        $postFields = http_build_query([
+            'name' => $name,
+            'permName' => $permName,
+            'type' => $type,
+        ]);
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Authorization: Bearer " . $this->token,
+            "Content-Type: application/x-www-form-urlencoded",
+            "User-Agent: Mozilla/5.0"
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200 && $httpCode !== 201) {
+            log_message("TikiWikiClient: createField '{$name}' HTTP {$httpCode} — response: " . substr($response, 0, 300));
+            return false;
+        }
+
+        return true;
     }
 
     private function getMimeType(string $filePath): string

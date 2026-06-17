@@ -41,7 +41,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 | | |
 |---|---|
-| **Versión** | v0.4.0 |
+| **Versión** | v0.5.2 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
 | **Repositorio** | https://github.com/cheperico/trackergram |
@@ -94,6 +94,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 - ✅ **Async processing per-conexión**: cada conexión tiene su propio toggle async en el admin
 - ✅ **`.env` simplificado**: solo contiene config global (admin, debug, async); credenciales bot/wiki solo en `setup.json`
 - ✅ **Sin fallback legacy**: api.php rechaza con 403 si no hay conexión en `setup.json`
+- ✅ **Accesibilidad ARIA completa en admin.php**: roles, landmarks, tooltips, skip link, focus trap, aria-live, teclado, contraste, prefers-reduced-motion
 
 ---
 
@@ -471,6 +472,7 @@ Ver [CAMBIOS.md](CAMBIOS.md) para el detalle completo por versión.
 
 | Versión | Cambio principal |
 |---|---|---|
+| v0.5.2 | **Accesibilidad ARIA completa en admin.php**: roles, landmarks, tooltips, skip link, focus trap, aria-live, contraste, prefers-reduced-motion |
 | v0.4.0 | **Async processing per-conexión + .env simplificado + adiós legacy**: toggle async por conexión en admin, api.php rechaza 403 sin conexión (sin fallback legacy), config.php sin constantes de credenciales, bootstrap.php sin DI wiring (cada entry point crea sus clientes), import.php usa MessageMapper local y requiere credenciales Tiki, TikiWikiClient.getBaseUrl() |
 | v0.3.0 | **Arquitectura multi-conexión**: ConfigManager, setup.json, admin con pestañas, webhook multi-bot, import per-sesión, worker async multi-conexión, .htaccess mejorado, config/ fuera del webroot |
 | v0.2.3 | log_message() ahora respeta DEBUG_MODE (debug.log solo cuando DEBUG_MODE=true o $force=true en errores críticos), documentación completa auditada y sincronizada |
