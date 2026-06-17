@@ -171,10 +171,45 @@ class ConfigManager
     }
 
     /**
-     * Buscar conexión por chat_id con validación de webhook_secret y enabled.
-     * 
-     * @param int $chatId Chat ID de Telegram
-     * @param string|null $webhookSecret Secret token del request (opcional)
+     * Buscar TODAS las conexiones que matchean un chat_id + webhook_secret
+     * Útil para fan-out: un mensaje enviado a múltiples trackers
+     * @param int $chatId ID del chat de Telegram
+     * @param string|null $webhookSecret Secret token del webhook
+     * @return array[] Array de conexiones, cada una con '_slug'
+     */
+    public function findAllByChatId(int $chatId, ?string $webhookSecret = null): array
+    {
+        $this->load();
+        $results = [];
+        foreach ($this->data['connections'] as $slug => $conn) {
+            if (empty($conn['enabled'])) {
+                continue;
+            }
+            if (($conn['chat_id'] ?? 0) !== $chatId) {
+                continue;
+            }
+
+            $hasConnSecret = !empty($conn['webhook_secret']);
+            $hasReqSecret = $webhookSecret !== null && $webhookSecret !== '';
+
+            if ($hasConnSecret) {
+                if ($hasReqSecret && hash_equals($conn['webhook_secret'], $webhookSecret)) {
+                    $results[] = $conn + ['_slug' => $slug];
+                }
+                continue;
+            } else {
+                log_message("ConfigManager: Conexión '{$slug}' sin webhook_secret — aceptando request. " .
+                    "Se recomienda editar la conexión para generar un secret automáticamente.", true);
+                $results[] = $conn + ['_slug' => $slug];
+            }
+        }
+        return $results;
+    }
+
+    /**
+     * Buscar primera conexión por chat_id + webhook_secret (sin fan-out)
+     * @param int $chatId ID del chat de Telegram
+     * @param string|null $webhookSecret Secret token del webhook
      * @return array|null Conexión + '_slug' o null si no hay match
      */
     public function findByChatId(int $chatId, ?string $webhookSecret = null): ?array

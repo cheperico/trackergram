@@ -65,13 +65,13 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
         $chatId = $update['my_chat_member']['chat']['id'];
     }
 
-    // 5. Buscar conexión por chat_id + webhook_secret
+    // 5. Buscar TODAS las conexiones por chat_id + webhook_secret (fan-out)
     $secretToken = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '';
     $configManager = new ConfigManager();
-    $found = $chatId ? $configManager->findByChatId((int) $chatId, $secretToken) : null;
+    $allFound = $chatId ? $configManager->findAllByChatId((int) $chatId, $secretToken) : [];
 
     // 6. Sin conexión por chat_id: detectar pasivamente
-    if ($found === null && $chatId && $secretToken !== '') {
+    if (empty($allFound) && $chatId && $secretToken !== '') {
         // 6a. Buscar conexión pendiente (chat_id=0)
         $detectedConn = $configManager->findByWebhookSecretPending($secretToken);
         
@@ -108,43 +108,48 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
     }
 
     // 7. Sin conexión = rechazar
-    if ($found === null) {
+    if (empty($allFound)) {
         log_message("trackerGram: chat_id {$chatId} sin conexión habilitada — rechazando", true);
         http_response_code(403);
         die(json_encode(['error' => 'Forbidden: no connection for this chat']));
     }
 
-    $connection = $found;
-    $connectionSlug = $found['_slug'];
-    unset($connection['_slug']);
+    // 8. Fan-out: procesar el update para TODAS las conexiones que matcheen
+    //    (útil cuando se duplica una conexión con diferente tracker_id)
+    foreach ($allFound as $found) {
+        $connection = $found;
+        $connectionSlug = $found['_slug'];
+        unset($connection['_slug']);
 
-    // 7. Procesar el update (async per-conexión o global)
-    $messageMapper = new MessageMapper();
-    $messageMapper->setFieldPrefix($connection['field_prefix'] ?? 'telegrammessage');
-    $useAsync = $connection['async_processing'] ?? ASYNC_PROCESSING;
-    if ($useAsync) {
-        // Modo async: escribir a buffer y responder rápido
-        $bufferDir = TEMP_DIR . '/buffer';
-        if (!is_dir($bufferDir)) {
-            @mkdir($bufferDir, 0700, true);
-        }
+        $messageMapper = new MessageMapper();
+        $messageMapper->setFieldPrefix($connection['field_prefix'] ?? 'telegrammessage');
+        $useAsync = $connection['async_processing'] ?? ASYNC_PROCESSING;
 
-        $bufferData = [
-            'connection_slug' => $connectionSlug,
-            'update' => $update,
-        ];
-        $bufferFile = $bufferDir . '/event_' . time() . '_' . bin2hex(random_bytes(4)) . '.json';
-        $written = @file_put_contents($bufferFile, json_encode($bufferData), LOCK_EX);
-        if ($written === false) {
-            log_message("trackerGram: No se pudo escribir buffer async — procesando sincrónicamente", true);
+        if ($useAsync) {
+            // Modo async: escribir a buffer y responder rápido
+            $bufferDir = TEMP_DIR . '/buffer';
+            if (!is_dir($bufferDir)) {
+                @mkdir($bufferDir, 0700, true);
+            }
+
+            $bufferData = [
+                'connection_slug' => $connectionSlug,
+                'update' => $update,
+            ];
+            $bufferFile = $bufferDir . '/event_' . time() . '_' . bin2hex(random_bytes(4)) . '.json';
+            $written = @file_put_contents($bufferFile, json_encode($bufferData), LOCK_EX);
+            if ($written === false) {
+                log_message("trackerGram: No se pudo escribir buffer async — procesando sincrónicamente", true);
+                processUpdate($update, $connection, $connectionSlug, $messageMapper);
+            }
+        } else {
+            // Modo sync: procesar inmediatamente
             processUpdate($update, $connection, $connectionSlug, $messageMapper);
         }
-        echo json_encode(['status' => 'ok']);
-    } else {
-        // Modo sync: procesar inmediatamente
-        processUpdate($update, $connection, $connectionSlug, $messageMapper);
-        echo json_encode(['status' => 'ok']);
     }
+
+    // Responder 200 OK una sola vez para todo el fan-out
+    echo json_encode(['status' => 'ok']);
 }
 
 /**
