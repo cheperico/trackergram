@@ -15,9 +15,9 @@
 
 | | |
 |---|---|
-| **Versión actual** | v0.4.0 |
+| **Versión actual** | v0.5.3 |
 | **Estado** | Beta funcional, desarrollo activo |
-| **Instancias activas** | Dev (tracker 12) · Prod (tracker 22) |
+| **Instancias activas** | Dev (tracker 26) · Prod (tracker 22) |
 | **Filosofía** | Sin DB local · PHP puro sin framework · MVP pragmático |
 
 ### Lo que ya funciona sólido
@@ -48,6 +48,10 @@
 - ✅ **Async processing por conexión**: toggle en admin, per-connection
 - ✅ **.env simplificado**: solo config global; credenciales en setup.json
 - ✅ **Service messages completos**: cobertura total webhook e import (incluye `remove_members`, `joined`, `new_chat_photo`, `delete_chat_photo`)
+- ✅ **Creación de tracker desde admin panel**: shell + fields + galería (auto o existente) + field prefix
+- ✅ **Fan-out**: mismo mensaje a múltiples trackers duplicando conexión
+- ✅ **FG field options vía API**: `updateFgFieldOptions()` con `name`+`type` requeridos
+- ✅ **Auto-población bot_name/chat_title** en cards de conexión
 
 ---
 
@@ -57,18 +61,18 @@
 
 Items con impacto inmediato en la operación del día a día.
 
-| # | Item | Esfuerzo | Por qué ahora |
-|   |------|----------|---------------|
-| 1 | **Service messages restantes** | 1 sesión | ✅ **Completado** — cobertura total webhook e import. |
-| 2 | **Hashtags como etiquetas** | 1 sesión | Extraer `#tags` a campo separado. Mejora búsqueda en TikiWiki. |
+| # | Item | Esfuerzo | Notas |
+|   |------|----------|-------|
+| 1 | **Hashtags como etiquetas** | 1 sesión | Extraer `#tags` a campo separado. Mejora búsqueda en TikiWiki. |
 
 ### 🟡 Fase 2: Robustez (1-2 semanas)
 
 | # | Item | Esfuerzo | Notas |
 |   |------|----------|-------|
-| 3 | **Service messages faltantes en import** — `new_chat_photo/delete_chat_photo`, `message_reaction` | 1 sesión | |
-| 4 | **Health check en admin** | 1 sesión | Estado del webhook, test conexión por conexión. |
-| 5 | **Mensajes editados/borrados** | 2 sesiones | Estrategia: archivo inmutable con eventos. Los editados/borrados son eventos adicionales. |
+| 2 | **Health check en admin** | 1 sesión | Estado del webhook, test conexión por conexión. |
+| 3 | **Mensajes editados/borrados** | 2 sesiones | Estrategia: archivo inmutable con eventos. Los editados/borrados son eventos adicionales. |
+| 4 | **Verificación post-creación de FG field** | 1 sesión | Tras `updateFgFieldOptions()`, GET /fields para confirmar que galleryId se guardó (workaround del bug de TikiWiki que siempre responde con options viejas). |
+| 5 | **Reproducción de mensajes previos a nuevo tracker** | 2 sesiones | Script/acción para re-enviar mensajes anteriores de un chat a un tracker recién creado. |
 
 ### 🟢 Fase 3: Features grandes (mediano plazo)
 
@@ -138,4 +142,4 @@ Los documentos en `design/` contienen exploraciones detalladas de features que e
 
 Los reportes históricos en `reports/` se conservan como referencia de investigaciones pasadas. Los items accionables ya están consolidados en este documento.
 
-> **Última actualización**: 16/06/2026
+> **Última actualización**: 18/06/2026

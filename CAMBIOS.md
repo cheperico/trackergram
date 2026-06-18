@@ -1,5 +1,35 @@
 # Cambios - Changelog
 
+## v0.5.3
+
+### Fixes críticos (API TikiWiki Content-Type + FG field options)
+- **Fix**: `createTrackerShell()`, `createTrackerField()`, `createGallery()` — la API REST de TikiWiki NO mergea JSON body a `$_POST`. Cambiado `Content-Type: application/json` → `application/x-www-form-urlencoded` en todos los POST que crean recursos. Los errores HTTP 409 silenciosos desaparecieron.
+- **Fix**: `checkPermissions()` — usaba `DELETE /api/galleries/999999/delete` para probar upload permissions, pero ese endpoint devuelve HTTP 200 aunque el recurso no exista (no 404). Ahora usa `GET /api/galleries` (HTTP 200 = OK).
+- **Fix**: `updateFgFieldOptions()` — no guardaba `galleryId` en el campo FG porque `action_edit_field` salta el bloque de guardado si no recibe `name` en el POST. Agregado `name` (fieldName) + `type` (`FG`) al POST body. La respuesta HTTP 200 es engañosa (TikiWiki bug: muestra options viejas), verificar con `GET /api/trackers/{id}/fields`.
+  - Root cause trazada hasta el código fuente de TikiWiki: `Controller.php` valida `$input->name->text()` antes de procesar options.
+
+### Feat: Gallery ID opcional en Crear Tracker
+- `createTracker()` acepta `?int $galleryId`. Si se pasa, usa esa galería sin intentar crear una nueva.
+- `admin.php` formulario "Crear Tracker" tiene campo "Gallery ID (opcional)".
+- Si no se pasa gallery ID, el flujo auto-crea una galería y la asigna (comportamiento anterior).
+
+### Feat: Fan-out en webhook
+- `ConfigManager::findAllByChatId()` devuelve TODAS las conexiones que matchean `(chat_id, webhook_secret)`.
+- `api.php` itera sobre todas las coincidencias y procesa el update para cada una.
+- Duplicar una conexión con diferente tracker_id ahora permite enviar el mismo mensaje a múltiples trackers.
+
+### Feat: Auto-población de bot_name y chat_title
+- `admin.php` fetchea `bot_name` vía `getMe()` y `chat_title` vía `getChat()` de la Telegram Bot API al cargar el panel.
+- Los nombres se persisten en `setup.json` y se muestran en las tarjetas de conexión.
+
+### Security: Eliminar auto-fill de tokens en admin
+- Eliminadas `fillImportFromConnection()` y `fillCreateFromConnection()` que exponían tokens TikiWiki via AJAX y data-attributes en HTML.
+- Los selectores de conexión ahora son solo informativos (sin auto-fill de URLs/tokens).
+
+### Chore
+- `index.php` redirige a `admin.php` para simplificar acceso.
+- Documentación sincronizada: AGENTS.md, CAMBIOS.md, roadmap.md.
+
 ## v0.5.2
 - **Feat**: Accesibilidad completa del panel admin (`admin.php`).
   - **ARIA**: `role="alert"`, `role="dialog"`, `role="progressbar"`, `role="main"`, `role="button"`, `aria-modal`, `aria-live`, `aria-atomic`, `aria-describedby`, `aria-labelledby`, `aria-required`, `aria-expanded`, `aria-controls`, `aria-hidden`, `aria-current="page"`, `aria-label`.

@@ -41,7 +41,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 | | |
 |---|---|
-| **Versión** | v0.5.2 |
+| **Versión** | v0.5.3 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
 | **Repositorio** | https://github.com/cheperico/trackergram |
@@ -429,8 +429,11 @@ ASYNC_PROCESSING=false
 
 - **No agregar lógica de negocio en `api.php`** — Es solo entry point. Toda la lógica va en `WebhookHandler`.
 - **No usar `curl` directamente** — Usar `TelegramClient` y `TikiWikiClient`.
+- **No usar JSON en POST a API de TikiWiki** — La API NO mergea JSON body a `$_POST`. Todos los POST que crean o modifican recursos (trackers, fields, galleries) deben usar `application/x-www-form-urlencoded`.
+- **No usar `GET /api/trackers/{id}` para obtener field definitions** — Ese endpoint devuelve **items**, no campos. Usar `GET /api/trackers/{id}/fields`. Confirmado en código fuente de TikiWiki (`ApiBridge.php` route `action=list_items`).
 - **No usar `GET /api/trackers/{id}` para obtener field definitions** — Ese endpoint devuelve **items**, no campos. Usar `GET /api/trackers/{id}/fields`. Confirmado en código fuente de TikiWiki (`ApiBridge.php` route `action=list_items`).
 - **No crear variables globales** — Usar `static` dentro de funciones o pasar por parámetros.
+- **No asumir que HTTP 200 significa éxito** en actualizaciones de FG field options — `POST /api/trackers/{id}/fields/{id}` requiere `name` + `type` + `option[...]` en el body. Si falta `name`, TikiWiki salta el bloque de guardado pero igual responde HTTP 200 (y la respuesta siempre muestra options viejas, incluso si se guardó). Verificar con `GET /api/trackers/{id}/fields` después.
 - **No requerir archivos individuales** — Siempre usar `require_once 'bootstrap.php'` (en trackerGram).
 - **No duplicar lógica de parsing entre webhook e import** — Ambos convergen en `MessageMapper::toWikiFields()` vía `NormalizedMessage`. Webhook usa `fromWebhook()`, import usa `fromExport()`.
 - **No depender del modo legacy** — El modo legacy (constantes en `.env`) fue eliminado. Todas las conexiones se configuran desde el panel admin y se persisten en `setup.json`. `api.php` rechaza con 403 si no hay conexión en `setup.json`.
@@ -472,6 +475,7 @@ Ver [CAMBIOS.md](CAMBIOS.md) para el detalle completo por versión.
 
 | Versión | Cambio principal |
 |---|---|---|
+| v0.5.3 | **Fix updateFgFieldOptions + gallery ID opcional + fan-out**: FG field options ahora requieren `name`+`type` en POST. Gallery ID opcional en crear tracker (auto-crea si no se provee). Fan-out: mismo mensaje a múltiples trackers. Auto-población bot_name/chat_title. Eliminado auto-fill de tokens via AJAX. |
 | v0.5.2 | **Accesibilidad ARIA completa en admin.php**: roles, landmarks, tooltips, skip link, focus trap, aria-live, contraste, prefers-reduced-motion |
 | v0.4.0 | **Async processing per-conexión + .env simplificado + adiós legacy**: toggle async por conexión en admin, api.php rechaza 403 sin conexión (sin fallback legacy), config.php sin constantes de credenciales, bootstrap.php sin DI wiring (cada entry point crea sus clientes), import.php usa MessageMapper local y requiere credenciales Tiki, TikiWikiClient.getBaseUrl() |
 | v0.3.0 | **Arquitectura multi-conexión**: ConfigManager, setup.json, admin con pestañas, webhook multi-bot, import per-sesión, worker async multi-conexión, .htaccess mejorado, config/ fuera del webroot |
