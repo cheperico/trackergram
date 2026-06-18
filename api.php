@@ -168,6 +168,22 @@ function processUpdate(array $update, array $connection, string $connectionSlug,
         uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
     );
     $tikiClient->setFieldPrefix($connection['field_prefix'] ?? 'telegrammessage');
+    $messageMapper->setFieldPrefix($connection['field_prefix'] ?? 'telegrammessage');
+
+    // Auto-detectar field prefix desde el tracker (corrige prefix mal guardado)
+    $trackerId = (int) $connection['tracker_id'];
+    if ($trackerId > 0) {
+        $resolvedPrefix = $tikiClient->resolveFieldPrefix($trackerId);
+        if ($resolvedPrefix !== $messageMapper->getFieldPrefix()) {
+            log_message("api.php: Field prefix corregido de '{$messageMapper->getFieldPrefix()}' a '{$resolvedPrefix}' para conexión '{$connectionSlug}'");
+            $messageMapper->setFieldPrefix($resolvedPrefix);
+            $tikiClient->setFieldPrefix($resolvedPrefix);
+            // Persistir en setup.json para evitar re-detección en cada request
+            $cm = new ConfigManager();
+            $cm->updateConnectionFields($connectionSlug, ['field_prefix' => $resolvedPrefix]);
+        }
+    }
+
     $tgClient = new TelegramClient(
         botToken: $connection['bot_token']
     );
@@ -175,7 +191,7 @@ function processUpdate(array $update, array $connection, string $connectionSlug,
         tikiWikiClient: $tikiClient,
         telegramClient: $tgClient,
         messageMapper: $messageMapper,
-        trackerId: (int) $connection['tracker_id']
+        trackerId: $trackerId
     );
     $handler->processUpdate($update);
 }

@@ -41,7 +41,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 | | |
 |---|---|
-| **Versión** | v0.5.3 |
+| **Versión** | v0.5.4 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
 | **Repositorio** | https://github.com/cheperico/trackergram |
@@ -297,6 +297,23 @@ El tracker por defecto tiene estos campos (permNames):
 | `telegrammessageReplyToId` | t (text) | ID del mensaje al que responde (con link a vista filtrada via Pretty Tracker) |
 | `telegrammessageReactions` | t (text) | Reacciones formateadas como texto legible (👍 3 · ❤️ 1) |
 
+### Auto-detección de field prefix
+
+Desde v0.5.4, el sistema **detecta automáticamente el field prefix real** del tracker cuando el almacenado es `telegrammessage` (el default). Esto permite:
+
+- **Adaptarse a cualquier prefix**: si el tracker se creó con un prefix custom (ej: `soporte`, `qpch2`, `equipo`), el sistema lo detecta desde los nombres de campo reales en TikiWiki.
+- **Corregir prefix mal guardados**: si `setup.json` tiene un prefix incorrecto por bugs anteriores, la auto-detección lo corrige al primer webhook y lo persiste.
+- **Sin configuración extra**: no requiere que el usuario configure el prefix manualmente.
+
+**Cómo funciona** (`TikiWikiClient::resolveFieldPriority()`):
+1. Si el prefix almacenado NO es `telegrammessage`, se confía en él (el usuario lo configuró explícitamente).
+2. Si es `telegrammessage` (default), fetchea `GET /api/trackers/{id}/fields`.
+3. Busca campos con permNames que terminen en sufijos conocidos (`TelegramMessageId`, `ChatId`, `Text`, `MessageDate`, `Media`).
+4. Extrae el prefijo común del primer match.
+5. Si el detectado difiere del almacenado, lo persiste a `setup.json` vía `ConfigManager::updateConnectionFields()`.
+
+**Cobertura**: webhook (api.php), async worker (worker.php), importación (import.php).
+
 ### Nota sobre field prefix
 
 Los permNames de los campos ya **no están hardcodeados** como `telegrammessage*`. Ahora se genera dinámicamente desde el `field_prefix` de la conexión (ej: `qpch`, `soporte`, `telegrammessage`).
@@ -305,6 +322,7 @@ Los permNames de los campos ya **no están hardcodeados** como `telegrammessage*
 - Máximo 16 caracteres, solo `[a-z][a-z0-9]*`, debe comenzar con letra.
 - Conexiones existentes sin prefix usan `telegrammessage` por defecto (backward compatible).
 - Todos los flujos (webhook, import, async) usan el field prefix de la conexión.
+- **Auto-detección**: si el prefix almacenado es `telegrammessage` (el default), el sistema lo verifica contra los campos reales del tracker vía API y lo corrige automáticamente si detecta un prefix diferente. Ver sección [Auto-detección de field prefix](#auto-detección-de-field-prefix) más arriba.
 
 ### Tipos de campo en TikiWiki
 

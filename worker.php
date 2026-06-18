@@ -142,6 +142,19 @@ function processBatch(string $bufferDir, int $maxEvents, ConfigManager $configMa
             );
             $tikiClient->setFieldPrefix($connection['field_prefix'] ?? 'telegrammessage');
             $messageMapper->setFieldPrefix($connection['field_prefix'] ?? 'telegrammessage');
+
+            // Auto-detectar field prefix desde el tracker (corrige prefix mal guardado)
+            $trackerId = (int) $connection['tracker_id'];
+            if ($trackerId > 0) {
+                $resolvedPrefix = $tikiClient->resolveFieldPrefix($trackerId);
+                if ($resolvedPrefix !== $messageMapper->getFieldPrefix()) {
+                    echo "[" . date('Y-m-d H:i:s') . "] Field prefix corregido de '{$messageMapper->getFieldPrefix()}' a '{$resolvedPrefix}' para conexión '{$connectionSlug}'\n";
+                    $messageMapper->setFieldPrefix($resolvedPrefix);
+                    $tikiClient->setFieldPrefix($resolvedPrefix);
+                    $configManager->updateConnectionFields($connectionSlug, ['field_prefix' => $resolvedPrefix]);
+                }
+            }
+
             $tgClient = new TelegramClient(
                 botToken: $connection['bot_token']
             );

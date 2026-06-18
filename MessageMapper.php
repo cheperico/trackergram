@@ -19,6 +19,11 @@ class MessageMapper
         $this->fieldPrefix = $prefix;
     }
 
+    public function getFieldPrefix(): string
+    {
+        return $this->fieldPrefix;
+    }
+
     /**
      * Procesar mensaje de webhook de Telegram
      * Sin efectos secundarios (no upload, no cache)

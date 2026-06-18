@@ -1,5 +1,21 @@
 # Cambios - Changelog
 
+## v0.5.4
+
+### Fix: Field prefix preservado al editar conexión desde modal Webhook
+- `ConfigManager::saveConnection()` — al editar, si `field_prefix` no viene en el POST (como ocurre en el modal de edición de la pestaña Webhook), preserva el valor existente en vez de resetearlo a `telegrammessage`.
+- Root cause: el modal de edición de conexiones no incluye el campo `field_prefix`, por lo que no se enviaba en el POST. `saveConnection()` asumía conexión nueva y ponía default.
+
+### Feat: Auto-detección de field prefix desde el tracker
+- `TikiWikiClient::resolveFieldPrefix(int $trackerId)` — detecta automáticamente el field prefix real del tracker consultando sus campos vía `GET /api/trackers/{id}/fields`. Busca permNames que terminen en sufijos conocidos (TelegramMessageId, ChatId, Text, MessageDate, Media) y extrae el prefijo común.
+- **Scope**: No solo corrige el prefix mal guardado, sino que se adapta a CUALQUIER prefix que tenga el tracker (creado manualmente, con otro nombre, etc.).
+- `getMediaGalleryId()` y `messageExists()` ahora usan `resolveFieldPrefix()` para obtener el prefix correcto sin asumir que el almacenado en `setup.json` es el real.
+- `loadTrackerFields(int $trackerId)` — método compartido que fetchea fields del tracker una sola vez, evitando doble API call entre la detección de prefix y la búsqueda del gallery ID.
+- **Persistencia**: Cuando el prefix detectado difiere del almacenado, se guarda automáticamente en `setup.json` vía `ConfigManager::updateConnectionFields()`.
+- **Afecta**: api.php (webhook sync), worker.php (async), import.php (handleExtract, handleProcess, handleFull).
+- `MessageMapper::getFieldPrefix()` — nuevo getter para sincronizar el prefix detectado.
+- **Sin regresión**: Si el prefix almacenado NO es el default `telegrammessage`, se confía en él (no se fetchea el tracker). La auto-detección solo se activa para conexiones con prefix default o vacío.
+
 ## v0.5.3
 
 ### Fixes críticos (API TikiWiki Content-Type + FG field options)

@@ -11,6 +11,10 @@ class TikiWikiClient
     private int $uploadTimeout;
     private string $fieldPrefix = 'telegrammessage';
     private array $mediaGalleryIdCache = [];
+    /** Cache de fields del tracker (para evitar doble fetch al detectar prefix y gallery ID) */
+    private array $trackerFieldsCache = [];
+    /** Cache de prefix resuelto por trackerId */
+    private array $resolvedPrefixCache = [];
     /** Trackers where repairFgGallery was already attempted (prevents loops) */
     private array $repairedTrackers = [];
 
@@ -20,6 +24,108 @@ class TikiWikiClient
     public function setFieldPrefix(string $prefix): void
     {
         $this->fieldPrefix = $prefix;
+    }
+
+    /**
+     * Obtener field prefix resuelto (auto-detectado si es necesario).
+     * Si el prefix actual es el default 'telegrammessage', intenta detectarlo
+     * desde los fields reales del tracker vía API.
+     * Una vez detectado, se guarda en el cache interno.
+     */
+    public function resolveFieldPrefix(int $trackerId): string
+    {
+        // Cache por trackerId para esta request
+        if (isset($this->resolvedPrefixCache[$trackerId])) {
+            return $this->resolvedPrefixCache[$trackerId];
+        }
+
+        // Si ya tenemos un prefix custom (no el default), confiarlo
+        if ($this->fieldPrefix !== 'telegrammessage') {
+            $this->resolvedPrefixCache[$trackerId] = $this->fieldPrefix;
+            return $this->fieldPrefix;
+        }
+
+        // Cargar fields del tracker (también detecta el prefix)
+        $fields = $this->loadTrackerFields($trackerId);
+
+        // Intentar detectar prefix desde los field names
+        $detected = $this->detectPrefixFromFieldNames($fields);
+        if ($detected !== null) {
+            log_message("TikiWikiClient: Field prefix auto-detectado como '{$detected}' para tracker {$trackerId}");
+            $this->fieldPrefix = $detected;
+            $this->resolvedPrefixCache[$trackerId] = $detected;
+            return $detected;
+        }
+
+        // Fallback al prefix default
+        $this->resolvedPrefixCache[$trackerId] = $this->fieldPrefix;
+        return $this->fieldPrefix;
+    }
+
+    /**
+     * Cargar fields del tracker desde la API y cachearlos internamente.
+     * Útil para compartir el fetch entre getMediaGalleryId() y resolveFieldPrefix().
+     * @return array Lista de fields
+     */
+    private function loadTrackerFields(int $trackerId): array
+    {
+        if (isset($this->trackerFieldsCache[$trackerId])) {
+            return $this->trackerFieldsCache[$trackerId];
+        }
+
+        $url = $this->apiUrl . "trackers/$trackerId/fields";
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Authorization: Bearer " . $this->token,
+            "User-Agent: Mozilla/5.0"
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        $fields = [];
+        if ($httpCode === 200) {
+            $data = json_decode($response, true);
+            if (isset($data['fields'])) {
+                $fields = $data['fields'];
+            } else {
+                log_message("TikiWikiClient: GET trackers/{$trackerId}/fields sin clave 'fields'. Keys: " . implode(', ', array_keys($data)), true);
+            }
+        } else {
+            log_message("TikiWikiClient: Error HTTP {$httpCode} al obtener fields de tracker {$trackerId}", true);
+        }
+
+        $this->trackerFieldsCache[$trackerId] = $fields;
+        return $fields;
+    }
+
+    /**
+     * Detectar field prefix desde los nombres de campo del tracker.
+     * Busca campos que terminen en sufijos conocidos (TelegramMessageId, ChatId, Text, etc.)
+     * y extrae el prefijo común.
+     */
+    private function detectPrefixFromFieldNames(array $fields): ?string
+    {
+        $knownSuffixes = ['TelegramMessageId', 'ChatId', 'Text', 'MessageDate', 'Media'];
+
+        foreach ($fields as $field) {
+            $permName = $field['permName'] ?? '';
+            foreach ($knownSuffixes as $suffix) {
+                if (str_ends_with($permName, $suffix)) {
+                    $prefix = substr($permName, 0, -strlen($suffix));
+                    if ($prefix !== '') {
+                        return $prefix;
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     public function __construct(
@@ -47,59 +153,38 @@ class TikiWikiClient
             return $this->mediaGalleryIdCache[$trackerId];
         }
 
-        // Usar el endpoint de fields, NO trackers/{id} (que lista items en TikiWiki 27+)
-        $url = $this->apiUrl . "trackers/$trackerId/fields";
+        // Resolver prefix desde los fields del tracker (usa cache si ya se cargaron)
+        $prefix = $this->resolveFieldPrefix($trackerId);
+        $fields = $this->loadTrackerFields($trackerId);
 
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Authorization: Bearer " . $this->token,
-            "User-Agent: Mozilla/5.0"
-        ]);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($httpCode === 200) {
-            $data = json_decode($response, true);
-            if (isset($data['fields'])) {
-                foreach ($data['fields'] as $field) {
-                    if (($field['type'] ?? '') === 'FG' && ($field['permName'] ?? '') === $this->fieldPrefix . 'Media') {
-                        $options = $field['options'] ?? null;
-                        $galleryId = $this->extractGalleryIdFromOptions($options);
-                        if ($galleryId !== null) {
-                            $this->mediaGalleryIdCache[$trackerId] = $galleryId;
-                            log_message("TikiWikiClient: Gallery ID {$galleryId} resuelto para tracker {$trackerId}");
-                            return $galleryId;
-                        }
-                        // No se pudo extraer galleryId — loguear el options real para debug
-                        $optionsPreview = is_string($options) ? $options : (is_array($options) ? json_encode($options, JSON_UNESCAPED_UNICODE) : var_export($options, true));
-                        log_message("TikiWikiClient: No se pudo extraer galleryId de options del campo FG en tracker {$trackerId}. Raw options: " . substr($optionsPreview, 0, 500), true);
-                        
-                        // Auto-reparación: crear galería + actualizar FG field (solo una vez por tracker)
-                        if (!in_array($trackerId, $this->repairedTrackers, true)) {
-                            $this->repairedTrackers[] = $trackerId;
-                            log_message("TikiWikiClient: Intentando auto-reparar galería para tracker {$trackerId}", true);
-                            $newGalleryId = $this->repairFgGallery($trackerId);
-                            if ($newGalleryId !== null) {
-                                $this->mediaGalleryIdCache[$trackerId] = $newGalleryId;
-                                log_message("TikiWikiClient: Gallery ID {$newGalleryId} creado y asignado tras auto-reparación");
-                                return $newGalleryId;
-                            }
-                        } else {
-                            log_message("TikiWikiClient: Auto-reparación ya intentada para tracker {$trackerId} — no reintentar");
-                        }
-                    }
+        foreach ($fields as $field) {
+            if (($field['type'] ?? '') === 'FG' && ($field['permName'] ?? '') === $prefix . 'Media') {
+                $options = $field['options'] ?? null;
+                $galleryId = $this->extractGalleryIdFromOptions($options);
+                if ($galleryId !== null) {
+                    $this->mediaGalleryIdCache[$trackerId] = $galleryId;
+                    log_message("TikiWikiClient: Gallery ID {$galleryId} resuelto para tracker {$trackerId}");
+                    return $galleryId;
                 }
-} else {
-            log_message("TikiWikiClient: GET trackers/{$trackerId}/fields sin clave 'fields'. Keys: " . implode(', ', array_keys($data)), true);
+                // No se pudo extraer galleryId — loguear el options real para debug
+                $optionsPreview = is_string($options) ? $options : (is_array($options) ? json_encode($options, JSON_UNESCAPED_UNICODE) : var_export($options, true));
+                log_message("TikiWikiClient: No se pudo extraer galleryId de options del campo FG en tracker {$trackerId}. Raw options: " . substr($optionsPreview, 0, 500), true);
+                
+                // Auto-reparación: crear galería + actualizar FG field (solo una vez por tracker)
+                if (!in_array($trackerId, $this->repairedTrackers, true)) {
+                    $this->repairedTrackers[] = $trackerId;
+                    log_message("TikiWikiClient: Intentando auto-reparar galería para tracker {$trackerId}", true);
+                    $newGalleryId = $this->repairFgGallery($trackerId);
+                    if ($newGalleryId !== null) {
+                        $this->mediaGalleryIdCache[$trackerId] = $newGalleryId;
+                        log_message("TikiWikiClient: Gallery ID {$newGalleryId} creado y asignado tras auto-reparación");
+                        return $newGalleryId;
+                    }
+                } else {
+                    log_message("TikiWikiClient: Auto-reparación ya intentada para tracker {$trackerId} — no reintentar");
+                }
+            }
         }
-    } else {
-        log_message("TikiWikiClient: Error HTTP {$httpCode} al obtener fields de tracker {$trackerId}", true);
-    }
 
         return null;
     }
@@ -272,10 +357,11 @@ class TikiWikiClient
 
     public function messageExists(int $trackerId, int $messageId, ?int $chatId = null): int
     {
-        $url = $this->apiUrl . "trackers/$trackerId/items?filter[fields][" . $this->fieldPrefix . "TelegramMessageId]=$messageId";
+        $prefix = $this->resolveFieldPrefix($trackerId);
+        $url = $this->apiUrl . "trackers/$trackerId/items?filter[fields][{$prefix}TelegramMessageId]=$messageId";
 
         if ($chatId !== null) {
-            $url .= "&filter[fields][" . $this->fieldPrefix . "ChatId]=$chatId";
+            $url .= "&filter[fields][{$prefix}ChatId]=$chatId";
         }
 
         $ch = curl_init();

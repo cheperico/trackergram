@@ -107,6 +107,15 @@ function handleExtract(): void
             uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
         );
         $localTikiClient->setFieldPrefix($fieldPrefix);
+
+        // Auto-detectar field prefix desde el tracker
+        $resolvedPrefix = $localTikiClient->resolveFieldPrefix((int) $trackerId);
+        if ($resolvedPrefix !== $fieldPrefix) {
+            log_message("import.php: Field prefix corregido de '{$fieldPrefix}' a '{$resolvedPrefix}' para tracker {$trackerId}");
+            $fieldPrefix = $resolvedPrefix;
+            $messageMapper->setFieldPrefix($resolvedPrefix);
+            $localTikiClient->setFieldPrefix($resolvedPrefix);
+        }
     }
 
     if (!isset($_FILES['export_file'])) {
@@ -383,6 +392,23 @@ function handleProcess(): void
             uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
         );
         $localTikiClient->setFieldPrefix($fieldPrefix);
+
+        // Auto-detectar field prefix desde el tracker
+        $resolvedPrefix = $localTikiClient->resolveFieldPrefix((int) $trackerId);
+        if ($resolvedPrefix !== $fieldPrefix) {
+            log_message("import.php process: Field prefix corregido de '{$fieldPrefix}' a '{$resolvedPrefix}'");
+            $fieldPrefix = $resolvedPrefix;
+            $messageMapper->setFieldPrefix($resolvedPrefix);
+            $localTikiClient->setFieldPrefix($resolvedPrefix);
+            // Actualizar metadata en disco para chunks subsiguientes
+            $metadata['field_prefix'] = $resolvedPrefix;
+            file_put_contents($metadataPath, json_encode($metadata));
+            // Actualizar session
+            if (isset($creds)) {
+                $creds['field_prefix'] = $resolvedPrefix;
+                $_SESSION[$importSessionKey] = $creds;
+            }
+        }
     }
     if (!$localTikiClient) {
         jsonError('Credenciales Tiki no disponibles — la sesión expiró o se perdió. Re-subir el export.');
@@ -594,6 +620,15 @@ function handleFull(): void
             uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
         );
         $localClient->setFieldPrefix($fieldPrefix);
+
+        // Auto-detectar field prefix desde el tracker
+        $resolvedPrefix = $localClient->resolveFieldPrefix((int) $trackerId);
+        if ($resolvedPrefix !== $fieldPrefix) {
+            log_message("import.php full: Field prefix corregido de '{$fieldPrefix}' a '{$resolvedPrefix}'");
+            $fieldPrefix = $resolvedPrefix;
+            $messageMapper->setFieldPrefix($resolvedPrefix);
+            $localClient->setFieldPrefix($resolvedPrefix);
+        }
     }
     if (!$localClient) {
         jsonError('Credenciales Tiki no proporcionadas');
