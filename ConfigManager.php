@@ -290,7 +290,9 @@ class ConfigManager
             'tiki_api_url' => rtrim(trim((string) ($data['tiki_api_url'] ?? '')), '/') . '/',
             'tiki_api_token' => trim((string) ($data['tiki_api_token'] ?? '')),
             'tracker_id' => (int) ($data['tracker_id'] ?? 0),
-            'field_prefix' => trim((string) ($data['field_prefix'] ?? 'telegrammessage')),
+            'field_prefix' => trim((string) ($data['field_prefix'] ?? 
+                ($isNew ? 'telegrammessage' : ($this->data['connections'][$slug]['field_prefix'] ?? 'telegrammessage'))
+            )),
         ];
 
         if ($isNew) {
