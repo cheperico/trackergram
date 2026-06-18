@@ -386,10 +386,12 @@ class TikiWikiClient
         $data = json_decode($response, true);
 
         $fieldId = null;
+        $fieldName = null;
         if (isset($data['fields'])) {
             foreach ($data['fields'] as $field) {
                 if (($field['permName'] ?? '') === $fgPermName) {
                     $fieldId = $field['fieldId'] ?? $field['id'] ?? null;
+                    $fieldName = $field['name'] ?? $fgPermName;
                     break;
                 }
             }
@@ -401,8 +403,14 @@ class TikiWikiClient
         }
 
         // Actualizar las options del field
+        // IMPORTANTE: action_edit_field requiere 'name' en el POST, 
+        // sin name el bloque de guardado se salta silenciosamente.
+        // La respuesta HTTP 200 muestra options VIEJAS (bug de TikiWiki) - 
+        // verificar con GET /fields después.
         $updateUrl = $this->apiUrl . "trackers/{$trackerId}/fields/{$fieldId}";
         $postData = http_build_query([
+            'name' => $fieldName,
+            'type' => 'FG',
             'option[galleryId]' => $galleryId,
             'option[count]' => 0,
             'option[excessBehavior]' => $excessBehavior,
@@ -424,8 +432,10 @@ class TikiWikiClient
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
+        // Nota: HTTP 200 no garantiza que se guardó — la respuesta muestra options viejas.
+        // Verificar con GET /api/trackers/{id}/fields después.
         if ($httpCode === 200) {
-            log_message("TikiWikiClient: FG field options actualizadas en tracker {$trackerId}: galleryId={$galleryId}, count=0");
+            log_message("TikiWikiClient: FG field options enviadas en tracker {$trackerId}: galleryId={$galleryId}, count=0");
             return true;
         }
 

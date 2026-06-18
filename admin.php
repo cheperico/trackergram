@@ -242,6 +242,53 @@ foreach ($connections as $slug => $conn) {
     $connectionsSafe[$slug] = $safe;
 }
 
+// Poblar bot_name y chat_title para conexiones existentes que aún no los tengan
+foreach ($connections as $slug => $conn) {
+    $needsUpdate = false;
+    $updateFields = [];
+
+    // Si tiene bot_token pero no bot_name, fetchear via getMe
+    if (!empty($conn['bot_token']) && empty($conn['bot_name'])) {
+        try {
+            $tgClient = new TelegramClient($conn['bot_token']);
+            $tgResult = $tgClient->testConnection();
+            if ($tgResult['ok'] && !empty($tgResult['bot_name'])) {
+                $updateFields['bot_name'] = $tgResult['bot_name'];
+                $needsUpdate = true;
+                // Actualizar versión segura para mostrar
+                $connectionsSafe[$slug]['bot_name'] = $tgResult['bot_name'];
+            }
+        } catch (Exception $e) {
+            log_message("admin: Error fetching bot_name for {$slug}: " . $e->getMessage());
+        }
+    }
+
+    // Si tiene chat_id pero no chat_title, fetchear via getChat
+    $chatId = (int) ($conn['chat_id'] ?? 0);
+    if (!empty($conn['bot_token']) && $chatId > 0 && empty($conn['chat_title'])) {
+        try {
+            $tgClient ??= new TelegramClient($conn['bot_token']);
+            $chatInfo = $tgClient->getChat($chatId);
+            if ($chatInfo !== null && !empty($chatInfo['title'] ?? $chatInfo['username'] ?? '')) {
+                $chatTitle = $chatInfo['title'] ?? $chatInfo['username'] ?? '';
+                $updateFields['chat_title'] = $chatTitle;
+                $needsUpdate = true;
+                $connectionsSafe[$slug]['chat_title'] = $chatTitle;
+            }
+        } catch (Exception $e) {
+            log_message("admin: Error fetching chat_title for {$slug}: " . $e->getMessage());
+        }
+    }
+
+    if ($needsUpdate) {
+        $configManager->updateConnectionFields($slug, $updateFields);
+        // Refrescar en $connections para que los cards muestren los nuevos valores
+        foreach ($updateFields as $key => $value) {
+            $connections[$slug][$key] = $value;
+        }
+    }
+}
+
 // ── Procesar acciones POST ──
 
 $successMessage = '';
@@ -1290,19 +1337,15 @@ document.addEventListener('click', function(e) {
             <?php if (!empty($connections)): ?>
             <div class="form-group">
                     <label for="import-connection-slug">Usar conexion existente (opcional)</label>
-                        <select name="connection_slug" id="import-connection-slug" onchange="fillImportFromConnection(this)" title="Seleccionar una conexión existente para autocompletar los datos">
+                        <select name="connection_slug" id="import-connection-slug" title="Seleccionar una conexión existente">
                             <option value="">— Ingresar manual —</option>
                         <?php foreach ($connections as $slug => $conn): ?>
-                        <option value="<?php echo escapeHtml($slug); ?>"
-                            data-tiki_url="<?php echo escapeHtml($conn['tiki_api_url']); ?>"
-                            data-tracker_id="<?php echo (int) $conn['tracker_id']; ?>"
-                            data-field_prefix="<?php echo escapeHtml($conn['field_prefix'] ?? 'telegrammessage'); ?>">
+                        <option value="<?php echo escapeHtml($slug); ?>">
                             <?php echo escapeHtml($conn['name']); ?>
                             (tracker #<?php echo (int) $conn['tracker_id']; ?>)
                         </option>
                         <?php endforeach; ?>
                     </select>
-                <div class="hint">Si seleccionas una conexion, los campos Tiki se completan automaticamente</div>
             </div>
             <?php endif; ?>
             
@@ -1342,34 +1385,6 @@ document.addEventListener('click', function(e) {
 </div>
 
 <script>
-function fillImportFromConnection(select) {
-    var option = select.options[select.selectedIndex];
-    if (option.value === '') return;
-    
-    document.getElementById('import-tiki_url').value = option.dataset.tiki_url;
-    document.getElementById('import-tracker_id').value = option.dataset.tracker_id;
-    document.getElementById('import-field_prefix').value = option.dataset.field_prefix || 'telegrammessage';
-    
-    // Fetch token desde el servidor (no se expone en HTML)
-    var data = new URLSearchParams();
-    data.append('action', 'get_connection');
-    data.append('slug', option.value);
-    data.append('csrf_token', '<?php echo generateCSRFToken(); ?>');
-    
-    fetch('admin.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: data.toString()
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(conn) {
-        if (conn.tiki_api_token) {
-            document.getElementById('import-tiki_token').value = conn.tiki_api_token;
-        }
-    })
-    .catch(function() { /* silencio — quedará vacío para llenado manual */ });
-}
-
 function startImport() {
     var form = document.getElementById('import-form');
     var formData = new FormData(form);
@@ -1575,18 +1590,16 @@ function processChunks(extractId, total, chatTitle, topicsFound) {
                 </div>
                 <div class="form-group">
                     <label for="create-connection-slug">Asignar a conexión (opcional)</label>
-                    <select name="connection_slug" id="create-connection-slug" onchange="fillCreateFromConnection(this)" title="Si seleccionás una conexión, se auto-asignará el tracker_id y el prefix">
+                    <select name="connection_slug" id="create-connection-slug" title="Seleccioná una conexión para ver sus datos abajo">
                         <option value="">— Solo crear tracker —</option>
                         <?php foreach ($connections as $slug => $conn): ?>
                         <option value="<?php echo escapeHtml($slug); ?>"
-                            data-tiki_url="<?php echo escapeHtml($conn['tiki_api_url']); ?>"
-                            data-prefix="<?php echo escapeHtml($conn['field_prefix'] ?? 'telegrammessage'); ?>"
                             <?php echo ($_POST['connection_slug'] ?? '') === $slug ? 'selected' : ''; ?>>
                             <?php echo escapeHtml($conn['name']); ?>
                         </option>
                         <?php endforeach; ?>
                     </select>
-                    <div class="hint">Si seleccionás una conexión, se auto-asignará el tracker_id y el prefix</div>
+                    <div class="hint">Seleccioná una conexión para recordar sus datos al asignar</div>
                 </div>
             </div>
             
@@ -1632,36 +1645,6 @@ function processChunks(extractId, total, chatTitle, topicsFound) {
 </div>
 
 <script>
-function fillCreateFromConnection(select) {
-    var option = select.options[select.selectedIndex];
-    if (option.value === '') return;
-    
-    document.getElementById('create-tiki-url').value = option.dataset.tiki_url;
-    
-    var prefix = option.dataset.prefix || 'telegrammessage';
-    document.getElementById('create-field-prefix').value = prefix;
-    updateFieldPreview(prefix);
-    
-    // Fetch token desde el servidor (no se expone en HTML)
-    var data = new URLSearchParams();
-    data.append('action', 'get_connection');
-    data.append('slug', option.value);
-    data.append('csrf_token', '<?php echo generateCSRFToken(); ?>');
-    
-    fetch('admin.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: data.toString()
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(conn) {
-        if (conn.tiki_api_token) {
-            document.getElementById('create-tiki-token').value = conn.tiki_api_token;
-        }
-    })
-    .catch(function() { /* silencio */ });
-}
-
 function updateFieldPreview(prefix) {
     var els = document.querySelectorAll('[id^="preview-prefix"]');
     els.forEach(function(el) { el.textContent = prefix; });
