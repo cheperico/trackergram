@@ -106,6 +106,42 @@ class TelegramClient
     }
 
     /**
+     * Obtener info del webhook configurado para este bot
+     * @return array{ok: bool, url: string, has_custom_certificate: bool, pending_update_count: int, last_error_date: ?int, last_error_message: string, max_connections: int, allowed_updates: array}
+     */
+    public function getWebhookInfo(): array
+    {
+        $url = $this->baseUrl . '/bot' . $this->botToken . '/getWebhookInfo';
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlError) {
+            return ['ok' => false, 'url' => '', 'has_custom_certificate' => false, 'pending_update_count' => 0, 'last_error_date' => null, 'last_error_message' => "Error de red: {$curlError}", 'max_connections' => 40, 'allowed_updates' => []];
+        }
+
+        if ($httpCode !== 200) {
+            return ['ok' => false, 'url' => '', 'has_custom_certificate' => false, 'pending_update_count' => 0, 'last_error_date' => null, 'last_error_message' => "HTTP {$httpCode}", 'max_connections' => 40, 'allowed_updates' => []];
+        }
+
+        $data = json_decode($response, true);
+        if (!$data || !isset($data['ok']) || !$data['ok']) {
+            return ['ok' => false, 'url' => '', 'has_custom_certificate' => false, 'pending_update_count' => 0, 'last_error_date' => null, 'last_error_message' => $data['description'] ?? 'respuesta inválida', 'max_connections' => 40, 'allowed_updates' => []];
+        }
+
+        return $data['result'];
+    }
+
+    /**
      * Probar conexión con la API de Telegram (getMe)
      * @return array{ok: bool, message: string}
      */

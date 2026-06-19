@@ -502,6 +502,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $results['bot_name'] = $tgResult['bot_name'];
                 }
                 
+                // Webhook info: estado del webhook configurado
+                $webhookInfo = $tgClient->getWebhookInfo();
+                $results['webhook'] = $webhookInfo;
+                
                 // Si hay chat_id, obtener chat_title via getChat
                 $chatId = (int) ($conn['chat_id'] ?? 0);
                 if ($chatId > 0) {
@@ -514,12 +518,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 }
             } else {
                 $results['telegram'] = ['ok' => false, 'message' => 'Sin bot_token'];
+                $results['webhook'] = ['ok' => false, 'message' => 'Sin bot_token'];
             }
             
             // Test TikiWiki
             if (!empty($conn['tiki_api_url']) && !empty($conn['tiki_api_token'])) {
                 $tikiClient = new TikiWikiClient($conn['tiki_api_url'], $conn['tiki_api_token']);
-                $tikiResult = $tikiClient->checkPermissions();
+                $trackerId = (int) ($conn['tracker_id'] ?? 0);
+                $tikiResult = $tikiClient->checkPermissions($trackerId);
                 $results['tikiwiki'] = $tikiResult;
             } else {
                 $results['tikiwiki'] = ['ok' => false, 'api_access' => false, 'file_gallery' => false, 'upload_files' => false, 'message' => 'Sin API URL o token'];
@@ -1250,6 +1256,26 @@ function testConnection(slug, btn) {
             if (!tgOk) allOk = false;
         }
         
+        // Webhook status
+        if (result.webhook) {
+            var wh = result.webhook;
+            var whLines = [];
+            if (wh.url) {
+                whLines.push('URL: ' + wh.url);
+                whLines.push('Updates pendientes: ' + (wh.pending_update_count || 0));
+                if (wh.last_error_message) {
+                    whLines.push('⚠️ Último error: ' + wh.last_error_message);
+                }
+                if (wh.pending_update_count > 10) {
+                    whLines.push('⚠️ ' + wh.pending_update_count + ' updates encolados — el webhook puede estar caído');
+                }
+                lines.push('🌐 Webhook: ' + whLines.join(' | '));
+            } else {
+                lines.push('🌐 Webhook: ⚠️ No configurado');
+                // No es crítico: el webhook se puede configurar desde el admin
+            }
+        }
+        
         // TikiWiki test
         if (result.tikiwiki) {
             var twOk = result.tikiwiki.ok;
@@ -1257,15 +1283,33 @@ function testConnection(slug, btn) {
             
             // Agregar detalle de permisos si la API responde
             if (result.tikiwiki.api_access) {
-                var fgOk = result.tikiwiki.file_gallery;
-                var upOk = result.tikiwiki.upload_files;
-                var permParts = [];
-                permParts.push((fgOk ? '✅' : '⚠️') + ' admin_file_galleries: ' + (fgOk ? 'OK' : 'FALTA'));
-                if (fgOk) {
-                    permParts.push((upOk ? '✅' : '⚠️') + ' upload_files: ' + (upOk ? 'OK' : 'FALTA'));
+                var p = result.tikiwiki;
+                var permLines = [];
+                
+                // admin_trackers (null = no testeado)
+                if (p.admin_trackers === null) {
+                    permLines.push('⏭️ admin_trackers (global): no testeado (sin tracker ID)');
+                } else {
+                    permLines.push((p.admin_trackers ? '✅' : '❌') + ' admin_trackers (global): ' + (p.admin_trackers ? 'OK' : 'FALTA — crítico'));
+                    if (!p.admin_trackers) allOk = false;
                 }
-                twMsg += ' | ' + permParts.join(' | ');
-                if (!fgOk || !upOk) allOk = false;
+                
+                // create_tracker_items (null = no testeado)
+                if (p.create_tracker_items === null) {
+                    permLines.push('⏭️ create_tracker_items: no testeado (sin tracker ID)');
+                } else {
+                    permLines.push((p.create_tracker_items ? '✅' : '❌') + ' create_tracker_items: ' + (p.create_tracker_items ? 'OK' : 'FALTA — crítico'));
+                    if (!p.create_tracker_items) allOk = false;
+                }
+                
+                permLines.push((p.view_file_gallery ? '✅' : '❌') + ' view_file_gallery: ' + (p.view_file_gallery ? 'OK' : 'FALTA'));
+                permLines.push((p.upload_files ? '✅' : '❌') + ' upload_files: ' + (p.upload_files ? 'OK' : 'FALTA'));
+                permLines.push((p.admin_file_galleries ? '✅' : '⚠️') + ' admin_file_galleries: ' + (p.admin_file_galleries ? 'OK' : 'FALTA — auto-repair no disponible'));
+                
+                if (!p.view_file_gallery) allOk = false;
+                if (!p.upload_files) allOk = false;
+                
+                twMsg += '<br>&nbsp;&nbsp;' + permLines.join('<br>&nbsp;&nbsp;');
             }
             
             lines.push(twMsg);
