@@ -997,10 +997,7 @@ if (isset($_GET['edit'])) {
                             <button type="submit" class="btn btn-outline btn-sm" title="Configurar el webhook en Telegram para recibir mensajes">Configurar Webhook</button>
                         </form>
                         
-                        <div style="display:inline-flex;flex-direction:column;align-items:flex-start;">
-                            <button class="btn btn-outline btn-sm" onclick="testConnection('<?php echo escapeHtml($slug); ?>', this)" title="Probar conexión con Telegram y TikiWiki">Test</button>
-                            <div class="test-result" style="display:none;" aria-live="polite" aria-atomic="true"></div>
-                        </div>
+                        <button class="btn btn-outline btn-sm" onclick="testConnection('<?php echo escapeHtml($slug); ?>', this)" title="Probar conexión con Telegram y TikiWiki">Test</button>
                         
                         <form method="post" class="inline-form" onsubmit="return confirm('¿Eliminar conexion \'<?php echo escapeHtml($conn['name']); ?>\'?')">
                             <input type="hidden" name="action" value="delete_connection">
@@ -1008,6 +1005,8 @@ if (isset($_GET['edit'])) {
                             <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
                             <button type="submit" class="btn btn-danger btn-sm" title="Eliminar esta conexión permanentemente">Eliminar</button>
                         </form>
+                        
+                        <div class="test-result" style="display:none;flex-basis:100%;" aria-live="polite" aria-atomic="true"></div>
                     </div>
                 </div>
                 <?php endforeach; ?>
@@ -1266,7 +1265,7 @@ function togglePassword(btn) {
 }
 
 function testConnection(slug, btn) {
-    var resultDiv = btn.parentElement.querySelector('.test-result');
+    var resultDiv = btn.closest('.conn-actions').querySelector('.test-result');
     resultDiv.style.display = 'block';
     resultDiv.className = 'test-result';
     resultDiv.textContent = 'Probando...';
