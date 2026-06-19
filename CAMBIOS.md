@@ -1,5 +1,38 @@
 # Cambios - Changelog
 
+## v0.5.5
+
+### Docs: Permisos de TikiWiki para trackerGram
+
+- **README.md**: Nueva sección "Configurar Permisos en TikiWiki" con guía paso a paso para crear el grupo `trackerGram`, asignar los 6 permisos necesarios (con la advertencia de que `tiki_p_admin_trackers` debe ser global), crear el usuario y generar el token de API.
+- **INSTALL.md**: Reemplazada la nota genérica de "permisos de administrador" por instrucciones específicas de grupo/usuario/permisos/token (mismos 6 permisos verificados contra el código fuente de TikiWiki 27.5).
+- **Hallazgo crítico**: La deduplicación (`action_list_items`) requiere `tiki_p_admin_trackers` a nivel **global** (`Perms::get()` sin contexto de objeto en `Tracker/Controller.php:700`). Sin esto, `messageExists()` responde 403 y los mensajes se duplican.
+
+### Infra: Reubicación del código fuente de TikiWiki
+
+- Movido el source de TikiWiki 27.5 fuera del workspace a `C:\Users\Federico\Documents\OpenCode\TikiWiki\tiki-27.5\`
+- Actualizados permisos de los agentes `tiki-expert` y `telegram-tiki-importer` con `read/glob/grep` sobre la nueva ruta
+
+### Feat: Health check visible en cards de conexión
+
+- `admin.php` ahora fetchea el estado del webhook (`getWebhookInfo()`) al cargar la página y lo muestra en cada tarjeta de conexión: ✅ configurado, ❌ no configurado, ⚠️ con errores.
+- Sin necesidad de apretar "Test" — se ve de un vistazo al abrir el admin.
+
+### Feat: Upload por base64
+
+- `TikiWikiClient::uploadFileBase64()` — nuevo método que sube archivos codificando el contenido en base64 en vez de usar `curl_file_create()` (multipart). Alternativa cuando multipart no funciona.
+- Sigue el formato que acepta la API de TikiWiki (`data` + `name` + `size` + `type`).
+
+### Feat: Verificación post-creación de FG field
+
+- `updateFgFieldOptions()` ahora verifica con `GET /fields` que el galleryId se haya guardado realmente (workaround del bug de TikiWiki que responde HTTP 200 aunque falle).
+- `createTracker()` loggea warning si la galería no pudo asignarse.
+
+### Feat: getWebhookInfo() en TelegramClient
+
+- Nuevo método que consulta `getWebhookInfo` de la Telegram Bot API. Devuelve URL configurada, updates pendientes, último error, etc.
+- Usado por el health check del admin y el botón "Test".
+
 ## v0.5.4
 
 ### Fix: Field prefix preservado al editar conexión desde modal Webhook

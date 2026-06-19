@@ -313,6 +313,82 @@ class TikiWikiClient
         return null;
     }
 
+    /**
+     * Subir archivo a galería usando base64 (alternativa a multipart).
+     * Útil cuando curl_file_create() no está disponible o falla.
+     * @see https://doc.tiki.org/API#File_Gallery
+     */
+    public function uploadFileBase64(string $filePath, string $fileName, ?int $galleryId = null, string $source = 'webhook', string $caption = ''): ?string
+    {
+        $galleryId ??= $this->getMediaGalleryId();
+
+        if (!file_exists($filePath)) {
+            log_message("TikiWikiClient: File not found for base64 upload: $filePath", true);
+            return null;
+        }
+
+        $fileContent = file_get_contents($filePath);
+        if ($fileContent === false) {
+            log_message("TikiWikiClient: Error reading file for base64 upload: $filePath", true);
+            return null;
+        }
+
+        $base64 = base64_encode($fileContent);
+        $size = strlen($fileContent);
+        $mimeType = $this->getMimeType($filePath);
+        $description = 'Subido desde trackerGram ' . $source;
+        $description .= ($caption !== '') ? ' | ' . $caption : ' - ' . date('Y-m-d H:i:s');
+
+        $url = $this->apiUrl . "galleries/upload";
+
+        $postFields = http_build_query([
+            'galleryId' => $galleryId,
+            'name' => $fileName,
+            'title' => $fileName,
+            'type' => $mimeType,
+            'data' => $base64,
+            'size' => $size,
+            'description' => $description,
+        ]);
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Authorization: Bearer " . $this->token,
+            "Content-Type: application/x-www-form-urlencoded",
+            "User-Agent: Mozilla/5.0"
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->uploadTimeout);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlError) {
+            log_message("TikiWikiClient: cURL error en uploadFileBase64: $curlError", true);
+            return null;
+        }
+
+        if ($httpCode !== 200 && $httpCode !== 201) {
+            log_message("TikiWikiClient: uploadFileBase64 HTTP $httpCode - Response: " . substr($response, 0, 200), true);
+            return null;
+        }
+
+        $data = json_decode($response, true);
+        $fileId = $data['fileId'] ?? $data['file_id'] ?? $data['id'] ?? null;
+        if ($fileId) {
+            log_message("TikiWikiClient: Archivo subido por base64: fileId={$fileId}, galleryId={$galleryId}, size={$size}");
+            return (string) $fileId;
+        }
+
+        log_message("TikiWikiClient: uploadFileBase64 respuesta sin fileId - Response: " . substr($response, 0, 200), true);
+        return null;
+    }
+
     public function createTrackerItem(int $trackerId, array $postFields): bool
     {
         $url = $this->apiUrl . "trackers/$trackerId/items";

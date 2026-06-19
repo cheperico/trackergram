@@ -289,6 +289,38 @@ foreach ($connections as $slug => $conn) {
     }
 }
 
+// ── Health check: estado del webhook para cada conexión ──
+$webhookStatuses = [];
+foreach ($connections as $slug => $conn) {
+    $status = ['ok' => false, 'label' => 'Sin bot token', 'pending' => 0];
+    if (!empty($conn['bot_token'])) {
+        try {
+            $tgClient ??= new TelegramClient($conn['bot_token']);
+            $wh = $tgClient->getWebhookInfo();
+            if (!empty($wh['url'])) {
+                $status['ok'] = true;
+                $expectedUrl = generateWebhookUrl();
+                $urlMatch = $wh['url'] === $expectedUrl;
+                $status['label'] = $urlMatch ? '✅' : ('⚠️ ' . parse_url($wh['url'], PHP_URL_HOST));
+                $status['pending'] = (int) ($wh['pending_update_count'] ?? 0);
+                if ($wh['pending_update_count'] > 10) {
+                    $status['label'] = '⚠️ ' . $wh['pending_update_count'] . ' pend.';
+                    $status['ok'] = false;
+                }
+                if (!empty($wh['last_error_message'])) {
+                    $status['label'] = '❌ Error: ' . substr($wh['last_error_message'], 0, 40);
+                    $status['ok'] = false;
+                }
+            } else {
+                $status['label'] = '❌ No configurado';
+            }
+        } catch (Exception $e) {
+            $status['label'] = '❓ Error';
+        }
+    }
+    $webhookStatuses[$slug] = $status;
+}
+
 // ── Procesar acciones POST ──
 
 $successMessage = '';
@@ -930,6 +962,10 @@ if (isset($_GET['edit'])) {
                         ?></span>
                         <span>Tracker: #<?php echo (int) $conn['tracker_id']; ?></span>
                         <span><?php echo escapeHtml(parse_url($conn['tiki_api_url'] ?? '', PHP_URL_HOST) ?: $conn['tiki_api_url']); ?></span>
+                        <span title="Estado del webhook">Webhook: <?php 
+                            $ws = $webhookStatuses[$slug] ?? ['label' => '❓'];
+                            echo $ws['label'];
+                        ?></span>
                     </div>
                     <div class="conn-actions">
                         <form method="get" class="inline-form">
@@ -961,8 +997,10 @@ if (isset($_GET['edit'])) {
                             <button type="submit" class="btn btn-outline btn-sm" title="Configurar el webhook en Telegram para recibir mensajes">Configurar Webhook</button>
                         </form>
                         
-                        <button class="btn btn-outline btn-sm" onclick="testConnection('<?php echo escapeHtml($slug); ?>', this)" title="Probar conexión con Telegram y TikiWiki">Test</button>
-                        <div class="test-result" style="display:none;" aria-live="polite" aria-atomic="true"></div>
+                        <div style="display:inline-flex;flex-direction:column;align-items:flex-start;">
+                            <button class="btn btn-outline btn-sm" onclick="testConnection('<?php echo escapeHtml($slug); ?>', this)" title="Probar conexión con Telegram y TikiWiki">Test</button>
+                            <div class="test-result" style="display:none;" aria-live="polite" aria-atomic="true"></div>
+                        </div>
                         
                         <form method="post" class="inline-form" onsubmit="return confirm('¿Eliminar conexion \'<?php echo escapeHtml($conn['name']); ?>\'?')">
                             <input type="hidden" name="action" value="delete_connection">
@@ -997,13 +1035,13 @@ foreach ($detections as $det) {
         <?php foreach ($detectionsBySlug as $slug => $chats): 
             $conn = $configManager->getConnection($slug);    
         ?>
-        <div style="margin-bottom:16px;padding:12px;border:1px solid var(--border);border-radius:8px;background:#fefefe;">
+        <div style="margin-bottom:16px;padding:12px;border:1px solid var(--border);border-radius:8px;">
             <div style="font-weight:600;font-size:0.9em;margin-bottom:8px;">
                 Conexión: <?php echo escapeHtml($conn['name'] ?? $slug); ?>
                 <span style="font-weight:400;color:var(--text-secondary);">(slug: <?php echo escapeHtml($slug); ?>)</span>
             </div>
             <?php foreach ($chats as $det): ?>
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;margin-bottom:6px;background:#fff8e1;border-radius:6px;border:1px solid #ffe082;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;margin-bottom:6px;border:1px solid var(--border);border-radius:6px;">
                 <div>
                     <strong><?php echo escapeHtml($det['chat_title']); ?></strong><br>
                     <span style="font-size:0.85em;color:var(--text-secondary);">
@@ -1662,7 +1700,7 @@ function processChunks(extractId, total, chatTitle, topicsFound) {
             </div>
             
             <div class="form-group">
-                <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:12px 16px;font-size:0.85em;color:#6d4c00;" aria-live="polite" aria-atomic="true">
+                <div style="border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-size:0.85em;color:var(--text);" aria-live="polite" aria-atomic="true">
                     <strong>📋 Vista previa de campos que se crearán:</strong>
                     <div style="margin-top:6px;font-family:monospace;font-size:0.9em;" id="field-preview">
                         <span id="preview-prefix"><?php echo escapeHtml($_POST['field_prefix'] ?? 'telegrammessage'); ?></span>TelegramMessageId,
