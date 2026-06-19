@@ -517,13 +517,71 @@ Podés copiar todo este bloque y pegarlo en **Admin → Trackers → Importar ca
 
 1. **Un bot de Telegram** — Se crea gratis hablando con [@BotFather](https://t.me/BotFather). Necesitás el token.
 2. **Un TikiWiki 21.x+** — Con la API habilitada, un token de acceso y un tracker (o dejá que trackerGram lo cree automáticamente).
-
-   > **Token API**: El token debe tener permisos para `trackers`, `tracker items` y **`admin_file_galleries** (para subir fotos, videos, etc.). El usuario del token debe tener permisos de administrador o suficientes para crear trackers y galerías.
 3. **Un servidor con PHP 8.0+** — Apache o Nginx, accesible desde internet con HTTPS.
 
 Cada vinculación (bot + wiki + tracker) se configura desde el panel de admin. Podés tener múltiples bots y wikis desde una misma instalación.
 
 Si no tenés nada de esto, la [guía de instalación](INSTALL.md) te explica paso a paso.
+
+## Configurar Permisos en TikiWiki
+
+trackerGram necesita un usuario de API con permisos específicos en TikiWiki. Lo ideal es crear un **grupo** dedicado y un **usuario** para ese grupo.
+
+### 1. Crear el grupo `trackerGram`
+
+En TikiWiki: **Admin → Grupos → Crear un nuevo grupo**
+
+| Campo | Valor |
+|-------|-------|
+| Nombre del grupo | `trackerGram` |
+| Descripción | Usuarios de la API de trackerGram |
+| Heredar de | `Registered` (o ningún grupo) |
+
+### 2. Asignar permisos al grupo
+
+En TikiWiki: **Admin → Grupos → trackerGram → Permisos**
+
+Agregá estos permisos al grupo:
+
+| Permiso | Ámbito | ¿Para qué sirve? |
+|---------|--------|-----------------|
+| `tiki_p_view_trackers` | Objeto (tracker) | Leer fields del tracker y listar trackers |
+| `tiki_p_create_tracker_items` | Objeto (tracker) | Crear items nuevos (mensajes) |
+| `tiki_p_upload_files` | Objeto (file gallery) | Subir fotos, videos, audios, etc. |
+| `tiki_p_view_file_gallery` | Objeto (file gallery) | Acceder a la galería de archivos |
+| `tiki_p_admin_trackers` | **Global** ⚠️ | Consultar items (deduplicación), actualizar field FG options, crear/editar fields |
+| `tiki_p_admin_file_galleries` | Objeto (file gallery) | Crear galerías automáticamente (auto-reparación) |
+
+> **⚠️ Importante**: `tiki_p_admin_trackers` **debe asignarse a nivel GLOBAL** (en la solapa "Permisos" del grupo, no desde un tracker individual). La API de TikiWiki exige este permiso global para listar items. Sin esto, la deduplicación falla y los mensajes se duplicarían.
+
+### 3. Crear el usuario
+
+En TikiWiki: **Admin → Usuarios → Crear un nuevo usuario**
+
+| Campo | Valor |
+|-------|-------|
+| Nombre de usuario | `trackergram` |
+| Contraseña | Elegí una segura |
+| Grupos | Agregar al grupo `trackerGram` |
+
+### 4. Crear el token de API
+
+En TikiWiki: **Admin → Seguridad → API → Crear token**
+
+| Campo | Valor |
+|-------|-------|
+| Token | Dejá que TikiWiki lo genere automáticamente |
+| Usuario asociado | `trackergram` |
+| Permisos del token | Marcar todos (los permisos reales los controla el grupo) |
+
+### 5. Copiar la URL del API y el token
+
+La URL de la API debe terminar en `/api/`. Ejemplo:
+```
+https://wiki.ejemplo.org/api/
+```
+
+Estos dos datos los vas a necesitar en el panel de admin de trackerGram al crear una conexión.
 
 ## Instalación Rápida
 

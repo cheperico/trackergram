@@ -32,15 +32,43 @@ php -m | grep -E "(curl|json|mbstring|zip)"
 
 1. Accedé a tu TikiWiki como administrador
 2. **Habilitar la API**: Admin → Security → API → activar
-3. **Crear un token de API**: Admin → Security → API → crear nuevo token con permisos para:
-   - `trackers` (leer/crear)
-   - `tracker items` (crear)
-   - **`admin_file_galleries`** (necesario para subir fotos, videos, audios y otros archivos adjuntos)
+
+3. **Crear grupo, usuario y permisos** — trackerGram necesita permisos específicos, no alcanza con ser admin general. Seguí estos pasos:
+
+   ### 3a. Crear el grupo `trackerGram`
+   **Admin → Grupos → Crear un nuevo grupo**
+   - Nombre: `trackerGram`
+   - Descripción: Usuarios de la API de trackerGram
+   - Heredar de: ninguno (o `Registered`)
+
+   ### 3b. Asignar permisos al grupo
+   **Admin → Grupos → trackerGram → Permisos** — Agregar:
+
+   | Permiso | Ámbito | Para qué |
+   |---------|--------|----------|
+   | `tiki_p_view_trackers` | Objeto (tracker) | Leer fields del tracker |
+   | `tiki_p_create_tracker_items` | Objeto (tracker) | Crear items (mensajes) |
+   | `tiki_p_upload_files` | Objeto (file gallery) | Subir fotos/videos/audios |
+   | `tiki_p_view_file_gallery` | Objeto (file gallery) | Acceder a la galería |
+   | `tiki_p_admin_trackers` | **Global** ⚠️ | Deduplicación, crear/editar fields, asignar galería |
+   | `tiki_p_admin_file_galleries` | Objeto (file gallery) | Crear galerías automáticamente |
+
+   > **⚠️ Importante**: `tiki_p_admin_trackers` debe ser **Global**, no por objeto. Si solo se asigna a nivel de tracker individual, la deduplicación fallará con error 403.
+
+   ### 3c. Crear el usuario
+   **Admin → Usuarios → Crear un nuevo usuario**
+   - Usuario: `trackergram` (por ejemplo)
+   - Contraseña: elegí una segura
+   - Grupos: agregar a `trackerGram`
+
+   ### 3d. Crear el token de API
+   **Admin → Seguridad → API → Crear token**
+   - Usuario asociado: `trackergram`
+   - Permisos: marcar todos (los reales los controla el grupo)
+
 4. Copiá el token y la URL de la API (debe terminar en `/api/`)
 
-> **Importante**: El usuario al que pertenece el token debe tener permisos de administrador en TikiWiki (o al menos los roles necesarios para crear trackers, file galleries y subir archivos). Si el token no tiene `admin_file_galleries`, los mensajes con multimedia se guardarán **sin los archivos adjuntos**.
-
-> **Opcional**: Podés crear el tracker manualmente o dejar que trackerGram lo cree automáticamente (Paso 5).
+> **Opcional**: Podés crear el tracker manualmente o dejar que trackerGram lo cree automáticamente (Paso 5). Para la lista completa de campos del tracker, ver [README.md → Campos del Tracker](README.md#campos-del-tracker).
 
 ---
 
