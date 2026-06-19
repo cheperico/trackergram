@@ -207,6 +207,7 @@ La mayoría de los archivos están en la raíz. Subdirectorios:
 | `opt/visualizacion-tiki.md` | Feed tipo chat en TikiWiki (investigación + template Smarty) — específico de wiki.chela.org.ar |
 | `opt/telegram_bots.md` | Tokens de bots de Telegram — **NO versionar** (archivo local) |
 | `design/*` | **📐 Documentos de diseño** — captura de decisiones, alternativas discutidas y arquitectura exploratoria antes de implementar. Leer siempre antes de arrancar una feature nueva (`001-configuracion-inversa-via-telegram.md`, `002-MiniApp.md`, `003-arquitectura-multi.md`). Este archivo se actualiza. |
+| `..\TikiWiki\` | **Código fuente de TikiWiki 27.5** — fuera del workspace, en `C:\Users\Federico\Documents\OpenCode\TikiWiki\tiki-27.5\`. Solo referencia, no se versiona. El agente `@tiki-expert` lo consulta para entender comportamientos internos de la API. |
 
 ### Orden recomendado de lectura del código
 

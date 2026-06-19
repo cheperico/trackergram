@@ -31,3 +31,5 @@ reports/
 
 # Configuración específica de instancia (no subir a GitHub)
 opt/
+
+# Código fuente de TikiWiki (fuera del workspace, en C:\Users\Federico\Documents\OpenCode\TikiWiki\tiki-27.5\)
