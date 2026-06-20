@@ -562,6 +562,26 @@ function handleProcess(): void
         ];
 
         $normalized = $messageMapper->fromExport($msg, $context);
+
+        // Resolver reply_to: buscar el tracker itemId del mensaje original
+        $replyToId = $normalized->replyToId;
+        if ($replyToId !== '') {
+            $replyMessageId = (int) $replyToId;
+            if ($replyMessageId > 0) {
+                $foundItemId = $activeTikiClient->findItemByMessageId(
+                    (int) $trackerId,
+                    $replyMessageId,
+                    (int) $chatId
+                );
+                if ($foundItemId !== null) {
+                    $normalized->replyToId = '#' . $foundItemId;
+                    log_message("trackerGram import: reply_to message_id={$replyMessageId} resuelto a itemId={$foundItemId}");
+                } else {
+                    log_message("trackerGram import: reply_to message_id={$replyMessageId} NO RESUELTO (aún no en tracker)");
+                }
+            }
+        }
+
         $fields = $messageMapper->toWikiFields($normalized);
 
         if ($activeTikiClient->createTrackerItem((int) $trackerId, $fields)) {
@@ -887,6 +907,26 @@ function handleFull(): void
         ];
 
         $normalized = $messageMapper->fromExport($msg, $context);
+
+        // Resolver reply_to: buscar el tracker itemId del mensaje original
+        $replyToId = $normalized->replyToId;
+        if ($replyToId !== '') {
+            $replyMessageId = (int) $replyToId;
+            if ($replyMessageId > 0) {
+                $foundItemId = $activeTikiClient->findItemByMessageId(
+                    (int) $trackerId,
+                    $replyMessageId,
+                    (int) $chatId
+                );
+                if ($foundItemId !== null) {
+                    $normalized->replyToId = '#' . $foundItemId;
+                    log_message("trackerGram import: reply_to message_id={$replyMessageId} resuelto a itemId={$foundItemId}");
+                } else {
+                    log_message("trackerGram import: reply_to message_id={$replyMessageId} NO RESUELTO (aún no en tracker)");
+                }
+            }
+        }
+
         $fields = $messageMapper->toWikiFields($normalized);
 
         if ($activeTikiClient->createTrackerItem((int) $trackerId, $fields)) {

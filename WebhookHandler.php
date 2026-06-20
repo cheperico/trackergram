@@ -269,6 +269,24 @@ class WebhookHandler
             }
         }
 
+        // Resolver reply_to: buscar el tracker itemId del mensaje original
+        if ($msg->replyToId !== '') {
+            $replyMessageId = (int) $msg->replyToId;
+            if ($replyMessageId > 0) {
+                $foundItemId = $this->tikiWikiClient->findItemByMessageId(
+                    $this->trackerId,
+                    $replyMessageId,
+                    $chatId
+                );
+                if ($foundItemId !== null) {
+                    $msg->replyToId = '#' . $foundItemId;
+                    log_message("trackerGram: reply_to message_id={$replyMessageId} resuelto a itemId={$foundItemId}");
+                } else {
+                    log_message("trackerGram: reply_to message_id={$replyMessageId} NO RESUELTO (aún no en tracker)");
+                }
+            }
+        }
+
         // Enviar a TikiWiki
         if (!$this->sendToTikiWikiWithRetries($msg)) {
             log_message("ERROR: No se pudo enviar mensaje a TikiWiki después de {$this->retryMaxAttempts} intentos: message_id={$msg->messageId}", true);

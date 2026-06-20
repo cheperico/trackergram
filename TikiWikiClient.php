@@ -462,6 +462,54 @@ class TikiWikiClient
     }
 
     /**
+     * Buscar un item en el tracker por (chat_id, message_id) de Telegram.
+     * Similar a messageExists() pero devuelve el itemId real si existe.
+     * @param int $trackerId ID del tracker
+     * @param int $messageId Telegram message_id
+     * @param int $chatId Telegram chat_id
+     * @return int|null El itemId del tracker, o null si no existe
+     */
+    public function findItemByMessageId(int $trackerId, int $messageId, int $chatId): ?int
+    {
+        $prefix = $this->resolveFieldPrefix($trackerId);
+        $url = $this->apiUrl . "trackers/$trackerId/items"
+            . "?filter[fields][{$prefix}TelegramMessageId]=" . urlencode((string) $messageId)
+            . "&filter[fields][{$prefix}ChatId]=" . urlencode((string) $chatId)
+            . "&maxRecords=1";
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Authorization: Bearer " . $this->token,
+            "User-Agent: Mozilla/5.0"
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200) {
+            return null;
+        }
+
+        $data = json_decode($response, true);
+        if (!is_array($data)) {
+            return null;
+        }
+
+        // La API puede devolver los items en 'data' o 'result'
+        $items = $data['data'] ?? $data['result'] ?? [];
+        if (empty($items) || !is_array($items)) {
+            return null;
+        }
+
+        $first = reset($items);
+        return isset($first['itemId']) ? (int) $first['itemId'] : null;
+    }
+
+    /**
      * Crear una file gallery en TikiWiki
      */
     public function createGallery(string $name, string $description = ''): ?int

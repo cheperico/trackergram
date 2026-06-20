@@ -556,6 +556,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 
                 // Si hay chat_id, obtener chat_title via getChat
                 $chatId = (int) ($conn['chat_id'] ?? 0);
+                $results['chat_id'] = $chatId;
                 if ($chatId > 0) {
                     $chatInfo = $tgClient->getChat($chatId);
                     if ($chatInfo !== null && !empty($chatInfo['title'] ?? $chatInfo['username'] ?? '')) {
@@ -1049,8 +1050,18 @@ if (isset($_GET['edit'])) {
                             $botDisplay = !empty($conn['bot_name']) ? '@' . escapeHtml($conn['bot_name']) : (substr($conn['bot_token'] ?? '', 0, 20) . '...');
                             echo $botDisplay;
                         ?></span>
-                        <span>Chat: <?php 
-                            echo !empty($conn['chat_title']) ? escapeHtml($conn['chat_title']) : ('ID ' . ((int) ($conn['chat_id'] ?? 0) ?: 'Pendiente'));
+                        <span>Chat: <?php
+                            $chatIdVal = (int) ($conn['chat_id'] ?? 0);
+                            if (!empty($conn['chat_title'])) {
+                                echo escapeHtml($conn['chat_title']);
+                                if ($chatIdVal != 0) {
+                                    echo ' <span style="font-size:0.85em;opacity:0.7;">(ID: ' . $chatIdVal . ')</span>';
+                                }
+                            } elseif ($chatIdVal != 0) {
+                                echo 'ID: ' . $chatIdVal;
+                            } else {
+                                echo 'Pendiente';
+                            }
                         ?></span>
                         <span>Tracker: #<?php echo (int) $conn['tracker_id']; ?></span>
                         <span><?php echo escapeHtml(parse_url($conn['tiki_api_url'] ?? '', PHP_URL_HOST) ?: $conn['tiki_api_url']); ?></span>
@@ -1208,8 +1219,18 @@ foreach ($connections as $slug => $conn) {
                         <span class="tracker-badge">Tracker #<?php echo (int) $conn['tracker_id']; ?></span>
                     </div>
                     <div class="sub-conn-details">
-                        <span>Chat: <?php 
-                            echo !empty($conn['chat_title']) ? escapeHtml($conn['chat_title']) : ('ID ' . ((int)($conn['chat_id'] ?? 0) ?: 'Pendiente'));
+                        <span>Chat: <?php
+                            $chatIdVal = (int) ($conn['chat_id'] ?? 0);
+                            if (!empty($conn['chat_title'])) {
+                                echo escapeHtml($conn['chat_title']);
+                                if ($chatIdVal != 0) {
+                                    echo ' <span style="font-size:0.85em;opacity:0.7;">(ID: ' . $chatIdVal . ')</span>';
+                                }
+                            } elseif ($chatIdVal != 0) {
+                                echo 'ID: ' . $chatIdVal;
+                            } else {
+                                echo 'Pendiente';
+                            }
                         ?></span>
                         <span><?php echo escapeHtml(parse_url($conn['tiki_api_url'] ?? '', PHP_URL_HOST) ?: $conn['tiki_api_url']); ?></span>
                         <span>Prefix: <?php echo escapeHtml($conn['field_prefix'] ?? 'telegrammessage'); ?></span>
@@ -1602,14 +1623,25 @@ function testConnection(slug, btn) {
                 }
             }
         }
-        if (result.chat_title) {
+        if (result.chat_id || result.chat_title) {
             var card = btn.closest('.conn-card');
             if (card) {
                 var details = card.querySelector('.conn-details');
                 if (details) {
                     var spans = details.querySelectorAll('span');
                     if (spans.length > 1) {
-                        spans[1].textContent = 'Chat: ' + result.chat_title;
+                        var chatLabel = '';
+                        if (result.chat_title) {
+                            chatLabel = result.chat_title;
+                            if (result.chat_id) {
+                                chatLabel += ' (ID: ' + result.chat_id + ')';
+                            }
+                        } else if (result.chat_id) {
+                            chatLabel = 'ID: ' + result.chat_id;
+                        } else {
+                            chatLabel = 'Pendiente';
+                        }
+                        spans[1].textContent = 'Chat: ' + chatLabel;
                     }
                 }
             }
