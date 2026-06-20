@@ -749,7 +749,7 @@ class TikiWikiClient
             $admHttp = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
             $result['admin_trackers'] = ($admHttp === 200);
-            $parts[] = 'admin_trackers: ' . ($result['admin_trackers'] ? 'OK' : 'FALTA (crítico)');
+            $parts[] = 'admin_trackers: ' . ($result['admin_trackers'] ? 'OK' : "FALTA (HTTP {$admHttp})");
             if (!$result['admin_trackers']) {
                 log_message("TikiWikiClient: checkPermissions — GET /api/trackers/{$trackerId} HTTP {$admHttp} (needs admin_trackers global)", true);
             }
@@ -774,7 +774,7 @@ class TikiWikiClient
             $createHttp = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
             $result['create_tracker_items'] = ($createHttp !== 403);
-            $parts[] = 'create_tracker_items: ' . ($result['create_tracker_items'] ? 'OK' : 'FALTA (crítico)');
+            $parts[] = 'create_tracker_items: ' . ($result['create_tracker_items'] ? 'OK' : "FALTA (HTTP {$createHttp})");
             if (!$result['create_tracker_items']) {
                 log_message("TikiWikiClient: checkPermissions — POST /trackers/{$trackerId}/items HTTP {$createHttp} (needs create_tracker_items)", true);
             }
@@ -797,7 +797,7 @@ class TikiWikiClient
         curl_close($ch);
         $result['view_file_gallery'] = ($galHttp === 200);
         $result['file_gallery'] = $result['view_file_gallery']; // backward compat
-        $parts[] = 'view_file_gallery: ' . ($result['view_file_gallery'] ? 'OK' : 'FALTA');
+        $parts[] = 'view_file_gallery: ' . ($result['view_file_gallery'] ? 'OK' : "FALTA (HTTP {$galHttp})");
         if (!$result['view_file_gallery']) {
             log_message("TikiWikiClient: checkPermissions — GET /api/galleries HTTP {$galHttp} (needs view_file_gallery)", true);
         }
@@ -820,46 +820,32 @@ class TikiWikiClient
         $upHttp = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         $result['upload_files'] = ($upHttp !== 403);
-        $parts[] = 'upload_files: ' . ($result['upload_files'] ? 'OK' : 'FALTA');
+        $parts[] = 'upload_files: ' . ($result['upload_files'] ? 'OK' : "FALTA (HTTP {$upHttp})");
         if (!$result['upload_files']) {
             log_message("TikiWikiClient: checkPermissions — POST /galleries/upload HTTP {$upHttp} (403=no upload_files)", true);
         }
 
-        // 6. admin_file_galleries (POST /api/galleries con create=1)
-        //    Crea una galería temporal con nombre identificable como test de permiso.
-        //    Si ya tenés view_file_gallery pero no admin_file_galleries, la auto-reparación no funcionará.
+        // 6. admin_file_galleries (DELETE /api/galleries/99999999/delete)
+        //    Envía DELETE a una galería inexistente. Si tenemos admin_file_galleries,
+        //    la API responde HTTP 200 (la galería no existe pero el permiso es válido).
+        //    Si NO tenemos el permiso, responde 403. Sin efectos secundarios.
         $ch = curl_init();
-        $testGalleryName = '__tg_permcheck_' . time() . '__';
-        curl_setopt($ch, CURLOPT_URL, $this->apiUrl . 'galleries');
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
-            'create' => 1,
-            'name' => $testGalleryName,
-            'description' => 'Creada automáticamente por trackerGram permission test',
-        ]));
+        curl_setopt($ch, CURLOPT_URL, $this->apiUrl . 'galleries/99999999/delete');
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             "Authorization: Bearer " . $this->token,
-            "Content-Type: application/x-www-form-urlencoded",
             "Accept: application/json",
             "User-Agent: Mozilla/5.0"
         ]);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
-        $resp = curl_exec($ch);
+        curl_exec($ch);
         $crGalHttp = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         $result['admin_file_galleries'] = ($crGalHttp !== 403);
-        $parts[] = 'admin_file_galleries: ' . ($result['admin_file_galleries'] ? 'OK' : 'FALTA (auto-repair no disponible)');
-        if ($crGalHttp === 200) {
-            // Intentar borrar la galería temporal para no dejar residuos
-            $respData = json_decode($resp, true);
-            $createdId = $respData['galleryId'] ?? $respData['id'] ?? null;
-            if ($createdId) {
-                $this->deleteGalleryQuiet($createdId);
-            }
-        }
-        if (!$result['admin_file_galleries']) {
-            log_message("TikiWikiClient: checkPermissions — POST /galleries HTTP {$crGalHttp} (403=no admin_file_galleries)", true);
+        $parts[] = 'admin_file_galleries: ' . ($result['admin_file_galleries'] ? 'OK' : 'FALTA (HTTP 403)');
+        if ($crGalHttp === 403) {
+            log_message("TikiWikiClient: checkPermissions — DELETE /galleries/99999999/delete HTTP 403 (no admin_file_galleries)", true);
         }
 
         // Armar resultado
@@ -894,23 +880,6 @@ class TikiWikiClient
         }
 
         return $result;
-    }
-
-    /**
-     * Borrar una galería temporal sin loguear errores si falla
-     */
-    private function deleteGalleryQuiet(int $galleryId): void
-    {
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $this->apiUrl . "galleries/$galleryId");
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Authorization: Bearer " . $this->token,
-        ]);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-        curl_exec($ch);
-        curl_close($ch);
     }
 
     public function createTracker(string $trackerName, string $description = '', string $prefix = 'telegrammessage', ?int $galleryId = null): ?int
