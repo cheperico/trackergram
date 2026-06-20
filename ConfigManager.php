@@ -56,8 +56,20 @@ class ConfigManager
         $dirty = false;
         foreach ($this->data['connections'] as $slug => &$conn) {
             if (empty($conn['webhook_secret'])) {
-                $conn['webhook_secret'] = bin2hex(random_bytes(16));
-                log_message("ConfigManager: webhook_secret auto-generado para conexión existente '{$slug}' durante load()");
+                // Si otra conexión con el mismo bot_token ya tiene secret, reusarlo
+                $reused = false;
+                foreach ($this->data['connections'] as $otherSlug => $otherConn) {
+                    if ($otherSlug !== $slug && !empty($otherConn['webhook_secret']) && ($otherConn['bot_token'] ?? '') === ($conn['bot_token'] ?? '')) {
+                        $conn['webhook_secret'] = $otherConn['webhook_secret'];
+                        log_message("ConfigManager: webhook_secret reusado de conexión '{$otherSlug}' para '{$slug}' (mismo bot_token)");
+                        $reused = true;
+                        break;
+                    }
+                }
+                if (!$reused) {
+                    $conn['webhook_secret'] = bin2hex(random_bytes(16));
+                    log_message("ConfigManager: webhook_secret auto-generado para conexión existente '{$slug}' durante load()");
+                }
                 $dirty = true;
             }
         }
@@ -272,10 +284,31 @@ class ConfigManager
         $isNew = !isset($this->data['connections'][$slug]);
 
         // Auto-generar webhook_secret si está vacío
+        // Prioridad: 1) Mantener el actual si existe (edición sin cambios)
+        //             2) Reusar el de otra conexión con el mismo bot_token
+        //             3) Generar uno nuevo
         $webhookSecret = trim((string) ($data['webhook_secret'] ?? ''));
         if ($webhookSecret === '') {
-            $webhookSecret = bin2hex(random_bytes(16));
-            log_message("ConfigManager: webhook_secret auto-generado para conexión '{$name}'");
+            // Edición: mantener secret actual
+            if (!$isNew && !empty($this->data['connections'][$slug]['webhook_secret'])) {
+                $webhookSecret = $this->data['connections'][$slug]['webhook_secret'];
+            } else {
+                // Buscar otra conexión con el mismo bot_token (un bot → un webhook → mismo secret)
+                $botToken = trim((string) ($data['bot_token'] ?? ''));
+                if ($botToken !== '') {
+                    foreach ($this->data['connections'] as $otherSlug => $otherConn) {
+                        if ($otherSlug !== $slug && !empty($otherConn['webhook_secret']) && ($otherConn['bot_token'] ?? '') === $botToken) {
+                            $webhookSecret = $otherConn['webhook_secret'];
+                            log_message("ConfigManager: webhook_secret reusado de conexión '{$otherSlug}' para '{$name}' (mismo bot_token)");
+                            break;
+                        }
+                    }
+                }
+                if ($webhookSecret === '') {
+                    $webhookSecret = bin2hex(random_bytes(16));
+                    log_message("ConfigManager: webhook_secret auto-generado para conexión '{$name}'");
+                }
+            }
         }
 
         $connection = [
