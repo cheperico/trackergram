@@ -751,6 +751,12 @@ if (!in_array($activeTab, ['webhook', 'import', 'create'])) {
     $activeTab = 'webhook';
 }
 
+// View mode: classic (default) or grouped (by bot)
+$view = $_GET['view'] ?? 'classic';
+if (!in_array($view, ['classic', 'grouped'])) {
+    $view = 'classic';
+}
+
 // Para la edición, cargar conexión si se pasa slug
 $editConnection = null;
 if (isset($_GET['edit'])) {
@@ -938,11 +944,38 @@ if (isset($_GET['edit'])) {
             .conn-card { transition: none; }
         }
 
+        /* ── Grouped view (bot cards) ── */
+        .bot-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 20px; overflow: hidden; }
+        .bot-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; background: #f8f9fa; border-bottom: 1px solid var(--border); }
+        .bot-name-col { display: flex; align-items: center; gap: 10px; }
+        .bot-icon { font-size: 1.4em; line-height: 1; }
+        .bot-title { font-weight: 700; font-size: 1.05em; color: var(--text); }
+        .bot-token-masked { font-size: 0.8em; color: var(--text-secondary); font-family: 'SFMono-Regular', Consolas, monospace; margin-top: 2px; }
+        .bot-webhook-col { display: flex; align-items: center; gap: 8px; font-size: 0.85em; }
+        .webhook-indicator { font-weight: 500; }
+        .webhook-indicator.ok { color: var(--success); }
+        .webhook-indicator.fail { color: var(--error); }
+        .pending-badge { background: var(--error-bg); color: var(--error); padding: 2px 8px; border-radius: 10px; font-size: 0.85em; font-weight: 500; }
+        .bot-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 20px; border-bottom: 1px solid var(--border); background: #fafbfc; }
+        .bot-connections { padding: 12px 20px 16px; display: flex; flex-direction: column; gap: 10px; }
+        .sub-conn-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; transition: box-shadow 0.2s; }
+        .sub-conn-card:hover { box-shadow: var(--shadow); }
+        .sub-conn-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .sub-conn-name { font-weight: 600; font-size: 0.95em; flex: 1; }
+        .inactive-label { font-size: 0.8em; color: var(--text-secondary); font-weight: 400; }
+        .tracker-badge { font-size: 0.78em; background: #e3f2fd; color: #1565c0; padding: 2px 8px; border-radius: 8px; font-weight: 500; white-space: nowrap; }
+        .sub-conn-details { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.82em; color: var(--text-secondary); margin-bottom: 8px; }
+        .sub-conn-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+        .view-toggle { display: flex; gap: 6px; margin-bottom: 16px; }
+        .view-toggle .btn { font-size: 0.85em; padding: 6px 16px; }
         @media (max-width: 600px) {
             .navbar { padding: 0 12px; }
             .navbar-brand { font-size: 1em; }
             .container { padding: 16px 12px; }
             .conn-actions { flex-direction: column; }
+            .bot-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+            .bot-webhook-col { align-self: flex-start; }
+            .sub-conn-header { flex-wrap: wrap; }
         }
     </style>
 </head>
@@ -979,6 +1012,14 @@ if (isset($_GET['edit'])) {
 
 <!-- ===== TAB: WEBHOOK ===== -->
 
+<!-- View toggle: classic / grouped -->
+<div class="view-toggle">
+    <a href="?tab=webhook&view=classic" class="btn btn-sm <?php echo $view === 'classic' ? 'btn-primary' : 'btn-outline'; ?>">Vista clasica</a>
+    <a href="?tab=webhook&view=grouped" class="btn btn-sm <?php echo $view === 'grouped' ? 'btn-primary' : 'btn-outline'; ?>">Vista agrupada</a>
+</div>
+
+<?php if ($view === 'classic'): ?>
+<!-- ── VISTA CLASICA ── -->
 <div class="section">
     <div class="section-header">Conexiones Activas</div>
     <div class="section-content">
@@ -1067,6 +1108,145 @@ if (isset($_GET['edit'])) {
         <?php endif; ?>
     </div>
 </div>
+
+<?php else: ?>
+<!-- ── VISTA AGRUPADA ── -->
+
+<?php
+// Group connections by bot_token
+$grouped = [];
+foreach ($connections as $slug => $conn) {
+    $botToken = $conn['bot_token'] ?? '';
+    if ($botToken === '') {
+        $botToken = '__no_token__';
+    }
+    if (!isset($grouped[$botToken])) {
+        $grouped[$botToken] = [
+            'bot_name' => $conn['bot_name'] ?? '',
+            'bot_token' => $conn['bot_token'] ?? '',
+            'slug' => $slug,
+            'connections' => [],
+        ];
+    }
+    if (empty($grouped[$botToken]['bot_name']) && !empty($conn['bot_name'])) {
+        $grouped[$botToken]['bot_name'] = $conn['bot_name'];
+    }
+    $grouped[$botToken]['connections'][] = ['slug' => $slug] + $conn;
+}
+?>
+
+<?php if (empty($connections)): ?>
+    <div class="section">
+        <div class="section-content">
+            <div class="empty-state">
+                <p>No hay conexiones configuradas.</p>
+                <button class="btn btn-primary" onclick="openModal('connection-modal')" title="Agregar una nueva conexión">+ Agregar conexion</button>
+            </div>
+        </div>
+    </div>
+<?php else: ?>
+    <div style="margin-bottom:16px;">
+        <button class="btn btn-primary" onclick="openModal('connection-modal')" title="Agregar una nueva conexión">+ Agregar conexion</button>
+    </div>
+    <?php foreach ($grouped as $botToken => $bot): ?>
+        <?php 
+        $firstSlug = $bot['connections'][0]['slug'] ?? '';
+        $whStatus = $webhookStatuses[$firstSlug] ?? ['label' => '❓', 'pending' => 0];
+        $connCount = count($bot['connections']);
+        ?>
+        <div class="bot-card">
+            <div class="bot-header">
+                <div class="bot-name-col">
+                    <div class="bot-icon" aria-hidden="true">🤖</div>
+                    <div>
+                        <div class="bot-title">
+                            <?php if (!empty($bot['bot_name'])): ?>
+                                @<?php echo escapeHtml($bot['bot_name']); ?>
+                            <?php else: ?>
+                                Bot sin nombre
+                            <?php endif; ?>
+                            <span style="font-weight:400;font-size:0.8em;color:var(--text-secondary);margin-left:6px;">
+                                (<?php echo $connCount; ?> conexion<?php echo $connCount !== 1 ? 'es' : ''; ?>)
+                            </span>
+                        </div>
+                        <div class="bot-token-masked">
+                            Token: <?php echo escapeHtml(substr($bot['bot_token'], 0, 6) . '...' . substr($bot['bot_token'], -4)); ?>
+                        </div>
+                    </div>
+                </div>
+                <div class="bot-webhook-col">
+                    <span class="webhook-indicator <?php echo $whStatus['ok'] ? 'ok' : 'fail';?>">
+                        Webhook: <?php echo $whStatus['label']; ?>
+                    </span>
+                    <?php if (($whStatus['pending'] ?? 0) > 0): ?>
+                        <span class="pending-badge"><?php echo (int) $whStatus['pending']; ?> pend.</span>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <div class="bot-actions">
+                <form method="post" class="inline-form">
+                    <input type="hidden" name="action" value="configure_webhook">
+                    <input type="hidden" name="slug" value="<?php echo escapeHtml($firstSlug); ?>">
+                    <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+                    <button type="submit" class="btn btn-outline btn-sm" title="Configurar el webhook en Telegram para este bot">Configurar Webhook</button>
+                </form>
+                <button class="btn btn-outline btn-sm" onclick="testBotConnection('<?php echo escapeHtml($firstSlug); ?>', this)" title="Probar conexión con Telegram y estado del webhook">Test Bot</button>
+                <button class="btn btn-outline btn-sm" onclick="checkPrivacy('<?php echo escapeHtml($firstSlug); ?>', this)" title="Ver mensajes recibidos para verificar privacy mode">📡 Updates</button>
+                <div class="test-result" style="display:none;flex-basis:100%;" aria-live="polite" aria-atomic="true"></div>
+            </div>
+            <div class="bot-connections">
+                <?php foreach ($bot['connections'] as $conn): ?>
+                <div class="sub-conn-card">
+                    <div class="sub-conn-header">
+                        <span class="conn-status <?php echo $conn['enabled'] ? 'active' : 'inactive'; ?>" aria-label="<?php echo $conn['enabled'] ? 'Activa' : 'Inactiva'; ?>"></span>
+                        <span class="sub-conn-name">
+                            <?php echo escapeHtml($conn['name']); ?>
+                            <?php if (!$conn['enabled']): ?>
+                                <span class="inactive-label">(inactivo)</span>
+                            <?php endif; ?>
+                        </span>
+                        <span class="tracker-badge">Tracker #<?php echo (int) $conn['tracker_id']; ?></span>
+                    </div>
+                    <div class="sub-conn-details">
+                        <span>Chat: <?php 
+                            echo !empty($conn['chat_title']) ? escapeHtml($conn['chat_title']) : ('ID ' . ((int)($conn['chat_id'] ?? 0) ?: 'Pendiente'));
+                        ?></span>
+                        <span><?php echo escapeHtml(parse_url($conn['tiki_api_url'] ?? '', PHP_URL_HOST) ?: $conn['tiki_api_url']); ?></span>
+                        <span>Prefix: <?php echo escapeHtml($conn['field_prefix'] ?? 'telegrammessage'); ?></span>
+                    </div>
+                    <div class="sub-conn-actions">
+                        <button class="btn btn-outline btn-sm" onclick="event.preventDefault(); openEditModal('<?php echo escapeHtml($conn['slug']); ?>')" title="Editar">Editar</button>
+                        <form method="post" class="inline-form">
+                            <input type="hidden" name="action" value="duplicate_connection">
+                            <input type="hidden" name="slug" value="<?php echo escapeHtml($conn['slug']); ?>">
+                            <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+                            <button type="submit" class="btn btn-outline btn-sm" title="Duplicar esta conexión">Duplicar</button>
+                        </form>
+                        <form method="post" class="inline-form">
+                            <input type="hidden" name="action" value="toggle_connection">
+                            <input type="hidden" name="slug" value="<?php echo escapeHtml($conn['slug']); ?>">
+                            <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+                            <button type="submit" class="btn btn-sm <?php echo $conn['enabled'] ? 'btn-warning' : 'btn-success'; ?>" title="<?php echo $conn['enabled'] ? 'Desactivar' : 'Activar'; ?>">
+                                <?php echo $conn['enabled'] ? 'Desactivar' : 'Activar'; ?>
+                            </button>
+                        </form>
+                        <button class="btn btn-outline btn-sm" onclick="testTikiConnection('<?php echo escapeHtml($conn['slug']); ?>', this)" title="Probar conexión con TikiWiki">Test Tiki</button>
+                        <form method="post" class="inline-form" onsubmit="return confirm('<?php echo addslashes('¿Eliminar conexion \'' . $conn['name'] . '\'?'); ?>')">
+                            <input type="hidden" name="action" value="delete_connection">
+                            <input type="hidden" name="slug" value="<?php echo escapeHtml($conn['slug']); ?>">
+                            <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+                            <button type="submit" class="btn btn-danger btn-sm" title="Eliminar esta conexión permanentemente">Eliminar</button>
+                        </form>
+                        <div class="test-result" style="display:none;flex-basis:100%;" aria-live="polite" aria-atomic="true"></div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    <?php endforeach; ?>
+<?php endif; ?>
+
+<?php endif; ?><!-- /view -->
 
 <?php
 // ── Chats detectados ──
@@ -1445,11 +1625,150 @@ function testConnection(slug, btn) {
 }
 
 /**
+ * Testear solo la parte Telegram + Webhook (vista agrupada, nivel bot)
+ */
+function testBotConnection(slug, btn) {
+    var resultDiv = btn.closest('.bot-actions').querySelector('.test-result');
+    resultDiv.style.display = 'block';
+    resultDiv.className = 'test-result';
+    resultDiv.textContent = 'Probando...';
+    btn.disabled = true;
+    
+    var data = new URLSearchParams();
+    data.append('action', 'test_connection');
+    data.append('slug', slug);
+    data.append('csrf_token', '<?php echo generateCSRFToken(); ?>');
+    
+    fetch('admin.php?tab=webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: data.toString()
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(result) {
+        var lines = [];
+        var allOk = true;
+        
+        if (result.telegram) {
+            var tgOk = result.telegram.ok;
+            lines.push((tgOk ? '✅' : '❌') + ' Telegram: ' + result.telegram.message);
+            if (!tgOk) allOk = false;
+        }
+        
+        if (result.webhook) {
+            var wh = result.webhook;
+            if (wh.url) {
+                var whMsg = 'URL: ' + wh.url;
+                whMsg += ' | Pendientes: ' + (wh.pending_update_count || 0);
+                if (wh.last_error_message) {
+                    whMsg += ' | ⚠️ ' + wh.last_error_message;
+                    allOk = false;
+                }
+                if (wh.pending_update_count > 10) {
+                    whMsg += ' | ⚠️ Updates encolados';
+                    allOk = false;
+                }
+                lines.push('🌐 Webhook: ' + whMsg);
+            } else {
+                lines.push('🌐 Webhook: ⚠️ No configurado');
+            }
+        }
+        
+        resultDiv.className = 'test-result ' + (allOk ? 'ok' : 'fail');
+        resultDiv.innerHTML = lines.join('<br>');
+    })
+    .catch(function(err) {
+        resultDiv.className = 'test-result fail';
+        resultDiv.innerHTML = 'Error de red: ' + err.message;
+    })
+    .finally(function() {
+        btn.disabled = false;
+    });
+}
+
+/**
+ * Testear solo la parte TikiWiki (vista agrupada, nivel conexion)
+ */
+function testTikiConnection(slug, btn) {
+    var resultDiv = btn.closest('.sub-conn-actions').querySelector('.test-result');
+    resultDiv.style.display = 'block';
+    resultDiv.className = 'test-result';
+    resultDiv.textContent = 'Probando TikiWiki...';
+    btn.disabled = true;
+    
+    var data = new URLSearchParams();
+    data.append('action', 'test_connection');
+    data.append('slug', slug);
+    data.append('csrf_token', '<?php echo generateCSRFToken(); ?>');
+    
+    fetch('admin.php?tab=webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: data.toString()
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(result) {
+        var lines = [];
+        var allOk = true;
+        
+        if (result.tikiwiki) {
+            var twOk = result.tikiwiki.ok;
+            var twMsg = (twOk ? '✅' : '❌') + ' TikiWiki: ' + result.tikiwiki.message;
+            
+            if (result.tikiwiki.api_access) {
+                var p = result.tikiwiki;
+                var permLines = [];
+                
+                if (p.admin_trackers === null) {
+                    permLines.push('⏭️ admin_trackers: no testeado');
+                } else {
+                    permLines.push((p.admin_trackers ? '✅' : '❌') + ' admin_trackers: ' + (p.admin_trackers ? 'OK' : 'FALTA'));
+                    if (!p.admin_trackers) allOk = false;
+                }
+                
+                if (p.create_tracker_items === null) {
+                    permLines.push('⏭️ create_tracker_items: no testeado');
+                } else {
+                    permLines.push((p.create_tracker_items ? '✅' : '❌') + ' create_tracker_items: ' + (p.create_tracker_items ? 'OK' : 'FALTA'));
+                    if (!p.create_tracker_items) allOk = false;
+                }
+                
+                permLines.push((p.view_file_gallery ? '✅' : '❌') + ' view_file_gallery: ' + (p.view_file_gallery ? 'OK' : 'FALTA'));
+                permLines.push((p.upload_files ? '✅' : '❌') + ' upload_files: ' + (p.upload_files ? 'OK' : 'FALTA'));
+                permLines.push((p.admin_file_galleries ? '✅' : '⚠️') + ' admin_file_galleries: ' + (p.admin_file_galleries ? 'OK' : 'FALTA'));
+                
+                if (!p.view_file_gallery) allOk = false;
+                if (!p.upload_files) allOk = false;
+                
+                twMsg += '<br>&nbsp;&nbsp;' + permLines.join('<br>&nbsp;&nbsp;');
+            }
+            
+            lines.push(twMsg);
+            if (!twOk) allOk = false;
+        } else {
+            lines.push('❌ TikiWiki: Sin datos');
+            allOk = false;
+        }
+        
+        resultDiv.className = 'test-result ' + (allOk ? 'ok' : 'fail');
+        resultDiv.innerHTML = lines.join('<br>');
+    })
+    .catch(function(err) {
+        resultDiv.className = 'test-result fail';
+        resultDiv.innerHTML = 'Error de red: ' + err.message;
+    })
+    .finally(function() {
+        btn.disabled = false;
+    });
+}
+
+/**
  * Verificar privacy mode: muestra los últimos mensajes recibidos por el bot
  * para determinar si recibe mensajes que no son comandos.
  */
 function checkPrivacy(slug, btn) {
-    var resultDiv = btn.closest('.conn-actions').querySelector('.test-result');
+    var actionsContainer = btn.closest('.conn-actions') || btn.closest('.bot-actions');
+    var resultDiv = actionsContainer.querySelector('.test-result');
     resultDiv.style.display = 'block';
     resultDiv.className = 'test-result';
     resultDiv.innerHTML = 'Consultando updates recientes...';
