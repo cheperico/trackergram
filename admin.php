@@ -505,6 +505,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $result = json_decode($response, true);
             if ($result && $result['ok']) {
                 $successMessage = 'Webhook configurado para "' . escapeHtml($conn['name']) . '": ' . $webhookUrl;
+                // Refrescar estado del webhook en los cards
+                try {
+                    $whClient = new TelegramClient($botToken);
+                    $wh = $whClient->getWebhookInfo();
+                    $status = ['ok' => !empty($wh['url']), 'label' => '✅', 'pending' => (int) ($wh['pending_update_count'] ?? 0)];
+                    if (!empty($wh['last_error_message'])) {
+                        $status['label'] = '❌ ' . substr($wh['last_error_message'], 0, 40);
+                        $status['ok'] = false;
+                    } elseif ($wh['pending_update_count'] > 10) {
+                        $status['label'] = '⚠️ ' . $wh['pending_update_count'] . ' pend.';
+                        $status['ok'] = false;
+                    }
+                    $webhookStatuses[$slug] = $status;
+                } catch (Exception $e) {
+                    // No actualizar status si falla
+                }
             } else {
                 $desc = $result['description'] ?? 'Error desconocido';
                 $errorMessage = 'Error al configurar webhook: ' . $desc;
@@ -565,6 +581,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             
             header('Content-Type: application/json');
             echo json_encode($results);
+            exit;
+        
+        // ── Verificar privacy mode (getUpdates) ──
+        case 'check_privacy':
+            $slug = $_POST['slug'] ?? '';
+            $conn = $configManager->getConnection($slug);
+            if (!$conn || empty($conn['bot_token'])) {
+                echo json_encode(['ok' => false, 'error' => 'Conexión inválida o sin bot_token']);
+                exit;
+            }
+            
+            try {
+                $tgClient = new TelegramClient($conn['bot_token']);
+                $result = $tgClient->getUpdates(10);
+                // HTTP 409 = webhook activo, no se puede llamar getUpdates
+                // No es un error real, es esperado. Devolver info útil.
+                if (!$result['ok'] && str_contains($result['error'] ?? '', 'webhook is active')) {
+                    // Obtener info del webhook para mostrar en su lugar
+                    $whInfo = $tgClient->getWebhookInfo();
+                    header('Content-Type: application/json');
+                    echo json_encode([
+                        'ok' => false,
+                        'webhook_active' => true,
+                        'error' => 'El webhook está activo — getUpdates no está disponible. Usá "Configurar Webhook" o "Test" para verificar el estado.',
+                        'webhook_url' => $whInfo['url'] ?? '',
+                        'pending' => $whInfo['pending_update_count'] ?? 0,
+                    ]);
+                    exit;
+                }
+                header('Content-Type: application/json');
+                echo json_encode($result);
+            } catch (Exception $e) {
+                header('Content-Type: application/json');
+                echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+            }
             exit;
         
         // ── Asignar chat detectado a conexión ──
@@ -999,6 +1050,8 @@ if (isset($_GET['edit'])) {
                         
                         <button class="btn btn-outline btn-sm" onclick="testConnection('<?php echo escapeHtml($slug); ?>', this)" title="Probar conexión con Telegram y TikiWiki">Test</button>
                         
+                        <button class="btn btn-outline btn-sm" onclick="checkPrivacy('<?php echo escapeHtml($slug); ?>', this)" title="Ver últimos mensajes recibidos por el bot (para verificar privacy mode)">📡 Updates</button>
+                        
                         <form method="post" class="inline-form" onsubmit="return confirm('¿Eliminar conexion \'<?php echo escapeHtml($conn['name']); ?>\'?')">
                             <input type="hidden" name="action" value="delete_connection">
                             <input type="hidden" name="slug" value="<?php echo escapeHtml($slug); ?>">
@@ -1381,6 +1434,107 @@ function testConnection(slug, btn) {
                 }
             }
         }
+    })
+    .catch(function(err) {
+        resultDiv.className = 'test-result fail';
+        resultDiv.innerHTML = 'Error de red: ' + err.message;
+    })
+    .finally(function() {
+        btn.disabled = false;
+    });
+}
+
+/**
+ * Verificar privacy mode: muestra los últimos mensajes recibidos por el bot
+ * para determinar si recibe mensajes que no son comandos.
+ */
+function checkPrivacy(slug, btn) {
+    var resultDiv = btn.closest('.conn-actions').querySelector('.test-result');
+    resultDiv.style.display = 'block';
+    resultDiv.className = 'test-result';
+    resultDiv.innerHTML = 'Consultando updates recientes...';
+    btn.disabled = true;
+    
+    var data = new URLSearchParams();
+    data.append('action', 'check_privacy');
+    data.append('slug', slug);
+    data.append('csrf_token', '<?php echo generateCSRFToken(); ?>');
+    
+    fetch('admin.php?tab=webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: data.toString()
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(result) {
+        var lines = [];
+        
+        if (result.webhook_active) {
+            lines.push('🔌 Webhook activo — getUpdates no disponible');
+            lines.push('   ' + result.error);
+            if (result.pending > 0) {
+                lines.push('   Updates pendientes: ' + result.pending);
+            }
+            resultDiv.className = 'test-result ok';
+            resultDiv.innerHTML = lines.join('<br>');
+            btn.disabled = false;
+            return;
+        }
+        
+        if (!result.ok) {
+            lines.push('❌ Error: ' + (result.error || 'sin respuesta'));
+            resultDiv.className = 'test-result fail';
+            resultDiv.innerHTML = lines.join('<br>');
+            return;
+        }
+        
+        var updates = result.updates || [];
+        lines.push('📡 Updates recientes: ' + result.count);
+        
+        // Diagnóstico de privacy mode
+        if (result.privacy_mode_on === false) {
+            lines.push('✅ Privacy mode: DESACTIVADO — el bot ve mensajes normales');
+        } else if (result.privacy_mode_on === true) {
+            lines.push('⚠️ Sin mensajes no-comando — posible privacy mode ACTIVADO');
+            lines.push('   Probá enviar un mensaje normal al grupo y volvé a consultar');
+        } else {
+            lines.push('⏳ Sin updates aún — no se puede determinar');
+            lines.push('   Agregá el bot a un grupo y enviale un mensaje');
+        }
+        
+        if (updates.length > 0) {
+            lines.push('');
+            lines.push('┌─ Últimos mensajes recibidos ──────────────');
+            updates.forEach(function(u) {
+                var icon = '💬';
+                var label = u.chat_title || '(sin nombre)';
+                
+                if (u.type === 'my_chat_member') {
+                    icon = '🔌';
+                    label = 'Evento de grupo';
+                } else if (u.is_private) {
+                    icon = '👤';
+                } else if (u.from_command) {
+                    icon = '/' ;
+                }
+                
+                var timeStr = '';
+                if (u.timestamp) {
+                    var d = new Date(u.timestamp * 1000);
+                    timeStr = d.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+                }
+                
+                var preview = u.text ? u.text.substring(0, 80) : '(sin texto)';
+                if (u.text && u.text.length > 80) preview += '…';
+                if (u.type === 'my_chat_member') preview = u.text;
+                
+                lines.push('  ' + icon + ' [' + timeStr + '] ' + label + ': ' + preview);
+            });
+            lines.push('└───────────────────────────────────────────');
+        }
+        
+        resultDiv.className = 'test-result ' + (result.privacy_mode_on === false ? 'ok' : 'fail');
+        resultDiv.innerHTML = lines.join('<br>');
     })
     .catch(function(err) {
         resultDiv.className = 'test-result fail';
