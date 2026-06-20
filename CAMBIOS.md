@@ -2,6 +2,34 @@
 
 ## v0.5.5
 
+### Fix: checkPermissions sin crear galerías en TikiWiki
+
+- `checkPermissions()` paso 6 (test de `admin_file_galleries`): antes creaba una galería temporal (`POST /api/galleries` con `create=1`) y luego intentaba borrarla con `deleteGalleryQuiet()` que tenía la ruta incorrecta (falta `/delete` en la URL). Ahora usa `DELETE /api/galleries/99999999/delete` contra una galería inexistente — HTTP 200 = tiene permiso, HTTP 403 = no tiene permiso. Cero efectos secundarios.
+- `deleteGalleryQuiet()` eliminado (ya no se necesita).
+
+### Fix: Health check webhook mostraba token incorrecto
+
+- `admin.php`: el health check (`$webhookStatuses`) reusaba el mismo `TelegramClient` para todas las conexiones por usar `??=` en vez de `=`. El primer loop (auto-poblar `bot_name`/`chat_title`) dejaba `$tgClient` con el token de la última conexión. El health check usaba ese mismo cliente para TODAS las conexiones, mostrando información del webhook equivocada en conexiones 2+.
+- Mismo bug en el auto-poblado de `chat_title`: si una conexión tenía `bot_name` pero no `chat_title`, reusaba el cliente de una iteración anterior.
+- Fix: `??=` reemplazado por `=` en ambos loops. Cada conexión ahora crea su propio `TelegramClient` con su token.
+
+### Fix: Updates (getUpdates) daba error 409 siempre
+
+- `TelegramClient::getUpdates()`: cuando hay webhook activo, Telegram devuelve HTTP 409 con descripción `"Conflict: can't use getUpdates method while webhook is active"`. El código ignoraba el body y devolvía "HTTP 409" genérico.
+- Ahora parsea el `description` del body de Telegram para mensajes más claros.
+- `check_privacy` en `admin.php`: detecta "webhook is active" y devuelve `webhook_active: true` con info útil via `getWebhookInfo()` (URL configurada, updates pendientes). El JS lo muestra como estado informativo en verde, no como error.
+
+### Fix: Tilde verde no se actualizaba tras configurar webhook
+
+- `$webhookStatuses` se computaba ANTES del bloque POST. Tras configurar webhook exitosamente, la página seguía mostrando el estado viejo (❌ No configurado).
+- Ahora, tras un `configure_webhook` exitoso, refresca `$webhookStatuses[$slug]` via `getWebhookInfo()` para que el tilde verde se refleje inmediatamente.
+
+### Fix: webhook_secret compartido entre conexiones con mismo bot_token
+
+- Un bot de Telegram tiene **un solo webhook** con **un solo secret_token**. Si dos conexiones usan el mismo `bot_token` pero distinto `webhook_secret`, al configurar el webhook para una se pisa la otra.
+- `ConfigManager::saveConnection()`: al auto-generar secret, primero busca si otra conexión ya tiene el mismo `bot_token` y **reusa su secret**. En edición, si el campo viene vacío mantiene el actual en vez de generar uno nuevo.
+- `ConfigManager::load()` (migración): mismo criterio al auto-generar secrets para conexiones existentes sin `webhook_secret`.
+
 ### Docs: Permisos de TikiWiki para trackerGram
 
 - **README.md**: Nueva sección "Configurar Permisos en TikiWiki" con guía paso a paso para crear el grupo `trackerGram`, asignar los 6 permisos necesarios (con la advertencia de que `tiki_p_admin_trackers` debe ser global), crear el usuario y generar el token de API.

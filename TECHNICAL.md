@@ -34,41 +34,67 @@ Las opciones son:
 
 ### Cómo recibe el mensaje trackerGram (v0.4.0+ — multi-conexión)
 
-El archivo `api.php` es el punto de entrada. Ahora busca una **conexión** configurada en `setup.json`:
+El archivo `api.php` es el punto de entrada. Recibe updates de **todos los grupos** donde está el bot. No hay un webhook por grupo — el webhook es **uno solo por bot**.
+
+#### Cómo se rutea cada mensaje a la conexión correcta
+
+Cada update de Telegram incluye el `chat.id` del grupo que lo originó. `api.php` usa **dos datos** para encontrar la conexión:
+
+1. `X-Telegram-Bot-Api-Secret-Token` (header) → identifica el bot (verifica que el request es legítimo)
+2. `chat.id` (del JSON del update) → identifica el grupo
+
+```
+Update de GroupA con secret=XYZ
+  → findAllByChatId(GroupA_id, XYZ)
+  → busca conexiones con chat_id=GroupA_id AND webhook_secret=XYZ
+  → encuentra CONEXIÓN A ✓
+
+Update de GroupB con secret=XYZ
+  → findAllByChatId(GroupB_id, XYZ)
+  → busca conexiones con chat_id=GroupB_id AND webhook_secret=XYZ
+  → encuentra CONEXIÓN B ✓
+```
+
+#### webhook_secret compartido
+
+**Importante**: Un bot tiene UN solo webhook con UN solo `secret_token`. Si dos conexiones usan el mismo `bot_token`, deben compartir el mismo `webhook_secret`. Si no, la última en configurar el webhook deja a la otra afuera.
+
+`ConfigManager` lo maneja automáticamente: al crear una conexión con un `bot_token` que ya existe, reusa el `webhook_secret` de la conexión existente.
+
+#### Fan-out: mismo mensaje a múltiples trackers
+
+Usando `findAllByChatId()`, si dos conexiones tienen el mismo `(chat_id, webhook_secret)` pero diferente `tracker_id`, el mismo mensaje se envía a ambos trackers. Útil para duplicar mensajes a wikis diferentes.
+
+#### El código real
 
 ```php
-require_once 'bootstrap.php';
-require_once 'ConfigManager.php';
-
-// Buscar conexión por (chat_id, X-Telegram-Bot-Api-Secret-Token)
 $configManager = new ConfigManager();
-$connection = $configManager->findByChat($chatId, $secretToken);
+$allFound = $configManager->findAllByChatId((int) $chatId, $secretToken);
 
-if (!$connection) {
+if (empty($allFound)) {
     http_response_code(403);
     die(json_encode(['error' => 'Forbidden: no connection for this chat']));
 }
 
-// Crear clientes per-conexión (inyección de dependencias)
-$tikiClient = new TikiWikiClient(
-    apiUrl: $connection['tiki_api_url'],
-    token: $connection['tiki_api_token'],
-    timeout: TIMEOUT_TIKIWIKI_API,
-    uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
-);
-$tgClient = new TelegramClient(botToken: $connection['bot_token']);
-
-$handler = new WebhookHandler(
-    tikiWikiClient: $tikiClient,
-    telegramClient: $tgClient,
-    messageMapper: new MessageMapper(),
-    trackerId: (int) $connection['tracker_id']
-);
-
-$handler->processUpdate($update);
+// Fan-out: procesar el update para TODAS las conexiones que matcheen
+foreach ($allFound as $found) {
+    $tikiClient = new TikiWikiClient(
+        apiUrl: $found['tiki_api_url'],
+        token: $found['tiki_api_token']
+    );
+    $tgClient = new TelegramClient(botToken: $found['bot_token']);
+    
+    $handler = new WebhookHandler(
+        tikiWikiClient: $tikiClient,
+        telegramClient: $tgClient,
+        messageMapper: new MessageMapper(),
+        trackerId: (int) $found['tracker_id']
+    );
+    $handler->processUpdate($update);
+}
 ```
 
-**Por qué está así**: `api.php` no tiene lógica de negocio. Solo valida que la petición venga de Telegram (secret token), limita la cantidad de peticiones (rate limiting), y delega en `WebhookHandler`. Esto se hizo en la refactorización v0.1.7 — antes, `api.php` tenía cientos de líneas de lógica mezclada.
+**Por qué está así**: `api.php` no tiene lógica de negocio. Solo valida que la petición venga de Telegram (secret token), limita la cantidad de peticiones (rate limiting), busca la conexión por `(chat_id, secret)`, y delega en `WebhookHandler`. Esto se hizo en la refactorización v0.1.7 — antes, `api.php` tenía cientos de líneas de lógica mezclada.
 
 **Lección aprendida**: Separar el "recibir la petición" del "procesar los datos" hace que el código sea más fácil de entender y modificar.
 

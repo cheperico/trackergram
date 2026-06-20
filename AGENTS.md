@@ -41,7 +41,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 | | |
 |---|---|
-| **Versión** | v0.5.4 |
+| **Versión** | v0.5.5 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
 | **Repositorio** | https://github.com/cheperico/trackergram |
@@ -95,6 +95,10 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 - ✅ **`.env` simplificado**: solo contiene config global (admin, debug, async); credenciales bot/wiki solo en `setup.json`
 - ✅ **Sin fallback legacy**: api.php rechaza con 403 si no hay conexión en `setup.json`
 - ✅ **Accesibilidad ARIA completa en admin.php**: roles, landmarks, tooltips, skip link, focus trap, aria-live, teclado, contraste, prefers-reduced-motion
+- ✅ **Webhook_secret compartido**: conexiones con mismo `bot_token` reusan el mismo `webhook_secret` (un bot = un webhook = un secret)
+- ✅ **Updates sin error 409**: `getUpdates()` parsea el body de Telegram y detecta webhook activo; el admin muestra mensaje informativo en vez de "error"
+- ✅ **Health check por conexión**: cada tarjeta en admin crea su propio `TelegramClient` (fix de leak de `$tgClient` entre conexiones)
+- ✅ **checkPermissions sin side effects**: test de `admin_file_galleries` usa `DELETE /api/galleries/99999999/delete` (galería inexistente), no crea galerías reales
 
 ---
 

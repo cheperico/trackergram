@@ -13,6 +13,7 @@ Puente entre Telegram y TikiWiki. Recibe mensajes de un grupo de Telegram y los 
 - **Captura eventos del grupo**: Creación de topics, miembros que entran o salen, mensajes fijados, cambios de título
 - **Importa historial**: Podés exportar conversaciones existentes desde Telegram e importarlas
 - **Crea trackers automáticamente**: No necesitás configurar los campos a mano
+- **Multi-conexión**: Un mismo webhook atiende múltiples bots, wikis y trackers. Cada conexión se rutea por `(chat_id + webhook_secret)`. Compartir el mismo `bot_token` entre conexiones es válido (el `webhook_secret` se reusa automáticamente).
 
 ## Tipos de Mensaje Soportados
 
@@ -519,7 +520,7 @@ Podés copiar todo este bloque y pegarlo en **Admin → Trackers → Importar ca
 2. **Un TikiWiki 21.x+** — Con la API habilitada, un token de acceso y un tracker (o dejá que trackerGram lo cree automáticamente).
 3. **Un servidor con PHP 8.0+** — Apache o Nginx, accesible desde internet con HTTPS.
 
-Cada vinculación (bot + wiki + tracker) se configura desde el panel de admin. Podés tener múltiples bots y wikis desde una misma instalación.
+Cada vinculación (bot + wiki + tracker) se configura desde el panel de admin como una **conexión**. Podés tener múltiples bots y wikis desde una misma instalación. Incluso podés tener **varias conexiones con el mismo bot** pero diferentes grupos de Telegram y diferentes wikis — el webhook es único por bot, pero `api.php` rutea cada mensaje al tracker correcto según el grupo de origen.
 
 Si no tenés nada de esto, la [guía de instalación](INSTALL.md) te explica paso a paso.
 
@@ -590,6 +591,8 @@ Estos dos datos los vas a necesitar en el panel de admin de trackerGram al crear
 3. Accedé al panel de administración: `https://tu-dominio.com/trackergram/admin.php`
 4. Creá una **conexión** desde el panel: nombre, bot token, webhook secret, TikiWiki URL, token y tracker ID
 5. Configurá el webhook con un clic desde la misma conexión (botón "🌐 Webhook")
+   - Si ya hay otra conexión con el mismo `bot_token`, el `webhook_secret` se reusa automáticamente
+   - No necesitás configurar el webhook más de una vez por bot
 6. Verificá que funcione con el botón "🧪 Test"
 7. Agregá el bot al grupo de Telegram — ¡los mensajes empiezan a llegar al tracker automáticamente!
 
