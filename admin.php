@@ -267,7 +267,7 @@ foreach ($connections as $slug => $conn) {
     $chatId = (int) ($conn['chat_id'] ?? 0);
     if (!empty($conn['bot_token']) && $chatId > 0 && empty($conn['chat_title'])) {
         try {
-            $tgClient ??= new TelegramClient($conn['bot_token']);
+            $tgClient = new TelegramClient($conn['bot_token']);
             $chatInfo = $tgClient->getChat($chatId);
             if ($chatInfo !== null && !empty($chatInfo['title'] ?? $chatInfo['username'] ?? '')) {
                 $chatTitle = $chatInfo['title'] ?? $chatInfo['username'] ?? '';
@@ -295,7 +295,7 @@ foreach ($connections as $slug => $conn) {
     $status = ['ok' => false, 'label' => 'Sin bot token', 'pending' => 0];
     if (!empty($conn['bot_token'])) {
         try {
-            $tgClient ??= new TelegramClient($conn['bot_token']);
+            $tgClient = new TelegramClient($conn['bot_token']);
             $wh = $tgClient->getWebhookInfo();
             if (!empty($wh['url'])) {
                 $status['ok'] = true;
