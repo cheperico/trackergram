@@ -812,9 +812,9 @@ if (!in_array($activeTab, ['webhook', 'import', 'create'])) {
 }
 
 // View mode: classic (default) or grouped (by bot)
-$view = $_GET['view'] ?? 'classic';
+$view = $_GET['view'] ?? 'grouped';
 if (!in_array($view, ['classic', 'grouped'])) {
-    $view = 'classic';
+    $view = 'grouped';
 }
 
 // Para la edición, cargar conexión si se pasa slug
