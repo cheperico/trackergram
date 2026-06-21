@@ -31,6 +31,7 @@ class MessageMapper
     public function fromWebhook(array $message): NormalizedMessage
     {
         $msg = new NormalizedMessage();
+        $msg->messageId = (string) ($message['message_id'] ?? '');
         $msg->text = $message['text'] ?? '';
         $msg->editedDate = (string) ($message['edit_date'] ?? '');
         $msg->replyToId = (string) ($message['reply_to_message']['message_id'] ?? '');

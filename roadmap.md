@@ -15,10 +15,10 @@
 
 | | |
 |---|---|
-| **Versión actual** | v0.5.3 |
+| **Versión actual** | v0.5.5 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Instancias activas** | Dev (tracker 26) · Prod (tracker 22) |
-| **Filosofía** | Sin DB local · PHP puro sin framework · MVP pragmático |
+| **Filosofía** | Sin DB con servidor · JSON files para estado local (no SQLite) · PHP puro sin framework · MVP pragmático |
 
 ### Lo que ya funciona sólido
 
@@ -91,7 +91,7 @@ Items con impacto inmediato en la operación del día a día.
 | 11 | **Tests unitarios** | Continuo | MessageMapper, WebhookHandler, clientes. |
 | 12 | **PSR-4 autoloading** | 1 sesión | Mover clases a `src/`, autoloader. |
 | 13 | **Transcripción de voz / OCR** | 3-4 sesiones | Whisper + OCR. Dependencias externas. |
-| 14 | **SQLite cache / dedup local** | 2 sesiones | Evaluar cuando el volumen lo justifique. |
+| 14 | **SQLite para cola async y rate limiting** (evaluación) | 1 sesión | **Opcional.** Evaluar si vale la pena migrar tmp/buffer/ y rate limiting de archivos JSON a SQLite. Prioridad mínima — los archivos actuales funcionan para el volumen esperado. No aplica a setup.json ni topic cache. |
 | 15 | **Rotación de logs por fecha** | 1 sesión | Además de por tamaño. |
 | 16 | **Expulsar bot desde admin panel** | 1 sesión | Botón para sacar el bot de un grupo directamente desde la interface, sin tener que hacerlo desde Telegram. |
 
@@ -123,7 +123,7 @@ Items con impacto inmediato en la operación del día a día.
 
 | Item | Motivo |
 |------|--------|
-| Base de datos local (MySQL/PostgreSQL) | Rompe la filosofía "sin DB". TikiWiki es el almacenamiento. |
+| Base de datos local con servidor (MySQL/PostgreSQL) | Rompe la filosofía "sin DB". TikiWiki es el almacenamiento. |
 | Framework PHP (Laravel/Symfony) | Overhead innecesario para un puente de ~10 archivos. |
 | Soporte multi-idioma | No agrega valor al caso de uso actual. |
 | Modo espejo (vs archivo) | Decidido: trackerGram es **archivo inmutable con eventos**. Los editados/borrados se guardan como eventos adicionales, no modifican el original. |

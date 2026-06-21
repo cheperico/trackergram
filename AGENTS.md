@@ -32,7 +32,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 ### Filosofía
 
-- Sin base de datos local — TikiWiki es el almacenamiento
+- Sin base de datos con servidor — nada de MySQL, PostgreSQL ni motores que requieran un servicio extra. TikiWiki es el almacenamiento. Para datos locales transitorios (cachés, cola async, rate limiting) se usan archivos JSON — no SQLite, por ser binario, no human-editable, depender de `ext-sqlite3` y no poder versionarse en git.
 - PHP puro, sin framework — simplicidad sobre complejidad
 - MVP pragmático — funcionalidad primero, perfección después
 - Iteración rápida — funciona, luego se mejora
@@ -104,9 +104,21 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 ## 2. Decisiones Arquitectónicas
 
-### Sin base de datos local
+### Sin base de datos con servidor (y sin SQLite)
 
 trackerGram no tiene base de datos propia. TikiWiki es el almacenamiento. La contrapartida es que toda la lógica de deduplicación, búsqueda y persistencia depende de la API de TikiWiki.
+
+Para datos locales transitorios (cachés, cola async, rate limiting) se usan **archivos JSON**, no SQLite. Las razones:
+
+| Motivo | Explicación |
+|--------|-------------|
+| **Human-editable** | Un JSON se puede inspeccionar y editar con `cat`, `nano`, `jq`. SQLite requiere `sqlite3` CLI o un DB browser. |
+| **Versionable en git** | `setup.json` (config multi-conexión) se versiona. Un `.sqlite` es binario, cambia constantemente, no se puede diff. |
+| **Sin dependencia de extensión** | `ext-sqlite3` viene incluido en PHP 8 pero a veces está deshabilitado en hosting compartido. Los archivos JSON funcionan siempre. |
+| **Simplicidad** | `file_get_contents` + `json_decode` es más simple que PDO + prepared statements para el volumen actual. |
+| **Rendimiento suficiente** | Para el volumen esperado (cientos de topics, miles de eventos encolados), los archivos JSON con `LOCK_EX` rinden bien. |
+
+> ⚠️ SQLite **no está descartado para siempre** — está en el roadmap como opcional/evaluación de mínima prioridad para cuando el volumen lo justifique, específicamente para la cola async y rate limiting. No aplica a `setup.json` ni a cachés chicas.
 
 ### PHP puro, sin framework
 

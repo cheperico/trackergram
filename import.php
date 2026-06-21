@@ -242,7 +242,13 @@ function handleExtract(): void
     unset($jsonContent); // liberar RAM del string JSON
 
     $chatTitle = $data['name'] ?? 'Unknown Chat';
-    $chatId = $data['id'] ?? 0;
+    $rawId = $data['id'] ?? 0;
+    $chatType = $data['type'] ?? '';
+    if (in_array($chatType, ['private_supergroup', 'private_channel']) && $rawId > 0) {
+        $chatId = '-100' . $rawId;
+    } else {
+        $chatId = $rawId;
+    }
 
     // Crear NDJSON (una línea por mensaje, para procesar sin recargar todo)
     $ndjsonFile = $tempDir . '/messages.ndjson';
@@ -771,7 +777,13 @@ function handleFull(): void
 
     $messages = $data['messages'];
     $chatTitle = $data['name'] ?? 'Unknown Chat';
-    $chatId = $data['id'] ?? 0;
+    $rawId = $data['id'] ?? 0;
+    $chatType = $data['type'] ?? '';
+    if (in_array($chatType, ['private_supergroup', 'private_channel']) && $rawId > 0) {
+        $chatId = '-100' . $rawId;
+    } else {
+        $chatId = $rawId;
+    }
 
     $topics = [];
     foreach ($messages as $msg) {

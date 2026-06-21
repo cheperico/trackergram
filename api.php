@@ -65,57 +65,66 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
         $chatId = $update['my_chat_member']['chat']['id'];
     }
 
-    // 5. Buscar TODAS las conexiones por chat_id + webhook_secret (fan-out)
+    // 5. Extraer secret token del header
     $secretToken = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '';
     $configManager = new ConfigManager();
+
+    // 6. Buscar TODAS las conexiones por chat_id + webhook_secret (fan-out)
     $allFound = $chatId ? $configManager->findAllByChatId((int) $chatId, $secretToken) : [];
 
-    // 6. Sin conexión por chat_id: detectar pasivamente
-    if (empty($allFound) && $chatId && $secretToken !== '') {
-        // 6a. Buscar conexión pendiente (chat_id=0)
+    // 7. Detectar pasivamente chats no configurados, incluso si chat_id=0 (test webhook)
+    if (empty($allFound) && $secretToken !== '') {
+        // 7a. Buscar conexión pendiente (chat_id=0)
         $detectedConn = $configManager->findByWebhookSecretPending($secretToken);
         
-        // 6b. Si no hay pendiente, buscar cualquier conexión con este webhook_secret
-        //    (mismo bot agregado a un grupo NUEVO)
+        // 7b. Si no hay pendiente, buscar cualquier conexión con este webhook_secret
+        //     (mismo bot agregado a un grupo NUEVO)
         if ($detectedConn === null) {
             $detectedConn = $configManager->findByWebhookSecret($secretToken);
         }
         
         if ($detectedConn !== null) {
-            $chatTitle = '';
-            if (isset($update['message']['chat']['title'])) {
-                $chatTitle = $update['message']['chat']['title'];
-            } elseif (isset($update['message']['chat']['username'])) {
-                $chatTitle = '@' . $update['message']['chat']['username'];
-            } elseif (isset($update['my_chat_member']['chat']['title'])) {
-                $chatTitle = $update['my_chat_member']['chat']['title'];
-            }
-            if ($chatTitle === '') {
-                $chatTitle = 'Chat ' . $chatId;
-            }
+            if ($chatId) {
+                // Hay chat real → registrar detección
+                $chatTitle = '';
+                if (isset($update['message']['chat']['title'])) {
+                    $chatTitle = $update['message']['chat']['title'];
+                } elseif (isset($update['message']['chat']['username'])) {
+                    $chatTitle = '@' . $update['message']['chat']['username'];
+                } elseif (isset($update['my_chat_member']['chat']['title'])) {
+                    $chatTitle = $update['my_chat_member']['chat']['title'];
+                }
+                if ($chatTitle === '') {
+                    $chatTitle = 'Chat ' . $chatId;
+                }
 
-            $slug = $detectedConn['_slug'];
-            addDetection($slug, (int) $chatId, $chatTitle);
-            log_message("trackerGram: Chat detectado '{$chatTitle}' ({$chatId}) para conexión '{$slug}'");
+                $slug = $detectedConn['_slug'];
+                addDetection($slug, (int) $chatId, $chatTitle);
+                log_message("trackerGram: Chat detectado '{$chatTitle}' ({$chatId}) para conexión '{$slug}'");
+            } else {
+                // Test webhook sin chat — el webhook funciona correctamente
+                $slug = $detectedConn['_slug'];
+                log_message("trackerGram: Webhook OK (test) para conexión '{$slug}'");
+            }
 
             // Responder 200 para no saturar logs de errores en Telegram
             http_response_code(200);
             die(json_encode(['status' => 'detected', 'slug' => $slug]));
         }
         
-        // 6c. Si no matchea ninguna conexión, el webhook_secret es desconocido
+        // 7c. Si no matchea ninguna conexión, el webhook_secret es desconocido
         log_message("trackerGram: webhook_secret desconocido para chat {$chatId} — ¿bot token filtrado?", true);
     }
 
-    // 7. Sin conexión = rechazar
+    // 9. Sin conexión = rechazar
     if (empty($allFound)) {
         log_message("trackerGram: chat_id {$chatId} sin conexión habilitada — rechazando", true);
         http_response_code(403);
         die(json_encode(['error' => 'Forbidden: no connection for this chat']));
     }
 
-    // 8. Fan-out: procesar el update para TODAS las conexiones que matcheen
-    //    (útil cuando se duplica una conexión con diferente tracker_id)
+    // 10. Fan-out: procesar el update para TODAS las conexiones que matcheen
+    //     (útil cuando se duplica una conexión con diferente tracker_id)
     foreach ($allFound as $found) {
         $connection = $found;
         $connectionSlug = $found['_slug'];
@@ -171,16 +180,22 @@ function processUpdate(array $update, array $connection, string $connectionSlug,
     $messageMapper->setFieldPrefix($connection['field_prefix'] ?? 'telegrammessage');
 
     // Auto-detectar field prefix desde el tracker (corrige prefix mal guardado)
+    // NOTA: admin.php ya auto-detecta el prefix al cargar la página (si es 'telegrammessage'),
+    // así que este bloque solo persiste cuando se detecta un prefix NO default
+    // en el improbable caso de que el admin no haya corrido aún.
     $trackerId = (int) $connection['tracker_id'];
     if ($trackerId > 0) {
         $resolvedPrefix = $tikiClient->resolveFieldPrefix($trackerId);
         if ($resolvedPrefix !== $messageMapper->getFieldPrefix()) {
-            log_message("api.php: Field prefix corregido de '{$messageMapper->getFieldPrefix()}' a '{$resolvedPrefix}' para conexión '{$connectionSlug}'");
+            $msg = "api.php: Field prefix corregido de '{$messageMapper->getFieldPrefix()}' a '{$resolvedPrefix}' para conexión '{$connectionSlug}'";
+            log_message($msg);
             $messageMapper->setFieldPrefix($resolvedPrefix);
             $tikiClient->setFieldPrefix($resolvedPrefix);
-            // Persistir en setup.json para evitar re-detección en cada request
-            $cm = new ConfigManager();
-            $cm->updateConnectionFields($connectionSlug, ['field_prefix' => $resolvedPrefix]);
+            // Persistir solo si el prefix detectado no es el default (el admin ya lo corregiría si lo fuera)
+            if ($resolvedPrefix !== 'telegrammessage') {
+                $cm = new ConfigManager();
+                $cm->updateConnectionFields($connectionSlug, ['field_prefix' => $resolvedPrefix]);
+            }
         }
     }
 

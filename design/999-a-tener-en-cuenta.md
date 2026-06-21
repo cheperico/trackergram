@@ -165,7 +165,7 @@ Construye condiciones con `?` y `$bindvars` (trackerlib.php:3333).
 3. **Valores type-hinted** — `messageExists(int $messageId, ?int $chatId)` fuerza coerción a entero
 4. **Prefix validado** — solo `[a-z0-9]+` (admin lo sanitiza; auto-detección lee de campos TikiWiki que son alfanuméricos por definición)
 5. **Token por conexión** — cada conexión tiene su propio token TikiWiki, limitando daño si uno se compromete
-6. **Sin DB local** — cero superficie de ataque del lado de trackerGram
+6. **Sin DB con servidor** — cero superficie de ataque del lado de trackerGram. Estado local en JSON, no SQLite (binario, no human-editable, dependencia de ext-sqlite3).
 
 ---
 

@@ -280,6 +280,29 @@ foreach ($connections as $slug => $conn) {
         }
     }
 
+    // Auto-detectar field_prefix si es el default (telegrammessage) y nunca se procesó un mensaje
+    $trackerId = (int) ($conn['tracker_id'] ?? 0);
+    $storedPrefix = $conn['field_prefix'] ?? 'telegrammessage';
+    if ($storedPrefix === 'telegrammessage' && $trackerId > 0 && !empty($conn['tiki_api_url']) && !empty($conn['tiki_api_token'])) {
+        try {
+            $tikiClient = new TikiWikiClient(
+                apiUrl: $conn['tiki_api_url'],
+                token: $conn['tiki_api_token'],
+                timeout: TIMEOUT_TIKIWIKI_API,
+                uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
+            );
+            $resolvedPrefix = $tikiClient->resolveFieldPrefix($trackerId);
+            if ($resolvedPrefix !== 'telegrammessage') {
+                $updateFields['field_prefix'] = $resolvedPrefix;
+                $needsUpdate = true;
+                $connectionsSafe[$slug]['field_prefix'] = $resolvedPrefix;
+                log_message("admin: Field prefix auto-detectado como '{$resolvedPrefix}' para conexión '{$slug}' (tracker {$trackerId})");
+            }
+        } catch (Exception $e) {
+            log_message("admin: Error detectando field_prefix para {$slug}: " . $e->getMessage());
+        }
+    }
+
     if ($needsUpdate) {
         $configManager->updateConnectionFields($slug, $updateFields);
         // Refrescar en $connections para que los cards muestren los nuevos valores
@@ -576,6 +599,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $trackerId = (int) ($conn['tracker_id'] ?? 0);
                 $tikiResult = $tikiClient->checkPermissions($trackerId);
                 $results['tikiwiki'] = $tikiResult;
+                
+                // Auto-detectar field prefix si tracker_id es válido
+                if ($trackerId > 0) {
+                    $storedPrefix = $conn['field_prefix'] ?? 'telegrammessage';
+                    try {
+                        $resolvedPrefix = $tikiClient->resolveFieldPrefix($trackerId);
+                        if ($resolvedPrefix !== $storedPrefix) {
+                            $configManager->updateConnectionFields($slug, ['field_prefix' => $resolvedPrefix]);
+                            $results['prefix_detected'] = $resolvedPrefix;
+                            log_message("admin/test: Field prefix corregido de '{$storedPrefix}' a '{$resolvedPrefix}' para conexión '{$slug}'");
+                        }
+                    } catch (Exception $e) {
+                        log_message("admin/test: Error detectando field_prefix para {$slug}: " . $e->getMessage());
+                    }
+                }
             } else {
                 $results['tikiwiki'] = ['ok' => false, 'api_access' => false, 'file_gallery' => false, 'upload_files' => false, 'message' => 'Sin API URL o token'];
             }

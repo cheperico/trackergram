@@ -24,6 +24,13 @@
 - `$webhookStatuses` se computaba ANTES del bloque POST. Tras configurar webhook exitosamente, la página seguía mostrando el estado viejo (❌ No configurado).
 - Ahora, tras un `configure_webhook` exitoso, refresca `$webhookStatuses[$slug]` via `getWebhookInfo()` para que el tilde verde se refleje inmediatamente.
 
+### Docs: Reporte de arquitectura y escalabilidad + roadmap SQLite
+
+- `reports/architecture_scalability_2026-06.md`: nuevo reporte con 20 hallazgos clasificados P0-P3, 4 escenarios de escalabilidad, y tabla de recomendaciones por impacto/esfuerzo.
+- `roadmap.md`: item 14 refinado ("SQLite para cola async y rate limiting") como opcional/mínima prioridad/evaluación. Actualizada versión a v0.5.5. Aclarada exclusión de MySQL/PostgreSQL con servidor.
+
+---
+
 ### Fix: webhook_secret compartido entre conexiones con mismo bot_token
 
 - Un bot de Telegram tiene **un solo webhook** con **un solo secret_token**. Si dos conexiones usan el mismo `bot_token` pero distinto `webhook_secret`, al configurar el webhook para una se pisa la otra.
