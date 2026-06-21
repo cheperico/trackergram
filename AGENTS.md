@@ -41,7 +41,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 | | |
 |---|---|
-| **Versión** | v0.5.5 |
+| **Versión** | v0.5.6 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
 | **Repositorio** | https://github.com/cheperico/trackergram |
@@ -99,6 +99,8 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 - ✅ **Updates sin error 409**: `getUpdates()` parsea el body de Telegram y detecta webhook activo; el admin muestra mensaje informativo en vez de "error"
 - ✅ **Health check por conexión**: cada tarjeta en admin crea su propio `TelegramClient` (fix de leak de `$tgClient` entre conexiones)
 - ✅ **checkPermissions sin side effects**: test de `admin_file_galleries` usa `DELETE /api/galleries/99999999/delete` (galería inexistente), no crea galerías reales
+- ✅ **Fan-out con try-catch individual**: si una conexión falla en el fan-out (timeout, error TikiWiki), no rompe las demás conexiones. Log gea el error individualmente y responde 200 con resultados por conexión.
+- ✅ **Cache auto-detección field prefix**: flag `field_prefix_checked` evita que admin.php y api.php llamen a la API de TikiWiki en cada request. Se ejecuta UNA SOLA VEZ por conexión.
 
 ---
 
@@ -324,12 +326,18 @@ Desde v0.5.4, el sistema **detecta automáticamente el field prefix real** del t
 
 **Cómo funciona** (`TikiWikiClient::resolveFieldPriority()`):
 1. Si el prefix almacenado NO es `telegrammessage`, se confía en él (el usuario lo configuró explícitamente).
-2. Si es `telegrammessage` (default), fetchea `GET /api/trackers/{id}/fields`.
+2. Si es `telegrammessage` (default) y el flag `field_prefix_checked` no está presente, fetchea `GET /api/trackers/{id}/fields`.
 3. Busca campos con permNames que terminen en sufijos conocidos (`TelegramMessageId`, `ChatId`, `Text`, `MessageDate`, `Media`).
 4. Extrae el prefijo común del primer match.
 5. Si el detectado difiere del almacenado, lo persiste a `setup.json` vía `ConfigManager::updateConnectionFields()`.
+6. Siempre persiste `field_prefix_checked: true` para NO repetir la llamada API en futuros requests.
 
-**Cobertura**: webhook (api.php), async worker (worker.php), importación (import.php).
+**Cache (field_prefix_checked)**: desde v0.5.6, la auto-detección se ejecuta **UNA SOLA VEZ** por conexión. El flag `field_prefix_checked` se persiste en `setup.json` tras la primera detección (incluso si el prefix es `telegrammessage` o si la API de TikiWiki falla). Esto evita:
+
+- Llamadas API innecesarias en cada carga del admin (2 TikiWikis × 8 recargas = 16 llamadas → 2 llamadas o 0 si ya cacheadas)
+- Llamadas API en cada webhook entrante desde `api.php` / `worker.php`
+
+**Cobertura**: admin.php (carga de página), webhook (api.php), async worker (worker.php), importación (import.php).
 
 ### Nota sobre field prefix
 

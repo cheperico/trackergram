@@ -872,10 +872,10 @@ if (isset($_GET['edit'])) {
         
         /* Navbar */
         .navbar { background: var(--primary); color: white; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 56px; box-shadow: var(--shadow-lg); position: sticky; top: 0; z-index: 100; }
-        .navbar-brand { font-size: 1.2em; font-weight: 700; letter-spacing: -0.3px; color: white; text-decoration: none; padding: 0; border-radius: 0; }
-        .navbar-brand:hover { background: none; }
-        .navbar-brand:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 4px; }
-        .navbar-brand span { opacity: 0.85; font-weight: 400; }
+        a.navbar-brand { font-size: 1.2em; font-weight: 700; letter-spacing: -0.3px; color: white; text-decoration: none; padding: 0; border-radius: 0; }
+        a.navbar-brand:hover { background: none; }
+        a.navbar-brand:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 4px; }
+        a.navbar-brand span { opacity: 0.85; font-weight: 400; }
         .navbar-actions { display: flex; align-items: center; gap: 12px; }
         .navbar a { color: white; text-decoration: none; font-size: 0.9em; padding: 6px 12px; border-radius: 6px; transition: background 0.2s; }
         .navbar a:hover { background: rgba(255,255,255,0.15); }
@@ -1019,7 +1019,7 @@ if (isset($_GET['edit'])) {
         .view-toggle .btn { font-size: 0.85em; padding: 6px 16px; }
         @media (max-width: 600px) {
             .navbar { padding: 0 12px; }
-            .navbar-brand { font-size: 1em; }
+            a.navbar-brand { font-size: 1em; }
             .container { padding: 16px 12px; }
             .conn-actions { flex-direction: column; }
             .bot-header { flex-direction: column; align-items: flex-start; gap: 8px; }

@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| **Versión actual** | v0.5.5 |
+| **Versión actual** | v0.5.6 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Instancias activas** | Dev (tracker 26) · Prod (tracker 22) |
 | **Filosofía** | Sin DB con servidor · JSON files para estado local (no SQLite) · PHP puro sin framework · MVP pragmático |
@@ -49,7 +49,8 @@
 - ✅ **.env simplificado**: solo config global; credenciales en setup.json
 - ✅ **Service messages completos**: cobertura total webhook e import (incluye `remove_members`, `joined`, `new_chat_photo`, `delete_chat_photo`)
 - ✅ **Creación de tracker desde admin panel**: shell + fields + galería (auto o existente) + field prefix
-- ✅ **Fan-out**: mismo mensaje a múltiples trackers duplicando conexión
+- ✅ **Fan-out**: mismo mensaje a múltiples trackers duplicando conexión (con try-catch individual, error en una conexión no rompe las demás)
+- ✅ **Cache auto-detección field prefix**: flag `field_prefix_checked` evita llamadas API repetidas en cada carga de admin y cada webhook
 - ✅ **FG field options vía API**: `updateFgFieldOptions()` con `name`+`type` requeridos
 - ✅ **Auto-población bot_name/chat_title** en cards de conexión
 
@@ -142,4 +143,4 @@ Los documentos en `design/` contienen exploraciones detalladas de features que e
 
 Los reportes históricos en `reports/` se conservan como referencia de investigaciones pasadas. Los items accionables ya están consolidados en este documento.
 
-> **Última actualización**: 18/06/2026
+> **Última actualización**: 21/06/2026

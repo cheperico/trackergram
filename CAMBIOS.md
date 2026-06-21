@@ -1,5 +1,25 @@
 # Cambios - Changelog
 
+## v0.5.6
+
+### Fix: Auto-detección de field_prefix NO cacheada generaba llamadas API en cada page load
+
+- **admin.php**: La auto-detección de field_prefix se ejecutaba en CADA carga de página para cada conexión con prefix default `'telegrammessage'`. Si el prefix detectado también era `'telegrammessage'` (el caso más común), no se persistía nada, y la siguiente carga de página volvía a ejecutar la detección. Para 2 conexiones apuntando a 2 TikiWikis diferentes, eso significaba **2 llamadas API por cada refresh del admin**, lo que ralentizaba la interfaz y ocupaba procesos de Apache innecesariamente.
+- **Fix**: Agregado flag `field_prefix_checked` por conexión. La detección ahora se ejecuta UNA SOLA VEZ (cuando el flag no existe). Tras la detección (incluso si falla o si el prefix es `telegrammessage`), se persiste `field_prefix_checked: true` y no se vuelve a ejecutar. En pruebas de estrés, las 8 recargas del admin en 1 minuto pasaron de 16 llamadas API a 2 (o 0 si ya estaban cacheadas).
+- **Mismo fix aplicado en `api.php` y `worker.php`**: ambos verifican `field_prefix_checked` antes de llamar a `resolveFieldPrefix()`, evitando llamadas API innecesarias en cada webhook entrante.
+
+### Fix: Fan-out sin try-catch causaba 500 si una conexión fallaba
+
+- **api.php**: El loop de fan-out (`foreach $allFound as $found`) llamaba a `processUpdate()` sin try-catch. Si la segunda conexión (apuntando a un TikiWiki diferente) fallaba por timeout, error de autenticación o cualquier excepción, **todo el request devolvía 500**, aunque la primera conexión hubiera procesado el mensaje exitosamente.
+- **Fix**: Cada iteración del fan-out ahora envuelve `processUpdate()` en un `try { ... } catch (Throwable $e) { ... }`. La respuesta siempre es 200 con resultados individuales por conexión. Los errores se loggean internamente.
+
+### Fix: worker.php persistía field_prefix incluso cuando no cambiaba
+
+- **worker.php**: El bloque de auto-detección de field_prefix usaba `updateConnectionFields()` SOLO si el prefix detectado era diferente al actual, pero no respetaba el nuevo flag `field_prefix_checked`.
+- **Fix**: Alineado con el mismo patrón de api.php: verifica `field_prefix_checked` primero, y siempre persiste tanto el prefix como el flag (si corresponde).
+
+---
+
 ## v0.5.5
 
 ### Fix: checkPermissions sin crear galerías en TikiWiki

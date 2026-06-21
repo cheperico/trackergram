@@ -125,6 +125,7 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
 
     // 10. Fan-out: procesar el update para TODAS las conexiones que matcheen
     //     (útil cuando se duplica una conexión con diferente tracker_id)
+    $fanOutResults = [];
     foreach ($allFound as $found) {
         $connection = $found;
         $connectionSlug = $found['_slug'];
@@ -134,31 +135,37 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
         $messageMapper->setFieldPrefix($connection['field_prefix'] ?? 'telegrammessage');
         $useAsync = $connection['async_processing'] ?? ASYNC_PROCESSING;
 
-        if ($useAsync) {
-            // Modo async: escribir a buffer y responder rápido
-            $bufferDir = TEMP_DIR . '/buffer';
-            if (!is_dir($bufferDir)) {
-                @mkdir($bufferDir, 0700, true);
-            }
+        try {
+            if ($useAsync) {
+                // Modo async: escribir a buffer y responder rápido
+                $bufferDir = TEMP_DIR . '/buffer';
+                if (!is_dir($bufferDir)) {
+                    @mkdir($bufferDir, 0700, true);
+                }
 
-            $bufferData = [
-                'connection_slug' => $connectionSlug,
-                'update' => $update,
-            ];
-            $bufferFile = $bufferDir . '/event_' . time() . '_' . bin2hex(random_bytes(4)) . '.json';
-            $written = @file_put_contents($bufferFile, json_encode($bufferData), LOCK_EX);
-            if ($written === false) {
-                log_message("trackerGram: No se pudo escribir buffer async — procesando sincrónicamente", true);
+                $bufferData = [
+                    'connection_slug' => $connectionSlug,
+                    'update' => $update,
+                ];
+                $bufferFile = $bufferDir . '/event_' . time() . '_' . bin2hex(random_bytes(4)) . '.json';
+                $written = @file_put_contents($bufferFile, json_encode($bufferData), LOCK_EX);
+                if ($written === false) {
+                    log_message("trackerGram: No se pudo escribir buffer async — procesando sincrónicamente", true);
+                    processUpdate($update, $connection, $connectionSlug, $messageMapper);
+                }
+            } else {
+                // Modo sync: procesar inmediatamente
                 processUpdate($update, $connection, $connectionSlug, $messageMapper);
             }
-        } else {
-            // Modo sync: procesar inmediatamente
-            processUpdate($update, $connection, $connectionSlug, $messageMapper);
+            $fanOutResults[$connectionSlug] = 'ok';
+        } catch (Throwable $e) {
+            log_message("trackerGram: Error en fan-out para conexión '{$connectionSlug}': " . $e->getMessage(), true);
+            $fanOutResults[$connectionSlug] = 'error: ' . $e->getMessage();
         }
     }
 
-    // Responder 200 OK una sola vez para todo el fan-out
-    echo json_encode(['status' => 'ok']);
+    // Responder 200 OK con resultados individuales
+    echo json_encode(['status' => 'ok', 'connections' => $fanOutResults]);
 }
 
 /**
@@ -179,24 +186,21 @@ function processUpdate(array $update, array $connection, string $connectionSlug,
     $tikiClient->setFieldPrefix($connection['field_prefix'] ?? 'telegrammessage');
     $messageMapper->setFieldPrefix($connection['field_prefix'] ?? 'telegrammessage');
 
-    // Auto-detectar field prefix desde el tracker (corrige prefix mal guardado)
-    // NOTA: admin.php ya auto-detecta el prefix al cargar la página (si es 'telegrammessage'),
-    // así que este bloque solo persiste cuando se detecta un prefix NO default
-    // en el improbable caso de que el admin no haya corrido aún.
+    // Auto-detectar field prefix (UNA SOLA VEZ, cacheado con field_prefix_checked)
     $trackerId = (int) $connection['tracker_id'];
-    if ($trackerId > 0) {
+    $prefixChecked = !empty($connection['field_prefix_checked']);
+    if ($trackerId > 0 && !$prefixChecked) {
         $resolvedPrefix = $tikiClient->resolveFieldPrefix($trackerId);
+        $updateFields = ['field_prefix_checked' => true];
         if ($resolvedPrefix !== $messageMapper->getFieldPrefix()) {
             $msg = "api.php: Field prefix corregido de '{$messageMapper->getFieldPrefix()}' a '{$resolvedPrefix}' para conexión '{$connectionSlug}'";
             log_message($msg);
             $messageMapper->setFieldPrefix($resolvedPrefix);
             $tikiClient->setFieldPrefix($resolvedPrefix);
-            // Persistir solo si el prefix detectado no es el default (el admin ya lo corregiría si lo fuera)
-            if ($resolvedPrefix !== 'telegrammessage') {
-                $cm = new ConfigManager();
-                $cm->updateConnectionFields($connectionSlug, ['field_prefix' => $resolvedPrefix]);
-            }
+            $updateFields['field_prefix'] = $resolvedPrefix;
         }
+        $cm = new ConfigManager();
+        $cm->updateConnectionFields($connectionSlug, $updateFields);
     }
 
     $tgClient = new TelegramClient(
