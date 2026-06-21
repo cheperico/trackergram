@@ -13,6 +13,22 @@
 - **api.php**: El loop de fan-out (`foreach $allFound as $found`) llamaba a `processUpdate()` sin try-catch. Si la segunda conexión (apuntando a un TikiWiki diferente) fallaba por timeout, error de autenticación o cualquier excepción, **todo el request devolvía 500**, aunque la primera conexión hubiera procesado el mensaje exitosamente.
 - **Fix**: Cada iteración del fan-out ahora envuelve `processUpdate()` en un `try { ... } catch (Throwable $e) { ... }`. La respuesta siempre es 200 con resultados individuales por conexión. Los errores se loggean internamente.
 
+### Fix: Error histórico de webhook (stale) se mostraba como error actual
+
+- **admin.php**: Los 4 lugares que mostraban `last_error_message` de `getWebhookInfo()` no verificaban si el error era antiguo. Telegram nunca borra `last_error_message` — solo lo actualiza cuando ocurre un NUEVO error. Si el webhook se recupera, el error viejo sigue apareciendo.
+- **Fix**: Comparar `last_successful_synchronization` vs `last_error_date`. Si hubo una sincronización exitosa DESPUÉS del último error, se muestra como "error histórico (recuperado)" en vez de error activo. Aplica a: cards de conexión (PHP), post-configuración de webhook (PHP), test de conexión (JS), test del bot (JS).
+
+### Fix: Foto perdida en álbum (media group) por falta de reintentos
+
+- **WebhookHandler::downloadAndUploadMedia()**: No tenía reintentos. Cuando 3 fotos de un álbum llegan como webhooks casi simultáneos, cada una se procesa en un proceso de Apache independiente. Si una falla transitoriamente (timeout, error de red, contención con TikiWiki), el mensaje se guardaba SIN la foto pero CON el texto.
+- **Fix**: `downloadAndUploadMedia()` ahora es un wrapper con reintentos (hasta 3 intentos con backoff progresivo 500ms + 1000ms). El intento único se movió a `attemptDownloadAndUpload()`. Si los 3 intentos fallan, recién ahí se guarda sin foto.
+- **Test case real**: Álbum de 3 fotos con caption en la primera. La foto del medio (photo_195) se perdió. Con reintentos, el error hubiera sido transitorio y se hubiera recuperado.
+
+### Fix: Race condition en cache de captions de álbumes
+
+- **media_group_captions.json**: `loadMediaGroupCaptions()` leía el archivo con `file_get_contents()` SIN lock. `saveMediaGroupCaptions()` escribía con `LOCK_EX`. En concurrencia (3 webhooks simultáneos), un proceso podía leer datos vacíos/parciales mientras otro escribía.
+- **Fix**: `loadMediaGroupCaptions()` ahora usa `fopen()` + `flock(LOCK_SH)` para lectura, bloqueando si otro proceso está escribiendo. Esto garantiza que la lectura siempre vea el último estado consistente.
+
 ### Fix: worker.php persistía field_prefix incluso cuando no cambiaba
 
 - **worker.php**: El bloque de auto-detección de field_prefix usaba `updateConnectionFields()` SOLO si el prefix detectado era diferente al actual, pero no respetaba el nuevo flag `field_prefix_checked`.

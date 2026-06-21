@@ -50,7 +50,7 @@ class WebhookHandler
     }
 
     /**
-     * Descargar archivo de Telegram y subir a TikiWiki
+     * Descargar archivo de Telegram y subir a TikiWiki (con reintentos)
      * Con límite real: usa WRITEFUNCTION para contar bytes y abortar si excede
      */
     public function downloadAndUploadMedia(NormalizedMessage $msg): ?string
@@ -59,9 +59,29 @@ class WebhookHandler
             return null;
         }
 
+        for ($attempt = 0; $attempt < $this->retryMaxAttempts; $attempt++) {
+            $result = $this->attemptDownloadAndUpload($msg);
+            if ($result !== null) {
+                return $result;
+            }
+            if ($attempt < $this->retryMaxAttempts - 1) {
+                $sleepMs = 500 + ($attempt * 500);
+                log_message("trackerGram: Reintentando download/upload para file_id={$msg->fileId} (intento " . ($attempt + 2) . "/{$this->retryMaxAttempts}, espera {$sleepMs}ms)");
+                usleep($sleepMs * 1000);
+            }
+        }
+        log_message("trackerGram: Download/upload FALLÓ tras {$this->retryMaxAttempts} intentos para file_id={$msg->fileId}", true);
+        return null;
+    }
+
+    /**
+     * Intento único de descargar y subir (llamado desde downloadAndUploadMedia con reintentos)
+     */
+    private function attemptDownloadAndUpload(NormalizedMessage $msg): ?string
+    {
         $fileUrl = $this->telegramClient->getFileUrl($msg->fileId);
         if (!$fileUrl) {
-            log_message("trackerGram: Cannot get download URL for file: {$msg->fileId}", true);
+            log_message("trackerGram: Cannot get download URL for file: {$msg->fileId}");
             return null;
         }
 
@@ -119,7 +139,7 @@ class WebhookHandler
             if ($aborted) {
                 log_message("trackerGram: File too large (>={$maxSize} bytes) for file_id: {$msg->fileId}", true);
             } else {
-                log_message("trackerGram: Cannot download file from Telegram: {$msg->fileId} (HTTP $httpCode)", true);
+                log_message("trackerGram: Cannot download file from Telegram: {$msg->fileId} (HTTP $httpCode)");
             }
             return null;
         }
@@ -457,7 +477,13 @@ class WebhookHandler
     {
         $file = $this->getMediaGroupCaptionFile();
         if (!file_exists($file)) return [];
-        $data = json_decode(file_get_contents($file), true);
+        $fp = fopen($file, 'r');
+        if (!$fp) return [];
+        flock($fp, LOCK_SH); // Read lock: espera si otro proceso está escribiendo
+        $content = stream_get_contents($fp);
+        flock($fp, LOCK_UN);
+        fclose($fp);
+        $data = json_decode($content, true);
         return is_array($data) ? $data : [];
     }
 

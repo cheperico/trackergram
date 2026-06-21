@@ -339,8 +339,15 @@ foreach ($connections as $slug => $conn) {
                     $status['ok'] = false;
                 }
                 if (!empty($wh['last_error_message'])) {
-                    $status['label'] = '❌ Error: ' . substr($wh['last_error_message'], 0, 40);
-                    $status['ok'] = false;
+                    $lastErrorDate = (int) ($wh['last_error_date'] ?? 0);
+                    $lastSuccessDate = (int) ($wh['last_successful_synchronization'] ?? 0);
+                    if ($lastSuccessDate > 0 && $lastSuccessDate > $lastErrorDate) {
+                        // Error antiguo — webhook funciona correctamente desde entonces
+                        $status['label'] = $urlMatch ? '✅ (error histórico)' : ('⚠️ ' . parse_url($wh['url'], PHP_URL_HOST));
+                    } else {
+                        $status['label'] = '❌ Error: ' . substr($wh['last_error_message'], 0, 40);
+                        $status['ok'] = false;
+                    }
                 }
             } else {
                 $status['label'] = '❌ No configurado';
@@ -542,8 +549,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $wh = $whClient->getWebhookInfo();
                     $status = ['ok' => !empty($wh['url']), 'label' => '✅', 'pending' => (int) ($wh['pending_update_count'] ?? 0)];
                     if (!empty($wh['last_error_message'])) {
-                        $status['label'] = '❌ ' . substr($wh['last_error_message'], 0, 40);
-                        $status['ok'] = false;
+                        $lastErrorDate = (int) ($wh['last_error_date'] ?? 0);
+                        $lastSuccessDate = (int) ($wh['last_successful_synchronization'] ?? 0);
+                        if ($lastSuccessDate > 0 && $lastSuccessDate > $lastErrorDate) {
+                            $status['label'] = '✅ (error histórico)';
+                        } else {
+                            $status['label'] = '❌ ' . substr($wh['last_error_message'], 0, 40);
+                            $status['ok'] = false;
+                        }
                     } elseif ($wh['pending_update_count'] > 10) {
                         $status['label'] = '⚠️ ' . $wh['pending_update_count'] . ' pend.';
                         $status['ok'] = false;
@@ -1604,7 +1617,10 @@ function testConnection(slug, btn) {
                 whLines.push('URL: ' + wh.url);
                 whLines.push('Updates pendientes: ' + (wh.pending_update_count || 0));
                 if (wh.last_error_message) {
-                    whLines.push('⚠️ Último error: ' + wh.last_error_message);
+                    var errorStale = wh.last_successful_synchronization && wh.last_error_date && wh.last_successful_synchronization > wh.last_error_date;
+                    if (!errorStale) {
+                        whLines.push('⚠️ Último error: ' + wh.last_error_message);
+                    }
                 }
                 if (wh.pending_update_count > 10) {
                     whLines.push('⚠️ ' + wh.pending_update_count + ' updates encolados — el webhook puede estar caído');
@@ -1742,8 +1758,13 @@ function testBotConnection(slug, btn) {
                 var whMsg = 'URL: ' + wh.url;
                 whMsg += ' | Pendientes: ' + (wh.pending_update_count || 0);
                 if (wh.last_error_message) {
-                    whMsg += ' | ⚠️ ' + wh.last_error_message;
-                    allOk = false;
+                    var errorStale = wh.last_successful_synchronization && wh.last_error_date && wh.last_successful_synchronization > wh.last_error_date;
+                    if (errorStale) {
+                        whMsg += ' | ⚠️ Error histórico (recuperado)';
+                    } else {
+                        whMsg += ' | ⚠️ ' + wh.last_error_message;
+                        allOk = false;
+                    }
                 }
                 if (wh.pending_update_count > 10) {
                     whMsg += ' | ⚠️ Updates encolados';
