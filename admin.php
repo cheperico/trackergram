@@ -280,10 +280,11 @@ foreach ($connections as $slug => $conn) {
         }
     }
 
-    // Auto-detectar field_prefix si es el default (telegrammessage) y nunca se procesó un mensaje
+    // Auto-detectar field_prefix UNA SOLA VEZ por conexión (cacheado con flag field_prefix_checked)
     $trackerId = (int) ($conn['tracker_id'] ?? 0);
     $storedPrefix = $conn['field_prefix'] ?? 'telegrammessage';
-    if ($storedPrefix === 'telegrammessage' && $trackerId > 0 && !empty($conn['tiki_api_url']) && !empty($conn['tiki_api_token'])) {
+    $prefixChecked = !empty($conn['field_prefix_checked']);
+    if ($storedPrefix === 'telegrammessage' && !$prefixChecked && $trackerId > 0 && !empty($conn['tiki_api_url']) && !empty($conn['tiki_api_token'])) {
         try {
             $tikiClient = new TikiWikiClient(
                 apiUrl: $conn['tiki_api_url'],
@@ -294,12 +295,19 @@ foreach ($connections as $slug => $conn) {
             $resolvedPrefix = $tikiClient->resolveFieldPrefix($trackerId);
             if ($resolvedPrefix !== 'telegrammessage') {
                 $updateFields['field_prefix'] = $resolvedPrefix;
-                $needsUpdate = true;
                 $connectionsSafe[$slug]['field_prefix'] = $resolvedPrefix;
                 log_message("admin: Field prefix auto-detectado como '{$resolvedPrefix}' para conexión '{$slug}' (tracker {$trackerId})");
+            } else {
+                log_message("admin: Field prefix verificado como 'telegrammessage' para conexión '{$slug}' (tracker {$trackerId})");
             }
+            // Marcar como verificado para NO repetir la llamada API en cada page load
+            $updateFields['field_prefix_checked'] = true;
+            $needsUpdate = true;
         } catch (Exception $e) {
             log_message("admin: Error detectando field_prefix para {$slug}: " . $e->getMessage());
+            // Marcar como verificado igual para no reintentar si TikiWiki está caído
+            $updateFields['field_prefix_checked'] = true;
+            $needsUpdate = true;
         }
     }
 
@@ -864,7 +872,9 @@ if (isset($_GET['edit'])) {
         
         /* Navbar */
         .navbar { background: var(--primary); color: white; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 56px; box-shadow: var(--shadow-lg); position: sticky; top: 0; z-index: 100; }
-        .navbar-brand { font-size: 1.2em; font-weight: 700; letter-spacing: -0.3px; }
+        .navbar-brand { font-size: 1.2em; font-weight: 700; letter-spacing: -0.3px; color: white; text-decoration: none; padding: 0; border-radius: 0; }
+        .navbar-brand:hover { background: none; }
+        .navbar-brand:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 4px; }
         .navbar-brand span { opacity: 0.85; font-weight: 400; }
         .navbar-actions { display: flex; align-items: center; gap: 12px; }
         .navbar a { color: white; text-decoration: none; font-size: 0.9em; padding: 6px 12px; border-radius: 6px; transition: background 0.2s; }
@@ -1024,8 +1034,9 @@ if (isset($_GET['edit'])) {
 
 <!-- Navbar -->
 <nav class="navbar" aria-label="Navegación principal">
-    <div class="navbar-brand" aria-hidden="true">trackerGram <span>Admin</span></div>
-    <span class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">trackerGram Admin</span>
+    <a href="admin.php" class="navbar-brand" aria-label="Volver al inicio (pestaña Webhook)">
+        trackerGram <span>Admin <span style="font-weight:400;font-size:0.65em;opacity:0.6;margin-left:4px;"><?php echo TRACKERGRAM_VERSION; ?></span></span>
+    </a>
     <div class="navbar-actions">
         <a href="?action=logout" aria-label="Cerrar sesión de administrador">Cerrar sesion</a>
     </div>
