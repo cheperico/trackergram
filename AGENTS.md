@@ -289,31 +289,31 @@ El tracker por defecto tiene estos campos (permNames):
 
 | PermName | Tipo | Descripción |
 |---|---|---|
-| `telegrammessageTelegramMessageId` | t (text) | ID del mensaje en Telegram |
-| `telegrammessageChatId` | t (text) | ID del chat |
-| `telegrammessageChatTitle` | t (text) | Título del chat |
-| `telegrammessageTopicId` | t (text) | ID del topic/forum |
-| `telegrammessageTopicTitle` | t (text) | Nombre del topic |
-| `telegrammessageUserId` | t (text) | ID del usuario de Telegram |
-| `telegrammessageUsername` | t (text) | Username |
-| `telegrammessageFirstName` | t (text) | Nombre |
-| `telegrammessageLastName` | t (text) | Apellido |
-| `telegrammessageDisplayName` | t (text) | Nombre para mostrar (unificado: webhook concatena firstName+lastName, import copia from original) |
-| `telegrammessageMessageType` | t (text) | Tipo: text, photo, video, etc. |
-| `telegrammessageText` | a (textarea) | Contenido del mensaje |
-| `telegrammessageLocation` | G (geolocation) | Coordenadas GPS (lon,lat,zoom) |
-| `telegrammessageMediaType` | t (text) | MIME type del media |
+| `telegrammessageTelegramMessageId` | t (text) | ID único del mensaje en Telegram |
+| `telegrammessageChatId` | t (text) | ID del chat/grupo en Telegram |
+| `telegrammessageChatTitle` | t (text) | Título del chat o grupo |
+| `telegrammessageTopicId` | t (text) | ID del tema/foro (0 si es General) |
+| `telegrammessageTopicTitle` | t (text) | Nombre del tema/foro |
+| `telegrammessageUserId` | t (text) | ID numérico del usuario que envió el mensaje |
+| `telegrammessageUsername` | t (text) | @username del usuario en Telegram |
+| `telegrammessageFirstName` | t (text) | Nombre del usuario (en import: display name completo) |
+| `telegrammessageLastName` | t (text) | Apellido del usuario (solo disponible en webhook) |
+| `telegrammessageDisplayName` | t (text) | Nombre completo para mostrar (unificado webhook e import) |
+| `telegrammessageMessageType` | t (text) | Tipo: text, photo, video, audio, document, sticker, voice, system, etc. |
+| `telegrammessageText` | a (textarea) | Contenido del mensaje (incluye captions de media) |
+| `telegrammessageLocation` | G (geolocation) | Coordenadas GPS (lon, lat, zoom) |
+| `telegrammessageMediaType` | t (text) | Tipo MIME del archivo adjunto |
 | `telegrammessageMediaSize` | n (number) | Tamaño del archivo en bytes |
-| `telegrammessageMediaCaption` | t (text) | Caption del media |
+| `telegrammessageMediaCaption` | t (text) | Texto de descripción del archivo multimedia |
 | `telegrammessageMessageDate` | f (datetime) | Fecha/hora del mensaje (timestamp UNIX) |
-| `telegrammessageMedia` | FG (file gallery) | Referencia al archivo subido |
+| `telegrammessageMedia` | FG (file gallery) | Archivo multimedia adjunto (referencia a File Gallery) |
 | `telegrammessageMediaUrl` | t (text) | URL pública del archivo en TikiWiki |
-| `telegrammessageFileUrl` | t (text) | URL del archivo original en Telegram |
+| `telegrammessageFileUrl` | t (text) | URL original del archivo en Telegram |
 | `telegrammessageMediaWidth` | n (number) | Ancho del media en píxeles |
 | `telegrammessageMediaHeight` | n (number) | Alto del media en píxeles |
 | `telegrammessageMediaDuration` | DUR (duration) | Duración en segundos (audio/video/voice), se muestra como hh:mm:ss |
-| `telegrammessageEditedDate` | t (text) | Unix timestamp de última edición (se muestra condicionalmente via Pretty Tracker) |
-| `telegrammessageReplyToId` | t (text) | ID del mensaje al que responde (con link a vista filtrada via Pretty Tracker) |
+| `telegrammessageEditedDate` | t (text) | Unix timestamp de última edición (vacío si no editado) |
+| `telegrammessageReplyToId` | t (text) | ID del mensaje al que responde |
 | `telegrammessageReactions` | t (text) | Reacciones formateadas como texto legible (👍 3 · ❤️ 1) |
 
 ### Auto-detección de field prefix
@@ -338,6 +338,17 @@ Desde v0.5.4, el sistema **detecta automáticamente el field prefix real** del t
 - Llamadas API en cada webhook entrante desde `api.php` / `worker.php`
 
 **Cobertura**: admin.php (carga de página), webhook (api.php), async worker (worker.php), importación (import.php).
+
+### Nota sobre IDs negativos en exports de Telegram
+
+Los exports de Telegram Desktop (`result.json`) pueden contener **IDs de mensaje negativos** para mensajes de grupos comunes (basic groups) que luego migraron a supergrupo. Esto no es un error:
+
+- **IDs negativos** (ej: `-999910510`): mensajes del grupo **original** (antes de migración a supergrupo)
+- **IDs positivos** (ej: `1`, `2`...): mensajes del **supergrupo** (después de migración)
+- La frontera está marcada por service messages `migrate_to_supergroup` / `migrate_from_group`
+- El chat_id del grupo original puede diferir del chat_id del supergrupo
+
+El webhook (Bot API) siempre devuelve IDs positivos y el chat_id con prefijo `-100`. La deduplicación por `(chat_id, message_id)` funciona correctamente porque los rangos negativos y positivos no se solapan.
 
 ### Nota sobre field prefix
 

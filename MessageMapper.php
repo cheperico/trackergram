@@ -34,7 +34,18 @@ class MessageMapper
         $msg->messageId = (string) ($message['message_id'] ?? '');
         $msg->text = $message['text'] ?? '';
         $msg->editedDate = (string) ($message['edit_date'] ?? '');
-        $msg->replyToId = (string) ($message['reply_to_message']['message_id'] ?? '');
+        // Ignorar reply_to si apunta a un mensaje de sistema de topics (forum_topic_*)
+        $replyToMsg = $message['reply_to_message'] ?? null;
+        if ($replyToMsg) {
+            $topicKeys = ['forum_topic_created', 'forum_topic_edited', 'forum_topic_closed', 'forum_topic_reopened'];
+            $isTopicMsg = false;
+            foreach ($topicKeys as $k) {
+                if (isset($replyToMsg[$k])) { $isTopicMsg = true; break; }
+            }
+            $msg->replyToId = $isTopicMsg ? '' : (string) ($replyToMsg['message_id'] ?? '');
+        } else {
+            $msg->replyToId = '';
+        }
 
         if (isset($message['photo'])) {
             $photo = end($message['photo']);

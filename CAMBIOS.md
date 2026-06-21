@@ -2,6 +2,12 @@
 
 ## v0.5.6
 
+### Fix: Chat_id sin prefijo `-100` en import de supergrupos
+
+- **import.php**: El `id` raíz del export JSON de Telegram Desktop omite el prefijo `-100` para supergrupos (ej: `4299700952` en vez de `-1004299700952`). El webhook no tiene este problema porque recibe el chat_id directo de la Bot API.
+- **Fix**: En `handleExtract()` y `handleFull()`, detectar `$data['type'] === 'private_supergroup'` o `'private_channel'` y anteponer `-100` al `id` raíz.
+- **Nota**: Solución parcial. Si el export incluye una migración grupo→supergrupo, los mensajes pre-migración tienen IDs negativos con un chat_id diferente. Ver roadmap item #6.
+
 ### Fix: Auto-detección de field_prefix NO cacheada generaba llamadas API en cada page load
 
 - **admin.php**: La auto-detección de field_prefix se ejecutaba en CADA carga de página para cada conexión con prefix default `'telegrammessage'`. Si el prefix detectado también era `'telegrammessage'` (el caso más común), no se persistía nada, y la siguiente carga de página volvía a ejecutar la detección. Para 2 conexiones apuntando a 2 TikiWikis diferentes, eso significaba **2 llamadas API por cada refresh del admin**, lo que ralentizaba la interfaz y ocupaba procesos de Apache innecesariamente.

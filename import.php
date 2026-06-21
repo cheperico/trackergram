@@ -569,6 +569,15 @@ function handleProcess(): void
 
         $normalized = $messageMapper->fromExport($msg, $context);
 
+        // Ignorar reply_to si el mensaje original es un topic message (forum_topic_*)
+        if ($normalized->replyToId !== '') {
+            $replyTopicId = (int) $normalized->replyToId;
+            if (isset($topics[$replyTopicId])) {
+                log_message("trackerGram import: reply_to message_id={$replyTopicId} es topic message, ignorado");
+                $normalized->replyToId = '';
+            }
+        }
+
         // Resolver reply_to: buscar el tracker itemId del mensaje original
         $replyToId = $normalized->replyToId;
         if ($replyToId !== '') {
@@ -919,6 +928,15 @@ function handleFull(): void
         ];
 
         $normalized = $messageMapper->fromExport($msg, $context);
+
+        // Ignorar reply_to si el mensaje original es un topic message (forum_topic_*)
+        if ($normalized->replyToId !== '') {
+            $replyTopicId = (int) $normalized->replyToId;
+            if (isset($topics[$replyTopicId])) {
+                log_message("trackerGram import: reply_to message_id={$replyTopicId} es topic message, ignorado");
+                $normalized->replyToId = '';
+            }
+        }
 
         // Resolver reply_to: buscar el tracker itemId del mensaje original
         $replyToId = $normalized->replyToId;

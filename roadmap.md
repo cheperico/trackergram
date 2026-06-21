@@ -53,6 +53,7 @@
 - ✅ **Cache auto-detección field prefix**: flag `field_prefix_checked` evita llamadas API repetidas en cada carga de admin y cada webhook
 - ✅ **FG field options vía API**: `updateFgFieldOptions()` con `name`+`type` requeridos
 - ✅ **Auto-población bot_name/chat_title** en cards de conexión
+- ✅ **Chat_id con -100 en import**: corrección del prefijo `-100` para supergrupos (el export JSON de Telegram Desktop omite el `-100` en el `id` raíz)
 
 ---
 
@@ -65,6 +66,7 @@ Items con impacto inmediato en la operación del día a día.
 | # | Item | Esfuerzo | Notas |
 |   |------|----------|-------|
 | 1 | **Hashtags como etiquetas** | 1 sesión | Extraer `#tags` a campo separado. Mejora búsqueda en TikiWiki. |
+| 2 | **Detección de migración grupo→supergrupo en webhook** | 1 sesión | Detectar `migrate_to_chat_id` en updates de Telegram y actualizar `chat_id` en `setup.json` automáticamente. Sin esto, si el grupo migra, el webhook deja de reconocerlo. También manejar error 400 de Bot API con `parameters.migrate_to_chat_id`. |
 
 ### 🟡 Fase 2: Robustez (1-2 semanas)
 
@@ -75,26 +77,28 @@ Items con impacto inmediato en la operación del día a día.
 | 4 | **Verificación post-creación de FG field** | 1 sesión | Tras `updateFgFieldOptions()`, GET /fields para confirmar que galleryId se guardó (workaround del bug de TikiWiki que siempre responde con options viejas). |
 | 5 | **Reproducción de mensajes previos a nuevo tracker** | 2 sesiones | Script/acción para re-enviar mensajes anteriores de un chat a un tracker recién creado. |
 
-### 🟢 Fase 3: Features grandes (mediano plazo)
+### 🟢 Fase 3: Features grandes / robustez (mediano plazo)
 
 | # | Item | Esfuerzo | Dependencias |
 |---|------|----------|--------------|
-| 6 | **Mensajes estructurados con prefijos** | 2-3 sesiones | Parser en MessageMapper para mensajes tipo `GPS user coord` o `#tag texto`. |
-| 7 | **Manejo de errores estandarizado** | 2-3 sesiones | Excepciones de dominio (`ConfigException`, `TelegramException`, `TikiWikiException`, `ImportException`). |
-| 8 | **Import CLI asíncrono** | 2 sesiones | Script CLI para exports grandes sin timeout HTTP. |
+| 6 | **Chat_id unificado para imports con migración** | 2 sesiones | Los exports de Telegram pueden incluir migración grupo→supergrupo. Los mensajes pre-migración tienen IDs negativos, los post-migración IDs positivos. El chat_id también cambia. Decidir estrategia (un solo chat_id para todo el grupo, o bifurcar) e implementar detección de service messages `migrate_to_supergroup`/`migrate_from_group`. |
+| 6b | **Mostrar texto del mensaje al que responde** (replyToText) | 1-2 sesiones | Agregar campo `replyToText` al tracker y poblarlo desde `MessageMapper`: en webhook extraer `reply_to_message.text/caption` (viene completo gratis), en import buscar el mensaje original ya importado en el tracker y copiar su texto. Ver `opt/visualizacion-lcc2026.md` y diseño en `AGENTS.md` sección de replies. Prioridad media. |
+| 7 | **Mensajes estructurados con prefijos** | 2-3 sesiones | Parser en MessageMapper para mensajes tipo `GPS user coord` o `#tag texto`. |
+| 8 | **Manejo de errores estandarizado** | 2-3 sesiones | Excepciones de dominio (`ConfigException`, `TelegramException`, `TikiWikiException`, `ImportException`). |
+| 9 | **Import CLI asíncrono** | 2 sesiones | Script CLI para exports grandes sin timeout HTTP. |
 
 ### 🔵 Fase 4: Visión (largo plazo)
 
 | # | Item | Esfuerzo | Notas |
 |---|------|----------|-------|
-| 9 | **Mini App** (Telegram Web App) | 5+ sesiones | Frontend embebido + backend. Formulario rico. Ver `design/002-MiniApp.md`. |
-| 10 | **Dashboard de métricas** | 2-3 sesiones | Mensajes procesados, errores, media subidos por conexión. |
-| 11 | **Tests unitarios** | Continuo | MessageMapper, WebhookHandler, clientes. |
-| 12 | **PSR-4 autoloading** | 1 sesión | Mover clases a `src/`, autoloader. |
-| 13 | **Transcripción de voz / OCR** | 3-4 sesiones | Whisper + OCR. Dependencias externas. |
-| 14 | **SQLite para cola async y rate limiting** (evaluación) | 1 sesión | **Opcional.** Evaluar si vale la pena migrar tmp/buffer/ y rate limiting de archivos JSON a SQLite. Prioridad mínima — los archivos actuales funcionan para el volumen esperado. No aplica a setup.json ni topic cache. |
-| 15 | **Rotación de logs por fecha** | 1 sesión | Además de por tamaño. |
-| 16 | **Expulsar bot desde admin panel** | 1 sesión | Botón para sacar el bot de un grupo directamente desde la interface, sin tener que hacerlo desde Telegram. |
+| 10 | **Mini App** (Telegram Web App) | 5+ sesiones | Frontend embebido + backend. Formulario rico. Ver `design/002-MiniApp.md`. |
+| 11 | **Dashboard de métricas** | 2-3 sesiones | Mensajes procesados, errores, media subidos por conexión. |
+| 12 | **Tests unitarios** | Continuo | MessageMapper, WebhookHandler, clientes. |
+| 13 | **PSR-4 autoloading** | 1 sesión | Mover clases a `src/`, autoloader. |
+| 14 | **Transcripción de voz / OCR** | 3-4 sesiones | Whisper + OCR. Dependencias externas. |
+| 15 | **SQLite para cola async y rate limiting** (evaluación) | 1 sesión | **Opcional.** Evaluar si vale la pena migrar tmp/buffer/ y rate limiting de archivos JSON a SQLite. Prioridad mínima — los archivos actuales funcionan para el volumen esperado. No aplica a setup.json ni topic cache. |
+| 16 | **Rotación de logs por fecha** | 1 sesión | Además de por tamaño. |
+| 17 | **Expulsar bot desde admin panel** | 1 sesión | Botón para sacar el bot de un grupo directamente desde la interface, sin tener que hacerlo desde Telegram. |
 
 ---
 
