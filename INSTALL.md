@@ -196,8 +196,6 @@ Estos límites se definen como constantes en `config.php`:
 
 ---
 
----
-
 ## Paso 6 (Opcional): Configurar la Vista Wiki Feed
 
 trackerGram incluye una plantilla Smarty para mostrar los mensajes del tracker como un feed tipo chat en una página wiki de TikiWiki.
@@ -222,7 +220,7 @@ Ver [opt/visualizacion-tiki.md](opt/visualizacion-tiki.md) para la documentació
 | Problema | Qué hacer |
 |---|---|
 | **500 Internal Server Error** | Revisá logs de Apache y sintaxis PHP: `php -l api.php` |
-| **Webhook no responde** | Verificá que la URL sea pública con HTTPS. Probá con `curl -I https://tu-dominio.com/api.php` |
+| **Webhook no responde** | Verificá que la URL sea pública con HTTPS. Probá con `curl -I https://tu-dominio.com/trackergram/api.php` |
 | **Error al conectar a TikiWiki** | Usá el botón "🧪 Test" en la conexión para verificar las credenciales |
 | **Mensajes duplicados** | Verificá que el webhook secret esté bien configurado en la conexión |
 | **Contraseña de admin olvidada** | Editá `.env` y cambiá `ADMIN_PASSWORD` manualmente |

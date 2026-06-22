@@ -15,6 +15,27 @@ Puente entre Telegram y TikiWiki. Recibe mensajes de un grupo de Telegram y los 
 - **Crea trackers automáticamente**: No necesitás configurar los campos a mano
 - **Multi-conexión**: Un mismo webhook atiende múltiples bots, wikis y trackers. Cada conexión se rutea por `(chat_id + webhook_secret)`. Compartir el mismo `bot_token` entre conexiones es válido (el `webhook_secret` se reusa automáticamente).
 
+## Qué Necesitás Antes de Empezar
+
+1. **Un bot de Telegram** — Se crea gratis hablando con [@BotFather](https://t.me/BotFather). Necesitás el token.
+2. **Un TikiWiki 21.x+** — Con la API habilitada, un token de acceso y un tracker (o dejá que trackerGram lo cree automáticamente).
+3. **Un servidor con PHP 8.0+** — Apache o Nginx, accesible desde internet con HTTPS.
+
+Cada vinculación (bot + wiki + tracker) se configura desde el panel de admin como una **conexión**. Podés tener múltiples bots y wikis desde una misma instalación.
+
+## Instalación Rápida
+
+1. Copiá los archivos de trackerGram a tu servidor web
+2. Copiá `.env.example` a `.env` y completá solo usuario/contraseña de admin
+3. Accedé al panel de administración: `https://tu-dominio.com/trackergram/admin.php`
+4. Creá una **conexión** desde el panel: nombre, bot token, webhook secret, TikiWiki URL, token y tracker ID
+5. Configurá el webhook con un clic desde la misma conexión (botón "🌐 Webhook")
+   - Si ya hay otra conexión con el mismo `bot_token`, el `webhook_secret` se reusa automáticamente
+6. Verificá que funcione con el botón "🧪 Test"
+7. Agregá el bot al grupo de Telegram — ¡los mensajes empiezan a llegar al tracker automáticamente!
+
+Para instrucciones detalladas, incluyendo cómo crear el bot, configurar permisos de TikiWiki y configurar el tracker, ver [INSTALL.md](INSTALL.md).
+
 ## Tipos de Mensaje Soportados
 
 ### Contenido de mensajes
@@ -37,12 +58,14 @@ Puente entre Telegram y TikiWiki. Recibe mensajes de un grupo de Telegram y los 
 ### Eventos del grupo (service messages)
 
 | Evento | Webhook | Import | Descripción |
-|---|---|---|---|
+|---|---|---|---|---|
 | `forum_topic_created` | ✅ | ✅ | Topic creado |
 | `forum_topic_edited` | ✅ | ✅ | Topic renombrado |
 | `forum_topic_closed` | ✅ | ✅ | Topic cerrado |
 | `forum_topic_reopened` | ✅ | ✅ | Topic reabierto |
 | `group_chat_created` | ✅ | ✅ | Grupo creado |
+| `migrate_to_supergroup` | 🚫 | ✅ | Grupo migra a supergrupo (solo en imports históricos) |
+| `migrate_from_group` | 🚫 | ✅ | Inicio de supergrupo post-migración (solo en imports históricos) |
 | `new_chat_title` | ✅ | ✅ | Título del grupo cambiado |
 | `new_chat_photo` | ✅ | ✅ | Foto del grupo actualizada |
 | `delete_chat_photo` | ✅ | ✅ | Foto del grupo eliminada |
@@ -61,6 +84,28 @@ Puente entre Telegram y TikiWiki. Recibe mensajes de un grupo de Telegram y los 
 | `message_reaction_count` | ✅ | ✅ (embebidas) | Conteo de reacciones |
 
 > **Nota**: Las reacciones en importación vienen embebidas como campo `reactions[]` dentro de cada mensaje, no como eventos separados. Ya se importan automáticamente con cada mensaje.
+
+## Uso
+
+### Una vez configurado
+
+No necesitás hacer nada más. Cuando alguien escriba en el grupo de Telegram donde está tu bot, el mensaje aparecerá automáticamente en el tracker de TikiWiki.
+
+### Panel de Administración
+
+Accedé a `https://tu-dominio.com/trackergram/admin.php` con tus credenciales de admin. El panel tiene tres pestañas:
+
+| Pestaña | Qué hace |
+|---|---|
+| **Webhook** | Administrá las conexiones: creá, editá, habilitá/deshabilitá cada vinculación entre un bot de Telegram y un tracker de TikiWiki. Configurá el webhook, probá la conexión, creá trackers automáticamente. |
+| **Importar** | Seleccioná una conexión o ingresá datos manualmente, subí un ZIP exportado de Telegram para importar mensajes antiguos al mismo tracker. |
+| **Crear Tracker** | Creá un tracker nuevo en TikiWiki con todos los campos necesarios, sin salir del panel. |
+
+### Importar Conversaciones Antiguas
+
+1. En Telegram: Settings → Advanced → Export Telegram data → elegí el formato JSON (sin photos para agilizar si es muy grande)
+2. En el panel de admin, pestaña "Importar": seleccioná la conexión destino (autocompleta TikiWiki + tracker) o ingresá manualmente
+3. Subí el ZIP y esperá a que termine (barra de progreso con lotes de 50 mensajes)
 
 ## Campos del Tracker
 
@@ -539,110 +584,7 @@ visibleInHistoryMode = y
 ```
 Podés copiar todo este bloque y pegarlo en **Admin → Trackers → Importar campos** al crear o editar un tracker.
 
-## Qué Necesitás Antes de Empezar
-
-1. **Un bot de Telegram** — Se crea gratis hablando con [@BotFather](https://t.me/BotFather). Necesitás el token.
-2. **Un TikiWiki 21.x+** — Con la API habilitada, un token de acceso y un tracker (o dejá que trackerGram lo cree automáticamente).
-3. **Un servidor con PHP 8.0+** — Apache o Nginx, accesible desde internet con HTTPS.
-
-Cada vinculación (bot + wiki + tracker) se configura desde el panel de admin como una **conexión**. Podés tener múltiples bots y wikis desde una misma instalación. Incluso podés tener **varias conexiones con el mismo bot** pero diferentes grupos de Telegram y diferentes wikis — el webhook es único por bot, pero `api.php` rutea cada mensaje al tracker correcto según el grupo de origen.
-
-Si no tenés nada de esto, la [guía de instalación](INSTALL.md) te explica paso a paso.
-
-## Configurar Permisos en TikiWiki
-
-trackerGram necesita un usuario de API con permisos específicos en TikiWiki. Lo ideal es crear un **grupo** dedicado y un **usuario** para ese grupo.
-
-### 1. Crear el grupo `trackerGram`
-
-En TikiWiki: **Admin → Grupos → Crear un nuevo grupo**
-
-| Campo | Valor |
-|-------|-------|
-| Nombre del grupo | `trackerGram` |
-| Descripción | Usuarios de la API de trackerGram |
-| Heredar de | `Registered` (o ningún grupo) |
-
-### 2. Asignar permisos al grupo
-
-En TikiWiki: **Admin → Grupos → trackerGram → Permisos**
-
-Agregá estos permisos al grupo:
-
-| Permiso | Ámbito | ¿Para qué sirve? |
-|---------|--------|-----------------|
-| `tiki_p_view_trackers` | Objeto (tracker) | Leer fields del tracker y listar trackers |
-| `tiki_p_create_tracker_items` | Objeto (tracker) | Crear items nuevos (mensajes) |
-| `tiki_p_upload_files` | Objeto (file gallery) | Subir fotos, videos, audios, etc. |
-| `tiki_p_view_file_gallery` | Objeto (file gallery) | Acceder a la galería de archivos |
-| `tiki_p_admin_trackers` | **Global** ⚠️ | Consultar items (deduplicación), actualizar field FG options, crear/editar fields |
-| `tiki_p_admin_file_galleries` | Objeto (file gallery) | Crear galerías automáticamente (auto-reparación) |
-
-> **⚠️ Importante**: `tiki_p_admin_trackers` **debe asignarse a nivel GLOBAL** (en la solapa "Permisos" del grupo, no desde un tracker individual). La API de TikiWiki exige este permiso global para listar items. Sin esto, la deduplicación falla y los mensajes se duplicarían.
-
-### 3. Crear el usuario
-
-En TikiWiki: **Admin → Usuarios → Crear un nuevo usuario**
-
-| Campo | Valor |
-|-------|-------|
-| Nombre de usuario | `trackergram` |
-| Contraseña | Elegí una segura |
-| Grupos | Agregar al grupo `trackerGram` |
-
-### 4. Crear el token de API
-
-En TikiWiki: **Admin → Seguridad → API → Crear token**
-
-| Campo | Valor |
-|-------|-------|
-| Token | Dejá que TikiWiki lo genere automáticamente |
-| Usuario asociado | `trackergram` |
-| Permisos del token | Marcar todos (los permisos reales los controla el grupo) |
-
-### 5. Copiar la URL del API y el token
-
-La URL de la API debe terminar en `/api/`. Ejemplo:
-```
-https://wiki.ejemplo.org/api/
-```
-
-Estos dos datos los vas a necesitar en el panel de admin de trackerGram al crear una conexión.
-
-## Instalación Rápida
-
-1. Copiá los archivos de trackerGram a tu servidor web
-2. Copiá `.env.example` a `.env` y completá solo usuario/contraseña de admin
-3. Accedé al panel de administración: `https://tu-dominio.com/trackergram/admin.php`
-4. Creá una **conexión** desde el panel: nombre, bot token, webhook secret, TikiWiki URL, token y tracker ID
-5. Configurá el webhook con un clic desde la misma conexión (botón "🌐 Webhook")
-   - Si ya hay otra conexión con el mismo `bot_token`, el `webhook_secret` se reusa automáticamente
-   - No necesitás configurar el webhook más de una vez por bot
-6. Verificá que funcione con el botón "🧪 Test"
-7. Agregá el bot al grupo de Telegram — ¡los mensajes empiezan a llegar al tracker automáticamente!
-
-Para instrucciones detalladas, incluyendo cómo crear el bot y configurar TikiWiki por primera vez, ver [INSTALL.md](INSTALL.md).
-
-## Uso
-
-### Una vez configurado
-
-No necesitás hacer nada más. Cuando alguien escriba en el grupo de Telegram donde está tu bot, el mensaje aparecerá automáticamente en el tracker de TikiWiki.
-
-### Panel de Administración
-
-Accedé a `https://tu-dominio.com/trackergram/admin.php` con tus credenciales de admin. El panel tiene dos pestañas:
-
-| Pestaña | Qué hace |
-|---|---|
-| **Webhook** | Administrá las conexiones: creá, editá, habilitá/deshabilitá cada vinculación entre un bot de Telegram y un tracker de TikiWiki. Configurá el webhook, probá la conexión, creá trackers automáticamente. |
-| **Importar** | Seleccioná una conexión o ingresá datos manualmente, subí un ZIP exportado de Telegram para importar mensajes antiguos al mismo tracker. |
-
-### Importar Conversaciones Antiguas
-
-1. En Telegram: Settings > Export chat data > elegí el formato JSON
-2. En el panel de admin, pestaña "Importar": seleccioná la conexión destino (autocompleta TikiWiki + tracker) o ingresá manualmente
-3. Subí el ZIP y esperá a que termine (barra de progreso con lotes de 50 mensajes)
+> **Alternativa más fácil**: Usá la pestaña "Crear Tracker" del panel de admin de trackerGram — genera todos los campos automáticamente y te ahorra el copy-paste.
 
 ## Problemas Comunes
 

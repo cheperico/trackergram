@@ -579,6 +579,7 @@ function handleProcess(): void
         }
 
         // Resolver reply_to: buscar el tracker itemId del mensaje original
+        // y concatenar el texto del mensaje al que responde (Opción B)
         $replyToId = $normalized->replyToId;
         if ($replyToId !== '') {
             $replyMessageId = (int) $replyToId;
@@ -589,7 +590,20 @@ function handleProcess(): void
                     (int) $chatId
                 );
                 if ($foundItemId !== null) {
-                    $normalized->replyToId = '#' . $foundItemId;
+                    // Resuelto: intentar obtener el texto del mensaje original
+                    $replyRef = '#' . $foundItemId;
+                    $originalItem = $activeTikiClient->getTrackerItem((int) $trackerId, $foundItemId);
+                    if ($originalItem) {
+                        $textKey = 'field_' . $fieldPrefix . 'Text';
+                        $originalText = $originalItem[$textKey] ?? $originalItem['fields'][$fieldPrefix . 'Text'] ?? '';
+                        if ($originalText !== '') {
+                            $truncated = mb_strlen($originalText) > 120
+                                ? mb_substr($originalText, 0, 120) . '…'
+                                : $originalText;
+                            $replyRef .= ' - "' . $truncated . '"';
+                        }
+                    }
+                    $normalized->replyToId = $replyRef;
                     log_message("trackerGram import: reply_to message_id={$replyMessageId} resuelto a itemId={$foundItemId}");
                 } else {
                     log_message("trackerGram import: reply_to message_id={$replyMessageId} NO RESUELTO (aún no en tracker)");
@@ -939,6 +953,7 @@ function handleFull(): void
         }
 
         // Resolver reply_to: buscar el tracker itemId del mensaje original
+        // y concatenar el texto del mensaje al que responde (Opción B)
         $replyToId = $normalized->replyToId;
         if ($replyToId !== '') {
             $replyMessageId = (int) $replyToId;
@@ -949,7 +964,20 @@ function handleFull(): void
                     (int) $chatId
                 );
                 if ($foundItemId !== null) {
-                    $normalized->replyToId = '#' . $foundItemId;
+                    // Resuelto: intentar obtener el texto del mensaje original
+                    $replyRef = '#' . $foundItemId;
+                    $originalItem = $activeTikiClient->getTrackerItem((int) $trackerId, $foundItemId);
+                    if ($originalItem) {
+                        $textKey = 'field_' . $fieldPrefix . 'Text';
+                        $originalText = $originalItem[$textKey] ?? $originalItem['fields'][$fieldPrefix . 'Text'] ?? '';
+                        if ($originalText !== '') {
+                            $truncated = mb_strlen($originalText) > 120
+                                ? mb_substr($originalText, 0, 120) . '…'
+                                : $originalText;
+                            $replyRef .= ' - "' . $truncated . '"';
+                        }
+                    }
+                    $normalized->replyToId = $replyRef;
                     log_message("trackerGram import: reply_to message_id={$replyMessageId} resuelto a itemId={$foundItemId}");
                 } else {
                     log_message("trackerGram import: reply_to message_id={$replyMessageId} NO RESUELTO (aún no en tracker)");

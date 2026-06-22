@@ -290,6 +290,7 @@ class WebhookHandler
         }
 
         // Resolver reply_to: buscar el tracker itemId del mensaje original
+        // y concatenar el texto del mensaje al que responde (Opción B)
         if ($msg->replyToId !== '') {
             $replyMessageId = (int) $msg->replyToId;
             if ($replyMessageId > 0) {
@@ -299,9 +300,24 @@ class WebhookHandler
                     $chatId
                 );
                 if ($foundItemId !== null) {
-                    $msg->replyToId = '#' . $foundItemId;
+                    // Resuelto: guardar referencia al itemId + texto del original
+                    $replyRef = '#' . $foundItemId;
+                    if ($msg->replyToText !== '') {
+                        $truncated = mb_strlen($msg->replyToText) > 120
+                            ? mb_substr($msg->replyToText, 0, 120) . '…'
+                            : $msg->replyToText;
+                        $replyRef .= ' - "' . $truncated . '"';
+                    }
+                    $msg->replyToId = $replyRef;
                     log_message("trackerGram: reply_to message_id={$replyMessageId} resuelto a itemId={$foundItemId}");
                 } else {
+                    // No resuelto: si tenemos texto del webhook, guardarlo igual
+                    if ($msg->replyToText !== '') {
+                        $truncated = mb_strlen($msg->replyToText) > 120
+                            ? mb_substr($msg->replyToText, 0, 120) . '…'
+                            : $msg->replyToText;
+                        $msg->replyToId = '"' . $truncated . '"';
+                    }
                     log_message("trackerGram: reply_to message_id={$replyMessageId} NO RESUELTO (aún no en tracker)");
                 }
             }

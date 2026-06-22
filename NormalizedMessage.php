@@ -43,4 +43,6 @@ class NormalizedMessage
     public ?string $mimeType = null;
     public ?string $systemMessage = null;
     public ?string $topicName = null;
+    /** Texto del mensaje al que responde (extraído de reply_to_message en webhook) */
+    public string $replyToText = '';
 }

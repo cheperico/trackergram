@@ -41,7 +41,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 | | |
 |---|---|
-| **Versión** | v0.5.6 |
+| **Versión** | v0.5.7 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
 | **Repositorio** | https://github.com/cheperico/trackergram |
@@ -529,7 +529,11 @@ Ver [CAMBIOS.md](CAMBIOS.md) para el detalle completo por versión.
 
 | Versión | Cambio principal |
 |---|---|---|
-| v0.5.3 | **Fix updateFgFieldOptions + gallery ID opcional + fan-out**: FG field options ahora requieren `name`+`type` en POST. Gallery ID opcional en crear tracker (auto-crea si no se provee). Fan-out: mismo mensaje a múltiples trackers. Auto-población bot_name/chat_title. Eliminado auto-fill de tokens via AJAX. |
+| v0.5.7 | **ReplyToId con texto del original + reintentos en download + fix concurrencia**: ReplyToId incluye texto del mensaje original (webhook gratis, import via API). downloadAndUploadMedia() con 3 reintentos. Race condition fix en cache de captions. worker.php alineado con api.php. |
+| v0.5.6 | **Chat_id -100 en import + field_prefix_checked cache + fan-out try-catch**: Fix chat_id sin -100 en supergrupos. Auto-detección de field_prefix ahora se cachea (UNA llamada API). Fan-out con try-catch individual. Fix error histórico de webhook. Reintentos en download media. |
+| v0.5.5 | **checkPermissions sin side effects + health check + getWebhookInfo**: Permissions test sin crear galerías reales. Health check visible en cards de conexión. Upload por base64. Verificación post-creación de FG field. webhook_secret compartido entre conexiones mismo bot. |
+| v0.5.4 | **Auto-detección field prefix**: detecta el prefix real del tracker desde sus campos vía API, sin configuración manual. Preserva field prefix al editar conexión. |
+| v0.5.3 | **Fix updateFgFieldOptions + gallery ID opcional + fan-out**: FG field options ahora requieren `name`+`type` en POST. Gallery ID opcional en crear tracker. Fan-out: mismo mensaje a múltiples trackers. Auto-población bot_name/chat_title. Eliminado auto-fill de tokens via AJAX. |
 | v0.5.2 | **Accesibilidad ARIA completa en admin.php**: roles, landmarks, tooltips, skip link, focus trap, aria-live, contraste, prefers-reduced-motion |
 | v0.4.0 | **Async processing per-conexión + .env simplificado + adiós legacy**: toggle async por conexión en admin, api.php rechaza 403 sin conexión (sin fallback legacy), config.php sin constantes de credenciales, bootstrap.php sin DI wiring (cada entry point crea sus clientes), import.php usa MessageMapper local y requiere credenciales Tiki, TikiWikiClient.getBaseUrl() |
 | v0.3.0 | **Arquitectura multi-conexión**: ConfigManager, setup.json, admin con pestañas, webhook multi-bot, import per-sesión, worker async multi-conexión, .htaccess mejorado, config/ fuera del webroot |

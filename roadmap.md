@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| **Versión actual** | v0.5.6 |
+| **Versión actual** | v0.5.7 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Instancias activas** | Dev (tracker 26) · Prod (tracker 22) |
 | **Filosofía** | Sin DB con servidor · JSON files para estado local (no SQLite) · PHP puro sin framework · MVP pragmático |
@@ -54,6 +54,10 @@
 - ✅ **FG field options vía API**: `updateFgFieldOptions()` con `name`+`type` requeridos
 - ✅ **Auto-población bot_name/chat_title** en cards de conexión
 - ✅ **Chat_id con -100 en import**: corrección del prefijo `-100` para supergrupos (el export JSON de Telegram Desktop omite el `-100` en el `id` raíz)
+- ✅ **ReplyToId con texto del original (Opción B)**: en webhook extrae `reply_to_message.text` (gratis), en import busca el texto via API. Guarda `#42 - "texto..."` en el campo ReplyToId existente.
+- ✅ **Health check visible en cards de conexión**: cada tarjeta muestra estado del webhook vía `getWebhookInfo()` (✅ configurado, ❌ no configurado, ⚠️ con errores).
+- ✅ **Verificación post-creación de FG field**: `updateFgFieldOptions()` verifica con `GET /fields` que el galleryId se haya guardado (workaround del bug de TikiWiki que responde HTTP 200 aunque falle).
+- ✅ **Field descriptions en API**: todos los campos del tracker se crean con `description` descriptivo enviado a la API de TikiWiki.
 
 ---
 
@@ -72,17 +76,15 @@ Items con impacto inmediato en la operación del día a día.
 
 | # | Item | Esfuerzo | Notas |
 |   |------|----------|-------|
-| 2 | **Health check en admin** | 1 sesión | Estado del webhook, test conexión por conexión. |
-| 3 | **Mensajes editados/borrados** | 2 sesiones | Estrategia: archivo inmutable con eventos. Los editados/borrados son eventos adicionales. |
-| 4 | **Verificación post-creación de FG field** | 1 sesión | Tras `updateFgFieldOptions()`, GET /fields para confirmar que galleryId se guardó (workaround del bug de TikiWiki que siempre responde con options viejas). |
-| 5 | **Reproducción de mensajes previos a nuevo tracker** | 2 sesiones | Script/acción para re-enviar mensajes anteriores de un chat a un tracker recién creado. |
+| 1 | **Mensajes editados/borrados** | 2 sesiones | Estrategia: archivo inmutable con eventos. Los editados/borrados son eventos adicionales. |
+| 2 | **Reproducción de mensajes previos a nuevo tracker** | 2 sesiones | Script/acción para re-enviar mensajes anteriores de un chat a un tracker recién creado. |
 
 ### 🟢 Fase 3: Features grandes / robustez (mediano plazo)
 
 | # | Item | Esfuerzo | Dependencias |
 |---|------|----------|--------------|
 | 6 | **Chat_id unificado para imports con migración** | 2 sesiones | Los exports de Telegram pueden incluir migración grupo→supergrupo. Los mensajes pre-migración tienen IDs negativos, los post-migración IDs positivos. El chat_id también cambia. Decidir estrategia (un solo chat_id para todo el grupo, o bifurcar) e implementar detección de service messages `migrate_to_supergroup`/`migrate_from_group`. |
-| 6b | **Mostrar texto del mensaje al que responde** (replyToText) | 1-2 sesiones | Agregar campo `replyToText` al tracker y poblarlo desde `MessageMapper`: en webhook extraer `reply_to_message.text/caption` (viene completo gratis), en import buscar el mensaje original ya importado en el tracker y copiar su texto. Ver `opt/visualizacion-lcc2026.md` y diseño en `AGENTS.md` sección de replies. Prioridad media. |
+| 6b | **Campo separado ReplyToText** (Opción A) | 1-2 sesiones | **Implementación alternativa** a la Opción B (v0.5.7). Crear campo `ReplyToText` separado en lugar de concatenar texto en `ReplyToId`. Para trackers existentes requiere migración. Prioridad media. |
 | 7 | **Mensajes estructurados con prefijos** | 2-3 sesiones | Parser en MessageMapper para mensajes tipo `GPS user coord` o `#tag texto`. |
 | 8 | **Manejo de errores estandarizado** | 2-3 sesiones | Excepciones de dominio (`ConfigException`, `TelegramException`, `TikiWikiException`, `ImportException`). |
 | 9 | **Import CLI asíncrono** | 2 sesiones | Script CLI para exports grandes sin timeout HTTP. |

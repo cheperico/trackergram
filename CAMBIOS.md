@@ -1,5 +1,17 @@
 # Cambios - Changelog
 
+## v0.5.7
+
+### Feature: ReplyToId incluye texto del mensaje original (Opción B)
+
+- **Webhook**: `MessageMapper::fromWebhook()` ahora extrae `reply_to_message.text ?? reply_to_message.caption` (viene gratis en el update de Telegram) y lo almacena como `replyToText` en `NormalizedMessage`.
+- **WebhookHandler**: Al resolver un reply (buscar itemId en el tracker), concatena el texto: `#42 - "texto del mensaje"`. Si no está resuelto pero hay texto, guarda `"texto del mensaje"` (sin referencia).
+- **Import**: Al resolver un reply, usa `TikiWikiClient::getTrackerItem()` para obtener el texto del mensaje original desde el tracker y lo concatena igual que en webhook.
+- **TikiWikiClient**: Nuevo método `getTrackerItem(int $trackerId, int $itemId): ?array` para obtener un item completo del tracker con todos sus fields.
+- **NormalizedMessage**: Nueva propiedad transiente `$replyToText` para transportar el texto del reply durante el procesamiento.
+- **Template**: La plantilla Smarty muestra el campo completo (`↪️ Respuesta a: #42 - "texto..."`) en lugar de solo el ID.
+- **Roadmap**: La Opción A (campo separado `ReplyToText`) queda documentada como prioridad media para quien prefiera datos más limpios.
+
 ## v0.5.6
 
 ### Fix: Chat_id sin prefijo `-100` en import de supergrupos

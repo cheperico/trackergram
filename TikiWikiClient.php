@@ -510,6 +510,47 @@ class TikiWikiClient
     }
 
     /**
+     * Obtener un item completo del tracker por su itemId interno.
+     * Devuelve el primer item del array 'data' con todos sus field values.
+     * @param int $trackerId ID del tracker
+     * @param int $itemId ID interno del item en TikiWiki
+     * @return array|null Item con fields, o null si no existe
+     */
+    public function getTrackerItem(int $trackerId, int $itemId): ?array
+    {
+        $url = $this->apiUrl . "trackers/$trackerId/items?itemId=" . urlencode((string) $itemId) . "&maxRecords=1";
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Authorization: Bearer " . $this->token,
+            "User-Agent: Mozilla/5.0"
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200) {
+            return null;
+        }
+
+        $data = json_decode($response, true);
+        if (!is_array($data)) {
+            return null;
+        }
+
+        $items = $data['data'] ?? $data['result'] ?? [];
+        if (empty($items) || !is_array($items)) {
+            return null;
+        }
+
+        return reset($items);
+    }
+
+    /**
      * Crear una file gallery en TikiWiki
      */
     public function createGallery(string $name, string $description = ''): ?int

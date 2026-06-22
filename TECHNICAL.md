@@ -160,10 +160,11 @@ Los campos del tracker tienen "permanent names" — identificadores únicos que 
 `$messageMapper->toWikiFields()` toma un `NormalizedMessage` y lo convierte al formato que TikiWiki espera:
 
 ```php
+$prefix = $this->getFieldPrefix(); // 'telegrammessage', 'qpch', etc.
 $fields = [
-    'fields[telegrammessageTelegramMessageId]' => 42,
-    'fields[telegrammessageChatId]' => -1001234567890,
-    'fields[telegrammessageText]' => 'Hola grupo!',
+    "fields[{$prefix}TelegramMessageId]" => 42,
+    "fields[{$prefix}ChatId]" => -1001234567890,
+    "fields[{$prefix}Text]" => 'Hola grupo!',
     // ...
 ];
 ```
@@ -302,6 +303,16 @@ if ($tikiWikiClient->messageExists(...) > 1) {
 
 Esto no previene el duplicado pero lo detecta para logging.
 
+### ReplyToId con texto del mensaje original
+
+El campo `telegrammessageReplyToId` originalmente solo guardaba el ID del mensaje al que se respondía. Desde v0.5.7, también incluye el texto del mensaje original:
+
+- **Webhook**: Telegram envía `reply_to_message.text` (o `caption`) **gratis** en el update. Extraemos el texto y lo concatenamos: `#42 - "texto del mensaje"`.
+- **Import**: No tenemos acceso directo al texto. Resolvemos el reply buscando el ID en el tracker vía `TikiWikiClient::getTrackerItem()`.
+- **Fallback**: Si no se encuentra el item referenciado, se guarda solo el texto sin referencia.
+
+Esto permite ver el contexto de la respuesta sin tener que abrir el mensaje original.
+
 ---
 
 ## Paso 7: Reintentos
@@ -377,6 +388,16 @@ foreach ($dirIterator as $f) {
 
 De O(n × m) a O(n + m).
 
+### Chat_id y IDs negativos en exports
+
+El export de Telegram Desktop tiene dos peculiaridades importantes:
+
+1. **Chat_id sin prefijo `-100`**: Para supergrupos, el `id` raíz del `result.json` viene sin el prefijo `-100` (ej: `4299700952` en vez de `-1004299700952`). Un fix en `import.php` detecta `private_supergroup`/`private_channel` y antepone `-100` automáticamente. El webhook no tiene este problema porque recibe el chat_id directo de la Bot API.
+
+2. **IDs de mensaje negativos**: Los mensajes del grupo **antes** de una migración a supergrupo tienen IDs negativos (ej: `-999907142`). Los IDs positivos comienzan después de la migración. Esto no es un error de Telegram — es su forma de distinguir el período pre-migración. La deduplicación por `(chat_id, message_id)` funciona correctamente porque los rangos negativos y positivos no se solapan.
+
+3. **Service messages de migración**: La frontera entre pre y post-migración está marcada por eventos `migrate_to_supergroup` (en el grupo viejo) y `migrate_from_group` (en el supergrupo nuevo). Ambos se importan correctamente pero no se pueden recibir por webhook (el webhook solo ve el supergrupo post-migración).
+
 ---
 
 ## Arquitectura del Proyecto
@@ -394,10 +415,11 @@ WebhookHandler::processMessage()
     ↓
 1. Validar campos requeridos
 2. Resolver topic (cache → fallback)
-3. Verificar duplicado
-4. MessageMapper::fromWebhook() → extraer datos
-5. downloadAndUploadMedia() → descargar de Telegram, subir a TikiWiki
-6. sendToTikiWikiWithRetries() → crear item con reintentos
+3. Resolver reply: buscar itemId en tracker + extraer texto del original
+4. Verificar duplicado
+5. MessageMapper::fromWebhook() → extraer datos
+6. downloadAndUploadMedia() → descargar de Telegram, subir a TikiWiki
+7. sendToTikiWikiWithRetries() → crear item con reintentos
 ```
 
 ### Cómo se relacionan los archivos (v0.4.0+)
@@ -419,7 +441,7 @@ worker.php → ConfigManager → clientes por conexión → WebhookHandler
 
 **No hay un wiring central**. Cada entry point crea sus propios clientes desde las credenciales de la conexión en `setup.json`. Esto permite tener múltiples bots, wikis y trackers desde una misma instalación.
 
-### Deuda técnica (v0.4.0)
+### Deuda técnica (v0.5.7)
 
 Items **ya resueltos**:
 - ✅ **Inyección de dependencias**: Clases instanciables con dependencias inyectadas por constructor, sin wiring central en bootstrap.
@@ -427,11 +449,21 @@ Items **ya resueltos**:
 - ✅ **Multi-conexión**: Múltiples bots, wikis y trackers desde una instalación.
 - ✅ **Async per-conexión**: Cada conexión puede procesar síncrona o asíncronamente.
 - ✅ **Sin modo legacy**: No hay constantes de credenciales en `.env`; todo viaja en `setup.json`.
+- ✅ **Health check en admin**: Cada tarjeta de conexión muestra estado del webhook vía `getWebhookInfo()`.
+- ✅ **FG field options verificación**: `updateFgFieldOptions()` verifica con GET /fields si el galleryId se guardó (workaround bug TikiWiki).
+- ✅ **Auto-detección field prefix**: El sistema detecta el prefix real del tracker y corrige `setup.json` automáticamente.
+- ✅ **Cache field_prefix_checked**: La auto-detección se ejecuta UNA vez, no en cada page load.
+- ✅ **Fan-out con try-catch**: Si una conexión falla en el fan-out, no rompe las demás.
+- ✅ **Reintentos en downloadAndUploadMedia**: Hasta 3 intentos con backoff progresivo para evitar pérdidas transitorias.
+- ✅ **Chat_id -100 en import**: Detección de supergrupos y corrección del prefijo.
+- ✅ **ReplyToId con texto del original**: Webhook aprovecha `reply_to_message.text` (gratis), import busca por API.
+- ✅ **Field descriptions enviadas a TikiWiki**: Todos los campos del tracker se crean con `description` en la API.
 
 Items aún pendientes:
-- ⬜ **Manejo de errores inconsistente**: Algunas funciones retornan `null`, otras `false`, otras usan `die()`. Pendiente migrar a excepciones de dominio (ver roadmap).
+- ⬜ **Manejo de errores inconsistente**: Algunas funciones retornan `null`, otras `false`, otras usan `die()`. Pendiente migrar a excepciones de dominio (ver roadmap Fase 3 #8).
 - ⬜ **Tests unitarios**: Las clases son instanciables y testeables, pero faltan los tests.
 - ⬜ **PSR-4 autoloading**: Sin autoloader, todo se incluye con `require_once`.
+- ⬜ **Detección de migración grupo→supergrupo en webhook**: Si el grupo migra, el `chat_id` cambia y el webhook deja de reconocerlo (ver roadmap Fase 1 #2).
 
 ---
 
