@@ -997,8 +997,8 @@ class TikiWikiClient
             log_message("TikiWikiClient: Usando galería existente ID {$galleryId} para el tracker");
         }
 
-        // 2. Crear tracker SHELL (solo name + description — la API NO soporta fields inline)
-        $trackerId = $this->createTrackerShell($trackerName, $desc);
+        // 2. Crear tracker SHELL (name + description + fieldPrefix — la API NO soporta fields inline)
+        $trackerId = $this->createTrackerShell($trackerName, $desc, $prefix);
         if ($trackerId === null) {
             return null;
         }
@@ -1030,17 +1030,23 @@ class TikiWikiClient
     /**
      * Crea el tracker SHELL (solo nombre + descripción, sin fields)
      */
-    private function createTrackerShell(string $name, string $description): ?int
+    private function createTrackerShell(string $name, string $description, string $fieldPrefix = ''): ?int
     {
         $url = $this->apiUrl . "trackers";
 
         // confirm=1 requerido por action_replace.
         // Usamos form-urlencoded porque TikiWiki NO mergea correctamente JSON body a $_POST
-        $postFields = http_build_query([
+        $postData = [
             'name' => $name,
             'description' => $description,
             'confirm' => 1,
-        ]);
+        ];
+        // Si hay fieldPrefix, enviarlo para que TikiWiki lo guarde en tiki_tracker_options
+        // (nativo de TikiWiki — usado al auto-generar permNames de nuevos campos)
+        if ($fieldPrefix !== '') {
+            $postData['fieldPrefix'] = $fieldPrefix;
+        }
+        $postFields = http_build_query($postData);
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
