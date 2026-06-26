@@ -490,7 +490,8 @@ ASYNC_PROCESSING=false
 - **No asumir que HTTP 200 significa éxito** en actualizaciones de FG field options — `POST /api/trackers/{id}/fields/{id}` requiere `name` + `type` + `option[...]` en el body. Si falta `name`, TikiWiki salta el bloque de guardado pero igual responde HTTP 200 (y la respuesta siempre muestra options viejas, incluso si se guardó). Verificar con `GET /api/trackers/{id}/fields` después.
 - **No requerir archivos individuales** — Siempre usar `require_once 'bootstrap.php'` (en trackerGram).
 - **No duplicar lógica de parsing entre webhook e import** — Ambos convergen en `MessageMapper::toWikiFields()` vía `NormalizedMessage`. Webhook usa `fromWebhook()`, import usa `fromExport()`.
-- **No depender del modo legacy** — El modo legacy (constantes en `.env`) fue eliminado. Todas las conexiones se configuran desde el panel admin y se persisten en `setup.json`. `api.php` rechaza con 403 si no hay conexión en `setup.json`.
+- **No depender del modo legado** — El modo legacy (constantes en `.env`) fue eliminado. Todas las conexiones se configuran desde el panel admin y se persisten en `setup.json`. `api.php` rechaza con 403 si no hay conexión en `setup.json`.
+- **No usar `htmlspecialchars()` en `toWikiFields()`** — Los datos se envían a la API de TikiWiki via `http_build_query()` (form-urlencoded). Aplicar `htmlspecialchars()` convierte `"` en `&quot;` y esos HTML entities se guardan LITERALMENTE en el tracker. El escape HTML es responsabilidad de la capa de vista (Smarty), no de la API.
 
 ### Telegram
 
@@ -531,7 +532,7 @@ Ver [CAMBIOS.md](CAMBIOS.md) para el detalle completo por versión.
 
 | Versión | Cambio principal |
 |---|---|---|
-| v0.5.8 | **BUG-001 fix + Privacy Mode doc**: findByWebhookSecret() prioriza conexiones pendientes. assignDetection() no sobrescribe chat_id existente. Documentado requisito de bot admin (Privacy Mode de Telegram). |
+| v0.5.8 | **BUG-001 fix + Privacy Mode doc + htmlspecialchars fix**: findByWebhookSecret() prioriza conexiones pendientes. assignDetection() no sobrescribe chat_id existente. Documentado requisito de bot admin (Privacy Mode de Telegram). Eliminado htmlspecialchars() de toWikiFields() que corrompía comillas y otros caracteres. |
 | v0.5.7 | **ReplyToId con texto del original + reintentos en download + fix concurrencia**: ReplyToId incluye texto del mensaje original (webhook gratis, import via API). downloadAndUploadMedia() con 3 reintentos. Race condition fix en cache de captions. worker.php alineado con api.php. |
 | v0.5.6 | **Chat_id -100 en import + field_prefix_checked cache + fan-out try-catch**: Fix chat_id sin -100 en supergrupos. Auto-detección de field_prefix ahora se cachea (UNA llamada API). Fan-out con try-catch individual. Fix error histórico de webhook. Reintentos en download media. |
 | v0.5.5 | **checkPermissions sin side effects + health check + getWebhookInfo**: Permissions test sin crear galerías reales. Health check visible en cards de conexión. Upload por base64. Verificación post-creación de FG field. webhook_secret compartido entre conexiones mismo bot. |

@@ -30,6 +30,18 @@ Para que un bot reciba TODOS los mensajes de un grupo, debe ser **administrador*
 
 Documentación oficial: https://core.telegram.org/bots/features#privacy-mode
 
+### Fix: htmlspecialchars() en toWikiFields corrompía caracteres especiales (&quot;)
+
+- **MessageMapper::toWikiFields()**: Todos los campos de texto (Text, ChatTitle, TopicTitle, Username, FirstName, LastName, DisplayName, MediaCaption, Reactions) se pasaban por `htmlspecialchars($valor, ENT_QUOTES)` antes de enviarlos a la API de TikiWiki.
+- **Problema**: Las comillas dobles `"` se convertían a `&quot;`, comillas simples `'` a `&#039;`, etc. Como el envío es via `http_build_query()` (form-urlencoded), TikiWiki recibe el valor URL-decodeado y guarda literalmente `&quot;` en lugar de `"`.
+- **Fix**: Eliminados todos los `htmlspecialchars()` de `toWikiFields()`. El escape HTML es responsabilidad de la capa de vista (TikiWiki/Smarty al mostrar), no de la capa de datos.
+- **Nota**: Los items ya existentes con `&quot;` quedan corruptos en la base de datos. Solo se puede corregir re-importando o con un UPDATE SQL directo.
+
+### Docs: Reporte de arquitectura y escalabilidad
+
+- `reports/architecture_scalability_2026-06.md`: nuevo reporte con 20 hallazgos clasificados P0-P3, 4 escenarios de escalabilidad, y tabla de recomendaciones por impacto/esfuerzo.
+- `AGENTS.md`: agregado el "qué-no-hacer" sobre `htmlspecialchars()` en `toWikiFields()`.
+
 ## v0.5.7
 
 ### Feature: ReplyToId incluye texto del mensaje original (Opción B)

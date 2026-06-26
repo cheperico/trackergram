@@ -483,30 +483,34 @@ class MessageMapper
     {
         $p = $this->fieldPrefix;
 
+        // NOTA: NO usar htmlspecialchars() aquí. Los datos se envían via form-urlencoded
+        // (http_build_query los URL-encodea automáticamente). TikiWiki almacena el valor
+        // decodificado y la capa de vista (Smarty) se encarga del escape HTML al mostrar.
+        // Si aplicamos htmlspecialchars(), las comillas se guardan literalmente como &quot;.
         $fields = [
             "fields[{$p}TelegramMessageId]" => $msg->messageId,
             "fields[{$p}ChatId]" => $msg->chatId,
-            "fields[{$p}ChatTitle]" => htmlspecialchars($msg->chatTitle, ENT_QUOTES, 'UTF-8'),
+            "fields[{$p}ChatTitle]" => $msg->chatTitle,
             "fields[{$p}TopicId]" => $msg->topicId,
-            "fields[{$p}TopicTitle]" => htmlspecialchars($msg->topicTitle, ENT_QUOTES, 'UTF-8'),
+            "fields[{$p}TopicTitle]" => $msg->topicTitle,
             "fields[{$p}UserId]" => $msg->userId,
-            "fields[{$p}Username]" => htmlspecialchars($msg->username, ENT_QUOTES, 'UTF-8'),
-            "fields[{$p}FirstName]" => htmlspecialchars($msg->firstName, ENT_QUOTES, 'UTF-8'),
-            "fields[{$p}LastName]" => htmlspecialchars($msg->lastName, ENT_QUOTES, 'UTF-8'),
-            "fields[{$p}DisplayName]" => htmlspecialchars($msg->displayName, ENT_QUOTES, 'UTF-8'),
+            "fields[{$p}Username]" => $msg->username,
+            "fields[{$p}FirstName]" => $msg->firstName,
+            "fields[{$p}LastName]" => $msg->lastName,
+            "fields[{$p}DisplayName]" => $msg->displayName,
             "fields[{$p}MessageType]" => $msg->messageType,
-            "fields[{$p}Text]" => htmlspecialchars($msg->text, ENT_QUOTES, 'UTF-8'),
+            "fields[{$p}Text]" => $msg->text,
             "fields[{$p}Location]" => $msg->location,
             "fields[{$p}MediaType]" => $msg->mediaType,
             "fields[{$p}MediaSize]" => $msg->mediaSize,
             "fields[{$p}MediaWidth]" => $msg->width,
             "fields[{$p}MediaHeight]" => $msg->height,
             "fields[{$p}MediaDuration]" => $msg->duration,
-            "fields[{$p}MediaCaption]" => htmlspecialchars($msg->mediaCaption, ENT_QUOTES, 'UTF-8'),
+            "fields[{$p}MediaCaption]" => $msg->mediaCaption,
             "fields[{$p}MessageDate]" => $msg->date,
             "fields[{$p}EditedDate]" => $msg->editedDate,
             "fields[{$p}ReplyToId]" => $msg->replyToId,
-            "fields[{$p}Reactions]" => htmlspecialchars($msg->reactions, ENT_QUOTES, 'UTF-8'),
+            "fields[{$p}Reactions]" => $msg->reactions,
         ];
 
         if (!empty($msg->uploadedFileIds)) {
