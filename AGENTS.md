@@ -631,38 +631,43 @@ Cuando el orquestador recibe una tarea que toca documentación:
 
 | Nombre | Tipo | Propósito |
 |--------|------|-----------|
-| `main` | branch | **Desarrollo de nueva arquitectura** — router multi-grupo, Mini App, mensajes prefijados, async worker, etc. Todo lo nuevo va acá. |
-| `qpch` | branch | **Versión monoTiki estable** — un solo TikiWiki, un solo grupo Telegram, un solo bot. Para el grupo "Qué pasa cheLA?". Solo bugfixes y parches menores. |
-| `qpch` | tag | Referencia histórica del punto exacto donde se creó el branch `qpch`. No se mueve. |
-| `qpch-vX.Y.Z` | tag | Hotfixes sobre qpch branch (ej: `qpch-v0.3.1`) |
+| `main` | branch | **Rama única de trabajo y producción**. Todo el desarrollo va acá. Los releases se marcan con tags. |
+| `mono` | branch | **Versión monoTiki legacy** (antes `qpch`). Un solo TikiWiki, un solo grupo Telegram, un solo bot. Solo bugfixes y parches menores (congelado). |
+| `mono-vX.Y.Z` | tag | Hotfixes sobre mono branch (ej: `mono-v0.3.1`) |
+| `vX.Y.Z` | tag | Releases estables sobre main (ej: `v0.6.0`, `v0.7.0`) |
 
 ### Cómo trabajar
 
-**Para desarrollo de features nuevas (arquitectura multi-grupo, etc.):**
+**Desarrollo normal:**
 ```bash
 git checkout main
 # ... desarrollar, commit, push ...
 ```
 
-**Para arreglar un bug en producción (qpch branch):**
+**Para arreglar un bug en mono (legacy congelado):**
 ```bash
-git checkout qpch
-git checkout -b fix/qpch-algo     # branch temporal para el fix
+git checkout mono
+git checkout -b fix/mono-algo     # branch temporal para el fix
 # ... arreglar, commit ...
-git tag -a qpch-v0.3.1 -m "descripción del hotfix"
-git push origin qpch-v0.3.1
-git checkout qpch
-git merge fix/qpch-algo           # mergear el fix al branch qpch
-git push origin qpch
-git branch -d fix/qpch-algo       # limpiar branch temporal
-# Opcional: mergear el fix también a main
+git tag -a mono-v0.3.1 -m "descripción del hotfix"
+git push origin mono-v0.3.1
+git checkout mono
+git merge fix/mono-algo
+git push origin mono
+git branch -d fix/mono-algo
+```
+
+**Para marcar un release estable en main:**
+```bash
+git tag -a v0.6.0 -m "Resumen del release"
+git push origin v0.6.0
 ```
 
 **Reglas:**
-- `qpch` (branch) es la versión estable monoTiki — solo bugfixes, sin features nuevas
-- Los hotfixes se taggean como `qpch-vX.Y.Z` incremental
-- `main` es donde se desarrolla todo lo nuevo
-- No hay branches `develop`, `staging`, etc. — simpleza sobre complejidad
+- `main` es la rama única — todo el desarrollo va acá
+- Los releases en main se marcan con tags `vX.Y.Z`
+- `mono` está congelado — solo bugfixes críticos, sin features nuevas
+- Para experimentos riesgosos, crear branch temporal y mergear cuando funcione
 
 ---
 
