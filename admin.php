@@ -1568,19 +1568,6 @@ function openEditModal(slug) {
     });
 }
 
-function togglePassword(btn) {
-    var input = btn.parentElement.querySelector('input');
-    if (input && input.type === 'password') {
-        input.type = 'text';
-        btn.textContent = 'Ocultar';
-        btn.setAttribute('aria-label', 'Ocultar contraseña');
-    } else if (input) {
-        input.type = 'password';
-        btn.textContent = 'Mostrar';
-        btn.setAttribute('aria-label', 'Mostrar contraseña');
-    }
-}
-
 function testConnection(slug, btn) {
     var resultDiv = btn.closest('.conn-actions').querySelector('.test-result');
     resultDiv.style.display = 'block';
@@ -2358,6 +2345,22 @@ document.getElementById('create-field-prefix').addEventListener('input', functio
 </div><!-- /container -->
 
 <script>
+/**
+ * Mostrar/ocultar contraseña en campos password (usado en todos los tabs)
+ */
+function togglePassword(btn) {
+    var input = btn.parentElement.querySelector('input');
+    if (input && input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = 'Ocultar';
+        btn.setAttribute('aria-label', 'Ocultar contraseña');
+    } else if (input) {
+        input.type = 'password';
+        btn.textContent = 'Mostrar';
+        btn.setAttribute('aria-label', 'Mostrar contraseña');
+    }
+}
+
 /**
  * Toggle panel de configuración global con soporte ARIA
  */
