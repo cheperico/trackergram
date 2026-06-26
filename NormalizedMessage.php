@@ -36,6 +36,8 @@ class NormalizedMessage
     public string $editedDate = '';
     public string $replyToId = '';
     public string $reactions = '';
+    /** Hashtags extraídos del mensaje (espacio-separados, sin #) */
+    public string $hashtags = '';
 
     // --- Transientes (usan durante el procesamiento, no persisten) ---
     public ?string $fileId = null;

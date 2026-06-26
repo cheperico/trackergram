@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| **Versión actual** | v0.5.4 |
+| **Versión actual** | v0.5.9 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Instancias activas** | Dev (tracker 26) · Prod (tracker 22) |
 | **Filosofía** | Sin DB con servidor · JSON files para estado local (no SQLite) · PHP puro sin framework · MVP pragmático |
@@ -59,6 +59,7 @@
 - ✅ **Verificación post-creación de FG field**: `updateFgFieldOptions()` verifica con `GET /fields` que el galleryId se haya guardado (workaround del bug de TikiWiki que responde HTTP 200 aunque falle).
 - ✅ **Field descriptions en API**: todos los campos del tracker se crean con `description` descriptivo enviado a la API de TikiWiki.
 - ✅ **Auto-detección de field prefix**: si el prefix almacenado en `setup.json` es `telegrammessage` (default), el sistema lo verifica contra los campos reales del tracker vía API y lo corrige automáticamente si es distinto. Se persiste tras el primer webhook. Cobertura: webhook, async worker, import.
+- ✅ **Hashtags como etiquetas (Freetags)**: `#tags` extraídos de mensajes de Telegram (webhook e import) guardados en campo tipo `F` (Freetags). Se integran al ecosistema de etiquetas de TikiWiki (tag cloud, búsqueda).
 
 ---
 
@@ -70,8 +71,7 @@ Items con impacto inmediato en la operación del día a día.
 
 | # | Item | Esfuerzo | Notas |
 |   |------|----------|-------|
-| 1 | **Hashtags como etiquetas** | 1 sesión | Extraer `#tags` a campo separado. Mejora búsqueda en TikiWiki. |
-| 2 | **Detección de migración grupo→supergrupo en webhook** | 1 sesión | Detectar `migrate_to_chat_id` en updates de Telegram y actualizar `chat_id` en `setup.json` automáticamente. Sin esto, si el grupo migra, el webhook deja de reconocerlo. También manejar error 400 de Bot API con `parameters.migrate_to_chat_id`. |
+| 1 | **Detección de migración grupo→supergrupo en webhook** | 1 sesión | Detectar `migrate_to_chat_id` en updates de Telegram y actualizar `chat_id` en `setup.json` automáticamente. Sin esto, si el grupo migra, el webhook deja de reconocerlo. También manejar error 400 de Bot API con `parameters.migrate_to_chat_id`. |
 
 ### 🟡 Fase 2: Robustez (1-2 semanas)
 

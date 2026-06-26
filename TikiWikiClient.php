@@ -111,7 +111,7 @@ class TikiWikiClient
      */
     private function detectPrefixFromFieldNames(array $fields): ?string
     {
-        $knownSuffixes = ['TelegramMessageId', 'ChatId', 'Text', 'MessageDate', 'Media'];
+        $knownSuffixes = ['TelegramMessageId', 'ChatId', 'Text', 'MessageDate', 'Media', 'Hashtags'];
 
         foreach ($fields as $field) {
             $permName = $field['permName'] ?? '';
@@ -1228,6 +1228,7 @@ class TikiWikiClient
             ['name' => $prefix . 'EditedDate', 'type' => 't', 'permName' => $prefix . 'EditedDate', 'description' => 'Fecha de última edición (timestamp UNIX, vacío si no fue editado)'],
             ['name' => $prefix . 'ReplyToId', 'type' => 't', 'permName' => $prefix . 'ReplyToId', 'description' => 'ID del mensaje al que responde (para conversaciones en hilo)'],
             ['name' => $prefix . 'Reactions', 'type' => 'a', 'permName' => $prefix . 'Reactions', 'description' => 'Reacciones al mensaje formateadas como texto (ej: 👍 3 · ❤️ 1)'],
+            ['name' => $prefix . 'Hashtags', 'type' => 'F', 'permName' => $prefix . 'Hashtags', 'description' => 'Hashtags de Telegram como etiquetas (espacio-separados, sin #)'],
         ];
     }
 

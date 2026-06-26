@@ -517,24 +517,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $errorMessage = 'La conexión no tiene tracker asignado';
                 break;
             }
-            $prefix = $conn['field_prefix'] ?? '';
-            if ($prefix === '') {
-                // Auto-detectar prefix desde el tracker
-                $tikiClient = new TikiWikiClient(
-                    apiUrl: $conn['tiki_api_url'],
-                    token: $conn['tiki_api_token'],
-                    timeout: TIMEOUT_TIKIWIKI_API
-                );
-                $prefix = $tikiClient->resolveFieldPrefix($trackerId);
-                // Persistir prefix detectado
-                $configManager->updateConnectionFields($slug, ['field_prefix' => $prefix, 'field_prefix_checked' => true]);
-                log_message("admin.php: sync_tracker — prefix auto-detectado '{$prefix}' para slug={$slug}");
-            } else {
-                $tikiClient = new TikiWikiClient(
-                    apiUrl: $conn['tiki_api_url'],
-                    token: $conn['tiki_api_token'],
-                    timeout: TIMEOUT_TIKIWIKI_API
-                );
+            $storedPrefix = $conn['field_prefix'] ?? 'telegrammessage';
+            $tikiClient = new TikiWikiClient(
+                apiUrl: $conn['tiki_api_url'],
+                token: $conn['tiki_api_token'],
+                timeout: TIMEOUT_TIKIWIKI_API
+            );
+            // Si el prefix es el default o está vacío, intentar auto-detectar desde el tracker
+            if ($storedPrefix === 'telegrammessage' || $storedPrefix === '') {
+                $resolvedPrefix = $tikiClient->resolveFieldPrefix($trackerId);
+                if ($resolvedPrefix !== $storedPrefix) {
+                    log_message("admin.php: sync_tracker — prefix corregido de '{$storedPrefix}' a '{$resolvedPrefix}' para slug={$slug}");
+                    $storedPrefix = $resolvedPrefix;
+                    $configManager->updateConnectionFields($slug, [
+                        'field_prefix' => $resolvedPrefix,
+                        'field_prefix_checked' => true,
+                    ]);
+                } elseif ($storedPrefix === '') {
+                    $storedPrefix = $resolvedPrefix;
+                }
             }
             try {
                 $result = $tikiClient->synchronizeTrackerFields($trackerId, $prefix);

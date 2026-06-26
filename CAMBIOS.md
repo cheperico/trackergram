@@ -1,5 +1,17 @@
 # Cambios - Changelog
 
+## v0.5.9
+
+### Feature: Hashtags como etiquetas (Freetags) en TikiWiki
+
+- **NormalizedMessage**: Nuevo campo `$hashtags` para transportar tags extraídos del mensaje.
+- **MessageMapper::extractHashtags()**: Nuevo método privado que extrae hashtags de `entities[].type=hashtag` (webhook: texto y captions) y del formato array del export (texto + `photo_caption`/`file_caption`/`caption`).
+- **MessageMapper::toWikiFields()**: Mapea `$msg->hashtags` al campo `{prefix}Hashtags` tipo `F` (Freetags).
+- **TikiWikiClient::getTrackerFieldDefinitions()**: Agregado `{prefix}Hashtags` tipo `F` como FIELD26. Nuevos trackers lo crean automáticamente.
+- **Prefix detection**: `Hashtags` agregado a `knownSuffixes` para auto-detección de field prefix.
+- **Sync**: `synchronizeTrackerFields()` crea el campo `Hashtags` en trackers existentes al hacer click en "Sync Fields" desde el admin.
+- **Store**: Tags se guardan espacio-separados, sin `#`, según formato estándar de TikiWiki Freetags. Se conectan automáticamente al ecosistema de etiquetas (tag cloud, búsqueda, nube).
+
 ## v0.5.8
 
 ### Fix: BUG-001 — findByWebhookSecret() devolvía primera conexión en vez de la pendiente
@@ -11,6 +23,11 @@
 
 - **detect_helper.php::assignDetection()**: Si el admin clickeaba "Asignar" en una detección, la función pisaba el `chat_id` de la conexión aunque ya tuviera uno configurado. En combinación con el bug anterior, esto podía corromper la conexión de otro grupo.
 - **Fix**: Ahora valida que la conexión tenga `chat_id=0` antes de asignar. Si ya tiene un chat asignado, devuelve error: "Creá una nueva conexión para este chat en vez de reasignar."
+
+### Fix: field prefix incorrecto al sincronizar tracker
+
+- **admin.php (sync_tracker)**: Cuando se ejecutaba la acción "Sincronizar Tracker", si el `field_prefix` almacenado en la conexión no estaba vacío (ej: `'telegrammessage'` default), se saltaba la auto-detección y usaba ese prefix directamente. Si el tracker real tenía un prefix diferente (ej: `lcc2026t`), generaba campos duplicados con el prefix incorrecto.
+- **Fix**: Ahora siempre llama a `resolveFieldPrefix()` cuando el prefix almacenado es `'telegrammessage'` (default) o está vacío, igual que hace `import.php` y la carga de página del admin. Si detecta un prefix diferente, lo persiste en la conexión antes de sincronizar.
 
 ### Docs: Requisito de bot admin documentado
 

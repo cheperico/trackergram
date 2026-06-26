@@ -41,7 +41,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 | | |
 |---|---|
-| **Versión** | v0.5.8 |
+| **Versión** | v0.5.9 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
 | **Repositorio** | https://github.com/cheperico/trackergram |
@@ -61,6 +61,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 - ✅ Deduplicación de mensajes
 - ✅ Seguridad: CSRF, rate limiting, hash de contraseñas, path traversal protection, XSS fix (innerHTML→textContent), DoS protection, 20MB real download limit, token leak fix
 - ✅ Reacciones formateadas como texto legible (👍 3 · ❤️ 1)
+- ✅ Hashtags extraídos como etiquetas Freetags (webhook + import) en campo tipo `F`
 - ✅ Álbumes/grupos de medios (mediaGroup) en webhook
 - ✅ Auto-reparación de galería (repairFgGallery)
 - ✅ Webhook Secret obligatorio (rechaza 500 si vacío)
@@ -315,6 +316,7 @@ El tracker por defecto tiene estos campos (permNames):
 | `telegrammessageEditedDate` | t (text) | Unix timestamp de última edición (vacío si no editado) |
 | `telegrammessageReplyToId` | t (text) | ID del mensaje al que responde |
 | `telegrammessageReactions` | t (text) | Reacciones formateadas como texto legible (👍 3 · ❤️ 1) |
+| `telegrammessageHashtags` | F (freetags) | Hashtags de Telegram como etiquetas (espacio-separados, sin #) |
 
 ### Auto-detección de field prefix
 
@@ -327,7 +329,7 @@ Desde v0.5.4, el sistema **detecta automáticamente el field prefix real** del t
 **Cómo funciona** (`TikiWikiClient::resolveFieldPriority()`):
 1. Si el prefix almacenado NO es `telegrammessage`, se confía en él (el usuario lo configuró explícitamente).
 2. Si es `telegrammessage` (default) y el flag `field_prefix_checked` no está presente, fetchea `GET /api/trackers/{id}/fields`.
-3. Busca campos con permNames que terminen en sufijos conocidos (`TelegramMessageId`, `ChatId`, `Text`, `MessageDate`, `Media`).
+3. Busca campos con permNames que terminen en sufijos conocidos (`TelegramMessageId`, `ChatId`, `Text`, `MessageDate`, `Media`, `Hashtags`).
 4. Extrae el prefijo común del primer match.
 5. Si el detectado difiere del almacenado, lo persiste a `setup.json` vía `ConfigManager::updateConnectionFields()`.
 6. Siempre persiste `field_prefix_checked: true` para NO repetir la llamada API en futuros requests.
@@ -532,6 +534,7 @@ Ver [CAMBIOS.md](CAMBIOS.md) para el detalle completo por versión.
 
 | Versión | Cambio principal |
 |---|---|---|
+| v0.5.9 | **Hashtags como etiquetas (Freetags)**: Extracción de `#tags` de mensajes Telegram (webhook + import) a campo tipo `F` en TikiWiki. Se integran al ecosistema de etiquetas (tag cloud, búsqueda). Nuevo campo `{prefix}Hashtags` en getTrackerFieldDefinitions(). |
 | v0.5.8 | **BUG-001 fix + Privacy Mode doc + htmlspecialchars fix**: findByWebhookSecret() prioriza conexiones pendientes. assignDetection() no sobrescribe chat_id existente. Documentado requisito de bot admin (Privacy Mode de Telegram). Eliminado htmlspecialchars() de toWikiFields() que corrompía comillas y otros caracteres. |
 | v0.5.7 | **ReplyToId con texto del original + reintentos en download + fix concurrencia**: ReplyToId incluye texto del mensaje original (webhook gratis, import via API). downloadAndUploadMedia() con 3 reintentos. Race condition fix en cache de captions. worker.php alineado con api.php. |
 | v0.5.6 | **Chat_id -100 en import + field_prefix_checked cache + fan-out try-catch**: Fix chat_id sin -100 en supergrupos. Auto-detección de field_prefix ahora se cachea (UNA llamada API). Fan-out con try-catch individual. Fix error histórico de webhook. Reintentos en download media. |
@@ -573,6 +576,7 @@ La documentación del proyecto se distribuye en varios archivos. Cada uno con pr
 | `design/*` | Equipo de desarrollo | Diseño exploratorio pre-implementación | Mantener como referencia, pasar a roadmap cuando madure |
 | `reports/*` | Histórico | Auditorías externas | NO borrar, roadmap consolida items accionables |
 | `opt/*` | Uso local | Credenciales, templates de instancia | NO versionar en GitHub |
+| `config.php` | Todos | Constantes globales, timeouts, versión del proyecto | **`TRACKERGRAM_VERSION` debe actualizarse en cada versión** — es la fuente de verdad que se muestra en la UI del admin |
 
 ### Reglas detalladas
 
@@ -654,6 +658,7 @@ git push origin v0.6.0
 - Los releases se marcan con tags `vX.Y.Z` sobre main.
 - `mono` está congelado — solo bugfixes críticos.
 - Si necesitás experimentar con algo riesgoso, creás un branch temporal (`git checkout -b experimento`), y cuando funciona lo mergeás a main y borrás el branch.
+- **Al cambiar de versión**, actualizar OBLIGATORIAMENTE `TRACKERGRAM_VERSION` en `config.php` (es la fuente de verdad que se muestra en la UI del admin). Hacerlo en el mismo commit del release.
 
 ---
 

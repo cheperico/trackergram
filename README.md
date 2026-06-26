@@ -582,6 +582,24 @@ excludeFromNotification = n
 visibleInViewMode = y
 visibleInEditMode = y
 visibleInHistoryMode = y
+
+[FIELD26]
+name = hashtags
+permName = telegrammessageHashtags
+type = F
+description = Hashtags de Telegram como etiquetas (espacio-separados, sin #)
+isTblVisible = y
+isMain = n
+isSearchable = y
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
 ```
 Podés copiar todo este bloque y pegarlo en **Admin → Trackers → Importar campos** al crear o editar un tracker.
 

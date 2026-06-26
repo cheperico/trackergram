@@ -28,9 +28,31 @@ class MessageMapper
      * Procesar mensaje de webhook de Telegram
      * Sin efectos secundarios (no upload, no cache)
      */
+    /**
+     * Extraer hashtags de entities de Telegram
+     * Busca en 'entities' y 'caption_entities', devuelve tags espacio-separados sin #
+     */
+    private function extractHashtags(array $message): string
+    {
+        $parts = [];
+        // entities -> text, caption_entities -> caption
+        foreach (['entities' => 'text', 'caption_entities' => 'caption'] as $entitiesKey => $textKey) {
+            if (isset($message[$entitiesKey]) && isset($message[$textKey]) && is_string($message[$textKey])) {
+                foreach ($message[$entitiesKey] as $entity) {
+                    if (($entity['type'] ?? '') === 'hashtag') {
+                        $tag = substr($message[$textKey], $entity['offset'], $entity['length']);
+                        $parts[] = ltrim($tag, '#');
+                    }
+                }
+            }
+        }
+        return implode(' ', $parts);
+    }
+
     public function fromWebhook(array $message): NormalizedMessage
     {
         $msg = new NormalizedMessage();
+        $msg->hashtags = $this->extractHashtags($message);
         $msg->messageId = (string) ($message['message_id'] ?? '');
         $msg->text = $message['text'] ?? '';
         $msg->editedDate = (string) ($message['edit_date'] ?? '');
@@ -400,6 +422,37 @@ class MessageMapper
 
         $msgType = $message['type'] ?? 'message';
 
+        // Extraer hashtags del texto del export (formato array o string, y captions)
+        $exportHashtags = [];
+
+        // Función helper inline para extraer hashtags de un text array del export
+        $extractExportTags = function($text) use (&$exportHashtags) {
+            if (is_array($text)) {
+                foreach ($text as $part) {
+                    if (($part['type'] ?? '') === 'hashtag') {
+                        $tag = ltrim($part['text'] ?? '', '#');
+                        if ($tag !== '') {
+                            $exportHashtags[] = $tag;
+                        }
+                    }
+                }
+            }
+        };
+
+        $rawText = $message['text'] ?? null;
+        if ($rawText !== null) {
+            $extractExportTags($rawText);
+        }
+        // También extraer de captions (photo_caption, file_caption, caption)
+        foreach (['photo_caption', 'file_caption', 'caption'] as $captionKey) {
+            if (isset($message[$captionKey])) {
+                $extractExportTags($message[$captionKey]);
+            }
+        }
+        if (!empty($exportHashtags)) {
+            $msg->hashtags = implode(' ', array_unique($exportHashtags));
+        }
+
         if ($msgType === 'message') {
             // Texto: si es array (con entidades), formatear links a sintaxis wiki
             $rawText = $message['text'] ?? '';
@@ -511,6 +564,7 @@ class MessageMapper
             "fields[{$p}EditedDate]" => $msg->editedDate,
             "fields[{$p}ReplyToId]" => $msg->replyToId,
             "fields[{$p}Reactions]" => $msg->reactions,
+            "fields[{$p}Hashtags]" => $msg->hashtags,
         ];
 
         if (!empty($msg->uploadedFileIds)) {
