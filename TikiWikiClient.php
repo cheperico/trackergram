@@ -1003,35 +1003,8 @@ class TikiWikiClient
             return null;
         }
 
-        // 3. Definición de todos los campos a crear
-        $fieldDefs = [
-            ['name' => $prefix . 'TelegramMessageId', 'type' => 't', 'permName' => $prefix . 'TelegramMessageId', 'description' => 'ID único del mensaje en Telegram'],
-            ['name' => $prefix . 'ChatId', 'type' => 't', 'permName' => $prefix . 'ChatId', 'description' => 'ID del chat/grupo en Telegram'],
-            ['name' => $prefix . 'ChatTitle', 'type' => 't', 'permName' => $prefix . 'ChatTitle', 'description' => 'Título del chat o grupo'],
-            ['name' => $prefix . 'TopicId', 'type' => 't', 'permName' => $prefix . 'TopicId', 'description' => 'ID del tema o foro (0 si es General)'],
-            ['name' => $prefix . 'TopicTitle', 'type' => 't', 'permName' => $prefix . 'TopicTitle', 'description' => 'Nombre del tema o foro'],
-            ['name' => $prefix . 'UserId', 'type' => 't', 'permName' => $prefix . 'UserId', 'description' => 'ID numérico del usuario que envió el mensaje'],
-            ['name' => $prefix . 'Username', 'type' => 't', 'permName' => $prefix . 'Username', 'description' => '@username del usuario en Telegram'],
-            ['name' => $prefix . 'FirstName', 'type' => 't', 'permName' => $prefix . 'FirstName', 'description' => 'Nombre del usuario (en import: display name completo)'],
-            ['name' => $prefix . 'LastName', 'type' => 't', 'permName' => $prefix . 'LastName', 'description' => 'Apellido del usuario (solo disponible en webhook)'],
-            ['name' => $prefix . 'DisplayName', 'type' => 't', 'permName' => $prefix . 'DisplayName', 'description' => 'Nombre completo para mostrar (unificado webhook e import)'],
-            ['name' => $prefix . 'MessageType', 'type' => 't', 'permName' => $prefix . 'MessageType', 'description' => 'Tipo de mensaje: text, photo, video, audio, document, sticker, voice, system, etc.'],
-            ['name' => $prefix . 'Text', 'type' => 'a', 'permName' => $prefix . 'Text', 'description' => 'Contenido textual del mensaje (incluye captions de media)'],
-            ['name' => $prefix . 'Location', 'type' => 'G', 'permName' => $prefix . 'Location', 'description' => 'Coordenadas GPS del mensaje (formato: lon, lat, zoom)'],
-            ['name' => $prefix . 'MediaType', 'type' => 't', 'permName' => $prefix . 'MediaType', 'description' => 'Tipo MIME del archivo adjunto (ej: image/jpeg, video/mp4)'],
-            ['name' => $prefix . 'MediaSize', 'type' => 'n', 'permName' => $prefix . 'MediaSize', 'description' => 'Tamaño del archivo adjunto en bytes'],
-            ['name' => $prefix . 'MediaCaption', 'type' => 't', 'permName' => $prefix . 'MediaCaption', 'description' => 'Texto de descripción asociado al archivo multimedia'],
-            ['name' => $prefix . 'MessageDate', 'type' => 'f', 'permName' => $prefix . 'MessageDate', 'description' => 'Fecha/hora del mensaje (timestamp UNIX)'],
-            ['name' => $prefix . 'Media', 'type' => 'FG', 'permName' => $prefix . 'Media', 'description' => 'Archivo multimedia adjunto (referencia a File Gallery de TikiWiki)'],
-            ['name' => $prefix . 'MediaUrl', 'type' => 't', 'permName' => $prefix . 'MediaUrl', 'description' => 'URL pública del archivo multimedia en TikiWiki'],
-            ['name' => $prefix . 'FileUrl', 'type' => 't', 'permName' => $prefix . 'FileUrl', 'description' => 'URL original del archivo en los servidores de Telegram'],
-            ['name' => $prefix . 'MediaWidth', 'type' => 'n', 'permName' => $prefix . 'MediaWidth', 'description' => 'Ancho de la imagen/video en píxeles'],
-            ['name' => $prefix . 'MediaHeight', 'type' => 'n', 'permName' => $prefix . 'MediaHeight', 'description' => 'Alto de la imagen/video en píxeles'],
-            ['name' => $prefix . 'MediaDuration', 'type' => 'DUR', 'permName' => $prefix . 'MediaDuration', 'description' => 'Duración del audio/video/voice en segundos (se muestra como hh:mm:ss)'],
-            ['name' => $prefix . 'EditedDate', 'type' => 't', 'permName' => $prefix . 'EditedDate', 'description' => 'Fecha de última edición (timestamp UNIX, vacío si no fue editado)'],
-            ['name' => $prefix . 'ReplyToId', 'type' => 't', 'permName' => $prefix . 'ReplyToId', 'description' => 'ID del mensaje al que responde (para conversaciones en hilo)'],
-            ['name' => $prefix . 'Reactions', 'type' => 'a', 'permName' => $prefix . 'Reactions', 'description' => 'Reacciones al mensaje formateadas como texto (ej: 👍 3 · ❤️ 1)'],
-        ];
+        // 3. Definición de todos los campos a crear (source of truth compartido con sync)
+        $fieldDefs = $this->getTrackerFieldDefinitions($prefix);
 
         // 4. Crear cada field individualmente vía POST /api/trackers/{trackerId}/fields
         //    Si algún field falla, abortamos — un tracker incompleto causaría errores difíciles
@@ -1139,6 +1112,90 @@ class TikiWikiClient
         }
 
         return true;
+    }
+
+    /**
+     * Devuelve la definición de todos los campos del tracker.
+     * Es el source of truth único — usado por createTracker() y synchronizeTrackerFields().
+     * @return array Lista de arrays con keys: name, permName, type, description
+     */
+    public function getTrackerFieldDefinitions(string $prefix): array
+    {
+        return [
+            ['name' => $prefix . 'TelegramMessageId', 'type' => 't', 'permName' => $prefix . 'TelegramMessageId', 'description' => 'ID único del mensaje en Telegram'],
+            ['name' => $prefix . 'ChatId', 'type' => 't', 'permName' => $prefix . 'ChatId', 'description' => 'ID del chat/grupo en Telegram'],
+            ['name' => $prefix . 'ChatTitle', 'type' => 't', 'permName' => $prefix . 'ChatTitle', 'description' => 'Título del chat o grupo'],
+            ['name' => $prefix . 'TopicId', 'type' => 't', 'permName' => $prefix . 'TopicId', 'description' => 'ID del tema o foro (0 si es General)'],
+            ['name' => $prefix . 'TopicTitle', 'type' => 't', 'permName' => $prefix . 'TopicTitle', 'description' => 'Nombre del tema o foro'],
+            ['name' => $prefix . 'UserId', 'type' => 't', 'permName' => $prefix . 'UserId', 'description' => 'ID numérico del usuario que envió el mensaje'],
+            ['name' => $prefix . 'Username', 'type' => 't', 'permName' => $prefix . 'Username', 'description' => '@username del usuario en Telegram'],
+            ['name' => $prefix . 'FirstName', 'type' => 't', 'permName' => $prefix . 'FirstName', 'description' => 'Nombre del usuario (en import: display name completo)'],
+            ['name' => $prefix . 'LastName', 'type' => 't', 'permName' => $prefix . 'LastName', 'description' => 'Apellido del usuario (solo disponible en webhook)'],
+            ['name' => $prefix . 'DisplayName', 'type' => 't', 'permName' => $prefix . 'DisplayName', 'description' => 'Nombre completo para mostrar (unificado webhook e import)'],
+            ['name' => $prefix . 'MessageType', 'type' => 't', 'permName' => $prefix . 'MessageType', 'description' => 'Tipo de mensaje: text, photo, video, audio, document, sticker, voice, system, etc.'],
+            ['name' => $prefix . 'Text', 'type' => 'a', 'permName' => $prefix . 'Text', 'description' => 'Contenido textual del mensaje (incluye captions de media)'],
+            ['name' => $prefix . 'Location', 'type' => 'G', 'permName' => $prefix . 'Location', 'description' => 'Coordenadas GPS del mensaje (formato: lon, lat, zoom)'],
+            ['name' => $prefix . 'MediaType', 'type' => 't', 'permName' => $prefix . 'MediaType', 'description' => 'Tipo MIME del archivo adjunto (ej: image/jpeg, video/mp4)'],
+            ['name' => $prefix . 'MediaSize', 'type' => 'n', 'permName' => $prefix . 'MediaSize', 'description' => 'Tamaño del archivo adjunto en bytes'],
+            ['name' => $prefix . 'MediaCaption', 'type' => 't', 'permName' => $prefix . 'MediaCaption', 'description' => 'Texto de descripción asociado al archivo multimedia'],
+            ['name' => $prefix . 'MessageDate', 'type' => 'f', 'permName' => $prefix . 'MessageDate', 'description' => 'Fecha/hora del mensaje (timestamp UNIX)'],
+            ['name' => $prefix . 'Media', 'type' => 'FG', 'permName' => $prefix . 'Media', 'description' => 'Archivo multimedia adjunto (referencia a File Gallery de TikiWiki)'],
+            ['name' => $prefix . 'MediaUrl', 'type' => 't', 'permName' => $prefix . 'MediaUrl', 'description' => 'URL pública del archivo multimedia en TikiWiki'],
+            ['name' => $prefix . 'FileUrl', 'type' => 't', 'permName' => $prefix . 'FileUrl', 'description' => 'URL original del archivo en los servidores de Telegram'],
+            ['name' => $prefix . 'MediaWidth', 'type' => 'n', 'permName' => $prefix . 'MediaWidth', 'description' => 'Ancho de la imagen/video en píxeles'],
+            ['name' => $prefix . 'MediaHeight', 'type' => 'n', 'permName' => $prefix . 'MediaHeight', 'description' => 'Alto de la imagen/video en píxeles'],
+            ['name' => $prefix . 'MediaDuration', 'type' => 'DUR', 'permName' => $prefix . 'MediaDuration', 'description' => 'Duración del audio/video/voice en segundos (se muestra como hh:mm:ss)'],
+            ['name' => $prefix . 'EditedDate', 'type' => 't', 'permName' => $prefix . 'EditedDate', 'description' => 'Fecha de última edición (timestamp UNIX, vacío si no fue editado)'],
+            ['name' => $prefix . 'ReplyToId', 'type' => 't', 'permName' => $prefix . 'ReplyToId', 'description' => 'ID del mensaje al que responde (para conversaciones en hilo)'],
+            ['name' => $prefix . 'Reactions', 'type' => 'a', 'permName' => $prefix . 'Reactions', 'description' => 'Reacciones al mensaje formateadas como texto (ej: 👍 3 · ❤️ 1)'],
+        ];
+    }
+
+    /**
+     * Obtener los permNames actuales de los campos del tracker.
+     */
+    public function getExistingFieldPermNames(int $trackerId): array
+    {
+        $fields = $this->loadTrackerFields($trackerId);
+        $names = [];
+        foreach ($fields as $f) {
+            if (!empty($f['permName'])) {
+                $names[] = $f['permName'];
+            }
+        }
+        return $names;
+    }
+
+    /**
+     * Sincronizar los campos del tracker con los esperados por trackerGram.
+     * Crea los campos faltantes (no modifica ni elimina existentes).
+     *
+     * @param int    $trackerId ID del tracker en TikiWiki
+     * @param string $prefix    Field prefix a usar (ej: telegrammessage, qpch, soporte)
+     * @return array Con keys: 'created' (lista de campos creados), 'existing' (lista de campos existentes), 'prefix_used' (prefix efectivo usado)
+     */
+    public function synchronizeTrackerFields(int $trackerId, string $prefix): array
+    {
+        $existingPermNames = $this->getExistingFieldPermNames($trackerId);
+        $expectedDefs = $this->getTrackerFieldDefinitions($prefix);
+        $created = [];
+
+        foreach ($expectedDefs as $fd) {
+            if (!in_array($fd['permName'], $existingPermNames, true)) {
+                if ($this->createTrackerField($trackerId, $fd['name'], $fd['permName'], $fd['type'], $fd['description'] ?? '')) {
+                    $created[] = $fd['permName'];
+                    log_message("TikiWikiClient: sync — campo creado '{$fd['permName']}' en tracker {$trackerId}");
+                } else {
+                    log_message("TikiWikiClient: sync — ERROR creando campo '{$fd['permName']}' en tracker {$trackerId}", true);
+                }
+            }
+        }
+
+        return [
+            'created' => $created,
+            'existing' => $existingPermNames,
+            'prefix_used' => $prefix,
+        ];
     }
 
     private function getMimeType(string $filePath): string

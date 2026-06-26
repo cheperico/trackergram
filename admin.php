@@ -504,6 +504,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
             break;
         
+        // ── Sincronizar tracker: crear campos faltantes ──
+        case 'sync_tracker':
+            $slug = $_POST['slug'] ?? '';
+            $conn = $configManager->getConnection($slug);
+            if (!$conn) {
+                $errorMessage = 'Conexión no encontrada';
+                break;
+            }
+            $trackerId = (int) ($conn['tracker_id'] ?? 0);
+            if ($trackerId <= 0) {
+                $errorMessage = 'La conexión no tiene tracker asignado';
+                break;
+            }
+            $prefix = $conn['field_prefix'] ?? '';
+            if ($prefix === '') {
+                // Auto-detectar prefix desde el tracker
+                $tikiClient = new TikiWikiClient(
+                    apiUrl: $conn['tiki_api_url'],
+                    token: $conn['tiki_api_token'],
+                    timeout: TIMEOUT_TIKIWIKI_API
+                );
+                $prefix = $tikiClient->resolveFieldPrefix($trackerId);
+                // Persistir prefix detectado
+                $configManager->updateConnectionFields($slug, ['field_prefix' => $prefix, 'field_prefix_checked' => true]);
+                log_message("admin.php: sync_tracker — prefix auto-detectado '{$prefix}' para slug={$slug}");
+            } else {
+                $tikiClient = new TikiWikiClient(
+                    apiUrl: $conn['tiki_api_url'],
+                    token: $conn['tiki_api_token'],
+                    timeout: TIMEOUT_TIKIWIKI_API
+                );
+            }
+            try {
+                $result = $tikiClient->synchronizeTrackerFields($trackerId, $prefix);
+                $created = $result['created'];
+                if (empty($created)) {
+                    $successMessage = 'Tracker sincronizado: todos los campos ya existen (' . count($result['existing']) . ' campos, prefix: ' . escapeHtml($prefix) . ')';
+                } else {
+                    $successMessage = 'Tracker sincronizado: creados ' . count($created) . ' campos faltantes (' . implode(', ', $created) . '). Prefix: ' . escapeHtml($prefix);
+                }
+            } catch (Exception $e) {
+                $errorMessage = 'Error al sincronizar tracker: ' . $e->getMessage();
+            }
+            break;
+        
         // ── Configurar webhook en Telegram ──
         case 'configure_webhook':
             $slug = $_POST['slug'] ?? '';
@@ -1315,13 +1360,19 @@ foreach ($connections as $slug => $conn) {
                             </button>
                         </form>
                         <button class="btn btn-outline btn-sm" onclick="testTikiConnection('<?php echo escapeHtml($conn['slug']); ?>', this)" title="Probar conexión con TikiWiki">Test Tiki</button>
+                        <form method="post" class="inline-form" style="display:inline;">
+                            <input type="hidden" name="action" value="sync_tracker">
+                            <input type="hidden" name="slug" value="<?php echo escapeHtml($conn['slug']); ?>">
+                            <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+                            <button type="submit" class="btn btn-outline btn-sm" title="Sincronizar campos del tracker con los esperados por trackerGram">🛠️ Sync</button>
+                        </form>
                         <form method="post" class="inline-form" onsubmit="return confirm('<?php echo addslashes('¿Eliminar conexion \'' . $conn['name'] . '\'?'); ?>')">
                             <input type="hidden" name="action" value="delete_connection">
                             <input type="hidden" name="slug" value="<?php echo escapeHtml($conn['slug']); ?>">
                             <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
                             <button type="submit" class="btn btn-danger btn-sm" title="Eliminar esta conexión permanentemente">Eliminar</button>
                         </form>
-                        <div class="test-result" style="display:none;flex-basis:100%;" aria-live="polite" aria-atomic="true"></div>
+                        <div class="test-result sync-result" style="display:none;flex-basis:100%;" aria-live="polite" aria-atomic="true"></div>
                     </div>
                 </div>
                 <?php endforeach; ?>
