@@ -391,16 +391,37 @@ class ConfigManager
      * Buscar cualquier conexión por webhook_secret, independientemente de chat_id.
      * Sirve para detectar cuando un bot conocido (con secret válido) es agregado
      * a un grupo nuevo que aún no está configurado.
+     *
+     * Prioriza conexiones PENDIENTES (chat_id=0/empty) sobre las ya configuradas,
+     * y entre las configuradas elige la más reciente (created_at).
+     * Esto evita BUG-001: asignar una detección a la conexión equivocada
+     * cuando varias comparten el mismo webhook_secret (mismo bot).
      */
     public function findByWebhookSecret(string $secret): ?array
     {
         $this->load();
+        $matches = [];
         foreach ($this->data['connections'] as $slug => $conn) {
             if (!empty($conn['webhook_secret']) && hash_equals($conn['webhook_secret'], $secret)) {
-                return $conn + ['_slug' => $slug];
+                $matches[] = $conn + ['_slug' => $slug];
             }
         }
-        return null;
+        if (empty($matches)) {
+            return null;
+        }
+        // Priorizar conexiones pendientes (chat_id=0) sobre las ya configuradas
+        usort($matches, function (array $a, array $b) {
+            $aPending = empty($a['chat_id']);
+            $bPending = empty($b['chat_id']);
+            if ($aPending !== $bPending) {
+                return $aPending ? -1 : 1; // pendientes primero
+            }
+            // Entre iguales, la más nueva creada primero (más probable que sea la relevante)
+            $aCreated = $a['created_at'] ?? '';
+            $bCreated = $b['created_at'] ?? '';
+            return strcmp($bCreated, $aCreated); // descendente
+        });
+        return $matches[0];
     }
 
     /**

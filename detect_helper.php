@@ -142,6 +142,16 @@ function assignDetection(string $slug, int $chatId): array
         ];
     }
 
+    // BUG-001: NO pisar chat_id existente. Si la conexión ya tiene un chat asignado,
+    // negarse a sobrescribir. El admin debe crear una conexión nueva para el nuevo chat.
+    if (!empty($conn['chat_id'])) {
+        return [
+            'success' => false,
+            'message' => 'Esta conexión ya tiene un chat asignado (#' . $conn['chat_id'] . '). '
+                . 'Creá una nueva conexión para el chat #' . $chatId . ' en vez de reasignar.',
+        ];
+    }
+
     // Remover detección PRIMERO para evitar orphan si falla el guardado
     $data = loadDetections();
     if (isset($data['detections'][$slug])) {

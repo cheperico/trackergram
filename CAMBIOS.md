@@ -1,5 +1,35 @@
 # Cambios - Changelog
 
+## v0.5.8
+
+### Fix: BUG-001 — findByWebhookSecret() devolvía primera conexión en vez de la pendiente
+
+- **ConfigManager::findByWebhookSecret()**: Cuando múltiples conexiones compartían el mismo `webhook_secret` (mismo bot en varios grupos), la función devolvía la primera conexión en orden de inserción. Si llegaba un mensaje de un grupo nuevo, la detección se asociaba al slug equivocado.
+- **Fix**: Ahora recolecta TODOS los matches y los ordena: conexiones pendientes (`chat_id=0`) primero, luego por `created_at` descendente. Así la detección siempre se asigna a la conexión correcta.
+
+### Fix: BUG-001 — assignDetection() sobrescribía chat_id existente
+
+- **detect_helper.php::assignDetection()**: Si el admin clickeaba "Asignar" en una detección, la función pisaba el `chat_id` de la conexión aunque ya tuviera uno configurado. En combinación con el bug anterior, esto podía corromper la conexión de otro grupo.
+- **Fix**: Ahora valida que la conexión tenga `chat_id=0` antes de asignar. Si ya tiene un chat asignado, devuelve error: "Creá una nueva conexión para este chat en vez de reasignar."
+
+### Docs: Requisito de bot admin documentado
+
+- Agregado requisito explícito en README.md > "Qué Necesitás Antes de Empezar": el bot debe ser administrador del grupo para recibir todos los mensajes (Privacy Mode de Telegram).
+- Agregado en README.md > "Problemas Comunes": diagnóstico rápido cuando solo llegan mensajes de sistema pero no los de texto.
+- Agregado paso explícito en INSTALL.md > Paso 5: "Hacé admin al bot" con instrucciones.
+- Agregado en tabla de troubleshooting de INSTALL.md.
+
+### Lección aprendida: Privacy Mode de Telegram
+
+Los bots de Telegram tienen **Privacy Mode** habilitado por defecto. Esto significa que solo reciben:
+- Mensajes de sistema (service messages) → **siempre**, incluso sin ser admin
+- Comandos (`/comando`), menciones (`@bot`), replies al bot
+- **NO reciben** mensajes de texto comunes de usuarios
+
+Para que un bot reciba TODOS los mensajes de un grupo, debe ser **administrador** del grupo (o deshabilitar privacy mode en BotFather con `/setprivacy` y re-agregar el bot).
+
+Documentación oficial: https://core.telegram.org/bots/features#privacy-mode
+
 ## v0.5.7
 
 ### Feature: ReplyToId incluye texto del mensaje original (Opción B)

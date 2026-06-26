@@ -129,8 +129,9 @@ Deberías ver `"ok": true` y `"url"` apuntando a `https://tu-dominio.com/tracker
 1. **Panel de admin**: Accedé a `https://tu-dominio.com/trackergram/admin.php` — deberías ver tus conexiones
 2. **Crear tracker** (si no tenés uno): Desde los botones de la conexión, usá **"Crear Tracker"** o hacélo manualmente en TikiWiki
 3. **Agregá el bot al grupo**: El bot debe ser miembro del grupo cuyo `chat_id` configuraste
-4. **Enviar un mensaje de prueba**: Escribí algo en el grupo de Telegram donde está tu bot
-5. **Verificar en TikiWiki**: Abrí el tracker y deberías ver el mensaje como un nuevo item
+4. **⚠️ Hacé admin al bot**: Para que el bot pueda ver TODOS los mensajes (texto, fotos, videos, etc.) y no solo mensajes de sistema, debe ser **administrador del grupo**. Los bots tienen **Privacy Mode** habilitado por defecto, que filtra los mensajes que no sean comandos o menciones al bot. Desde los ajustes del grupo: Administradores → Agregar `@tubot` → permisos mínimos (solo "Leer mensajes").
+5. **Enviar un mensaje de prueba**: Escribí algo en el grupo de Telegram donde está tu bot
+6. **Verificar en TikiWiki**: Abrí el tracker y deberías ver el mensaje como un nuevo item
 
 ### Si no funciona
 
@@ -218,10 +219,11 @@ Ver [opt/visualizacion-tiki.md](opt/visualizacion-tiki.md) para la documentació
 ---
 
 | Problema | Qué hacer |
-|---|---|
+|---|---|---|
 | **500 Internal Server Error** | Revisá logs de Apache y sintaxis PHP: `php -l api.php` |
 | **Webhook no responde** | Verificá que la URL sea pública con HTTPS. Probá con `curl -I https://tu-dominio.com/trackergram/api.php` |
 | **Error al conectar a TikiWiki** | Usá el botón "🧪 Test" en la conexión para verificar las credenciales |
 | **Mensajes duplicados** | Verificá que el webhook secret esté bien configurado en la conexión |
 | **Contraseña de admin olvidada** | Editá `.env` y cambiá `ADMIN_PASSWORD` manualmente |
+| **Solo llegan mensajes de sistema, los textos no** | El bot no es admin del grupo. Los bots requieren ser administradores para recibir todos los mensajes (Privacy Mode de Telegram). Agregalo como admin desde ajustes del grupo. |
 | **No llegan mensajes nuevos** | Verificá que el bot sea miembro del grupo y que el webhook esté activo (`getWebhookInfo`) |

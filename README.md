@@ -20,6 +20,7 @@ Puente entre Telegram y TikiWiki. Recibe mensajes de un grupo de Telegram y los 
 1. **Un bot de Telegram** — Se crea gratis hablando con [@BotFather](https://t.me/BotFather). Necesitás el token.
 2. **Un TikiWiki 21.x+** — Con la API habilitada, un token de acceso y un tracker (o dejá que trackerGram lo cree automáticamente).
 3. **Un servidor con PHP 8.0+** — Apache o Nginx, accesible desde internet con HTTPS.
+4. **⚠️ El bot debe ser administrador del grupo** — Para recibir **todos los mensajes** (texto, fotos, videos, etc.), el bot necesita ser administrador del grupo de Telegram. Los bots por defecto tienen **Privacy Mode** habilitado, lo que significa que solo ven mensajes de sistema (miembros que entran/salen, topics, pins) y comandos. Hacé admin al bot desde los ajustes del grupo con permisos mínimos (solo "Leer mensajes"). Ver [Privacy Mode](https://core.telegram.org/bots/features#privacy-mode) en la documentación oficial de Telegram.
 
 Cada vinculación (bot + wiki + tracker) se configura desde el panel de admin como una **conexión**. Podés tener múltiples bots y wikis desde una misma instalación.
 
@@ -592,7 +593,8 @@ Podés copiar todo este bloque y pegarlo en **Admin → Trackers → Importar ca
 
 1. Verificá que el webhook esté activo: accedé al panel de admin y usá el botón "🌐 Webhook" o consultá manualmente: `https://api.telegram.org/bot<TU_TOKEN>/getWebhookInfo`
 2. Revisá que el tracker ID y las credenciales Tiki sean correctas en el panel de admin
-3. Activá `DEBUG_MODE=true` en `.env` y revisá `debug.log`
+3. **Si solo llegan mensajes de sistema** (miembros, topics, pins) pero **no los mensajes de texto**: el bot no es administrador del grupo. Por defecto Telegram limita lo que ve el bot (Privacy Mode). Hacé admin al bot desde los ajustes del grupo.
+4. Activá `DEBUG_MODE=true` en `.env` y revisá `debug.log`
 
 ### Error al conectar a TikiWiki
 

@@ -41,7 +41,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 | | |
 |---|---|
-| **Versión** | v0.5.7 |
+| **Versión** | v0.5.8 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
 | **Repositorio** | https://github.com/cheperico/trackergram |
@@ -498,6 +498,8 @@ ASYNC_PROCESSING=false
 - **No asumir que `message_id` es único sin `chat_id`** — Deduplicación es por par `(chat_id, message_id)`.
 - **No usar `sleep()` en reintentos** — Usar `usleep()`.
 - **No descargar archivos sin verificar tamaño** — Límite de 20MB (`MEDIA_DOWNLOAD_MAX_SIZE`).
+- **No asumir que el bot recibe todos los mensajes del grupo** — Por defecto los bots tienen **Privacy Mode** habilitado y solo ven mensajes de sistema, comandos, menciones y replies. Para recibir todos los mensajes, el bot debe ser **administrador del grupo** o deshabilitar privacy mode en BotFather (`/setprivacy` → Disable) y re-agregarlo. Ver: https://core.telegram.org/bots/features#privacy-mode
+- **BUG-001: `findByWebhookSecret()` no debe devolver la primera conexión que encuentra** — Cuando varias conexiones comparten el mismo `webhook_secret`, priorizar las pendientes (`chat_id=0`). Si no hay pendientes, ordenar por `created_at` descendente. Nunca devolver la primera en orden de inserción.
 
 ### Seguridad
 
@@ -529,6 +531,7 @@ Ver [CAMBIOS.md](CAMBIOS.md) para el detalle completo por versión.
 
 | Versión | Cambio principal |
 |---|---|---|
+| v0.5.8 | **BUG-001 fix + Privacy Mode doc**: findByWebhookSecret() prioriza conexiones pendientes. assignDetection() no sobrescribe chat_id existente. Documentado requisito de bot admin (Privacy Mode de Telegram). |
 | v0.5.7 | **ReplyToId con texto del original + reintentos en download + fix concurrencia**: ReplyToId incluye texto del mensaje original (webhook gratis, import via API). downloadAndUploadMedia() con 3 reintentos. Race condition fix en cache de captions. worker.php alineado con api.php. |
 | v0.5.6 | **Chat_id -100 en import + field_prefix_checked cache + fan-out try-catch**: Fix chat_id sin -100 en supergrupos. Auto-detección de field_prefix ahora se cachea (UNA llamada API). Fan-out con try-catch individual. Fix error histórico de webhook. Reintentos en download media. |
 | v0.5.5 | **checkPermissions sin side effects + health check + getWebhookInfo**: Permissions test sin crear galerías reales. Health check visible en cards de conexión. Upload por base64. Verificación post-creación de FG field. webhook_secret compartido entre conexiones mismo bot. |
