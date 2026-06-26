@@ -15,7 +15,7 @@
 
 | | |
 |---|---|
-| **Versión actual** | v0.5.7 |
+| **Versión actual** | v0.5.4 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Instancias activas** | Dev (tracker 26) · Prod (tracker 22) |
 | **Filosofía** | Sin DB con servidor · JSON files para estado local (no SQLite) · PHP puro sin framework · MVP pragmático |
@@ -58,6 +58,7 @@
 - ✅ **Health check visible en cards de conexión**: cada tarjeta muestra estado del webhook vía `getWebhookInfo()` (✅ configurado, ❌ no configurado, ⚠️ con errores).
 - ✅ **Verificación post-creación de FG field**: `updateFgFieldOptions()` verifica con `GET /fields` que el galleryId se haya guardado (workaround del bug de TikiWiki que responde HTTP 200 aunque falle).
 - ✅ **Field descriptions en API**: todos los campos del tracker se crean con `description` descriptivo enviado a la API de TikiWiki.
+- ✅ **Auto-detección de field prefix**: si el prefix almacenado en `setup.json` es `telegrammessage` (default), el sistema lo verifica contra los campos reales del tracker vía API y lo corrige automáticamente si es distinto. Se persiste tras el primer webhook. Cobertura: webhook, async worker, import.
 
 ---
 
@@ -101,6 +102,16 @@ Items con impacto inmediato en la operación del día a día.
 | 15 | **SQLite para cola async y rate limiting** (evaluación) | 1 sesión | **Opcional.** Evaluar si vale la pena migrar tmp/buffer/ y rate limiting de archivos JSON a SQLite. Prioridad mínima — los archivos actuales funcionan para el volumen esperado. No aplica a setup.json ni topic cache. |
 | 16 | **Rotación de logs por fecha** | 1 sesión | Además de por tamaño. |
 | 17 | **Expulsar bot desde admin panel** | 1 sesión | Botón para sacar el bot de un grupo directamente desde la interface, sin tener que hacerlo desde Telegram. |
+
+### ⚪ Fase 5: Pendientes de reevaluación (muy baja prioridad)
+
+Items que no justifican implementación hoy pero se documentan por si el contexto cambia. Requieren re-evaluación antes de arrancar.
+
+| # | Item | Notas |
+|---|------|-------|
+| 1 | **Botón "Detectar prefix" en admin** | Con la auto-detección automática en el primer webhook, un botón manual es redundante. Solo tendría sentido si hubiera casos donde no se pueda enviar un mensaje para gatillar la detección. |
+| 2 | **Flag `prefix_confirmed` para evitar re-detección** | La auto-detección ya persiste el prefix corregido a `setup.json` después del primer webhook, por lo que no hay re-detección en requests subsiguientes. El flag no agrega valor. |
+| 3 | **Campo `field_prefix` visible/editable en modal de edición de conexión** | El modal de Webhook no incluye `field_prefix`. Con la auto-detección ya no es necesario editarlo manualmente. Solo tendría sentido si se quiere ver el valor detectado por transparencia. |
 
 ---
 
@@ -149,4 +160,4 @@ Los documentos en `design/` contienen exploraciones detalladas de features que e
 
 Los reportes históricos en `reports/` se conservan como referencia de investigaciones pasadas. Los items accionables ya están consolidados en este documento.
 
-> **Última actualización**: 21/06/2026
+> **Última actualización**: 26/06/2026
