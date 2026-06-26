@@ -631,43 +631,29 @@ Cuando el orquestador recibe una tarea que toca documentación:
 
 | Nombre | Tipo | Propósito |
 |--------|------|-----------|
+| Nombre | Tipo | Propósito |
+|--------|------|-----------|
 | `main` | branch | **Rama única de trabajo y producción**. Todo el desarrollo va acá. Los releases se marcan con tags. |
 | `mono` | branch | **Versión monoTiki legacy** (antes `qpch`). Un solo TikiWiki, un solo grupo Telegram, un solo bot. Solo bugfixes y parches menores (congelado). |
 | `mono-vX.Y.Z` | tag | Hotfixes sobre mono branch (ej: `mono-v0.3.1`) |
-| `vX.Y.Z` | tag | Releases estables sobre main (ej: `v0.6.0`, `v0.7.0`) |
+| `vX.Y.Z` | tag | Releases estables sobre main (ej: `v0.5.8`, `v0.6.0`) |
 
 ### Cómo trabajar
 
-**Desarrollo normal:**
 ```bash
 git checkout main
 # ... desarrollar, commit, push ...
-```
 
-**Para arreglar un bug en mono (legacy congelado):**
-```bash
-git checkout mono
-git checkout -b fix/mono-algo     # branch temporal para el fix
-# ... arreglar, commit ...
-git tag -a mono-v0.3.1 -m "descripción del hotfix"
-git push origin mono-v0.3.1
-git checkout mono
-git merge fix/mono-algo
-git push origin mono
-git branch -d fix/mono-algo
-```
-
-**Para marcar un release estable en main:**
-```bash
+# Cuando algo está probado y querés dejar un punto de referencia:
 git tag -a v0.6.0 -m "Resumen del release"
 git push origin v0.6.0
 ```
 
 **Reglas:**
-- `main` es la rama única — todo el desarrollo va acá
-- Los releases en main se marcan con tags `vX.Y.Z`
-- `mono` está congelado — solo bugfixes críticos, sin features nuevas
-- Para experimentos riesgosos, crear branch temporal y mergear cuando funcione
+- `main` es la rama única de trabajo. No hay branches adicionales.
+- Los releases se marcan con tags `vX.Y.Z` sobre main.
+- `mono` está congelado — solo bugfixes críticos.
+- Si necesitás experimentar con algo riesgoso, creás un branch temporal (`git checkout -b experimento`), y cuando funciona lo mergeás a main y borrás el branch.
 
 ---
 
