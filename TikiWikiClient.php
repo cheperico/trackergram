@@ -1121,6 +1121,80 @@ class TikiWikiClient
     }
 
     /**
+     * Obtener información de un tracker (nombre, descripción, etc.) vía API.
+     * @return array|null Datos del tracker o null si no se encontró
+     */
+    public function getTrackerInfo(int $trackerId): ?array
+    {
+        $url = $this->apiUrl . "trackers/{$trackerId}";
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HTTPGET, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Authorization: Bearer " . $this->token,
+            "User-Agent: Mozilla/5.0"
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200) {
+            return null;
+        }
+
+        return json_decode($response, true) ?: null;
+    }
+
+    /**
+     * Actualizar el fieldPrefix de un tracker existente vía API (POST /api/trackers con trackerId).
+     * TikiWiki guarda fieldPrefix como opción del tracker en tiki_tracker_options.
+     */
+    public function setTrackerFieldPrefix(int $trackerId, string $prefix): bool
+    {
+        // Necesitamos el nombre actual del tracker (requerido por action_replace)
+        $info = $this->getTrackerInfo($trackerId);
+        if ($info === null || empty($info['name'])) {
+            log_message("TikiWikiClient: setTrackerFieldPrefix — no se pudo obtener info del tracker {$trackerId}", true);
+            return false;
+        }
+
+        $url = $this->apiUrl . "trackers";
+        $postFields = http_build_query([
+            'trackerId' => $trackerId,
+            'name' => $info['name'],
+            'fieldPrefix' => $prefix,
+            'confirm' => 1,
+        ]);
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Authorization: Bearer " . $this->token,
+            "Content-Type: application/x-www-form-urlencoded",
+            "User-Agent: Mozilla/5.0"
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200 && $httpCode !== 201) {
+            log_message("TikiWikiClient: setTrackerFieldPrefix HTTP {$httpCode} — response: " . substr($response, 0, 300));
+            return false;
+        }
+
+        log_message("TikiWikiClient: fieldPrefix '{$prefix}' seteado en tracker {$trackerId}");
+        return true;
+    }
+
+    /**
      * Devuelve la definición de todos los campos del tracker.
      * Es el source of truth único — usado por createTracker() y synchronizeTrackerFields().
      * @return array Lista de arrays con keys: name, permName, type, description
@@ -1175,10 +1249,11 @@ class TikiWikiClient
     /**
      * Sincronizar los campos del tracker con los esperados por trackerGram.
      * Crea los campos faltantes (no modifica ni elimina existentes).
+     * Además, asegura que el fieldPrefix esté configurado en el tracker.
      *
      * @param int    $trackerId ID del tracker en TikiWiki
      * @param string $prefix    Field prefix a usar (ej: telegrammessage, qpch, soporte)
-     * @return array Con keys: 'created' (lista de campos creados), 'existing' (lista de campos existentes), 'prefix_used' (prefix efectivo usado)
+     * @return array Con keys: 'created' (lista de campos creados), 'existing' (lista de campos existentes), 'prefix_used' (prefix efectivo usado), 'prefix_set' (bool: se configuró el fieldPrefix en el tracker?)
      */
     public function synchronizeTrackerFields(int $trackerId, string $prefix): array
     {
@@ -1197,10 +1272,14 @@ class TikiWikiClient
             }
         }
 
+        // También asegurar que el tracker tenga configurado su fieldPrefix nativo
+        $prefixSet = $this->setTrackerFieldPrefix($trackerId, $prefix);
+
         return [
             'created' => $created,
             'existing' => $existingPermNames,
             'prefix_used' => $prefix,
+            'prefix_set' => $prefixSet,
         ];
     }
 
