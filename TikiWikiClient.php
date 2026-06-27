@@ -772,13 +772,14 @@ class TikiWikiClient
         curl_close($ch);
 
         if ($httpCode !== 200) {
-            log_message("getVersion: GET /api/version HTTP {$httpCode}" . ($curlError ? " — cURL error: {$curlError}" : ""));
+            if ($curlError) {
+                log_message("getVersion: GET /api/version error de red: {$curlError}" . ($curlError ? " (HTTP {$httpCode})" : ""));
+            }
             return null;
         }
 
         $data = json_decode($response, true);
         if ($data === null) {
-            log_message("getVersion: respuesta no es JSON válido: " . substr($response, 0, 200));
             return null;
         }
         return $data['version'] ?? null;

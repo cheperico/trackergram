@@ -541,13 +541,20 @@ class WebhookHandler
             $lines[] = "🌐 <b>Webhook:</b> ❌ No configurado";
         }
 
-        // TikiWiki
-        $tikiVersion = $this->tikiWikiClient->getVersion();
-        if ($tikiVersion !== null) {
-            $lines[] = "🗄️ <b>TikiWiki:</b> v{$tikiVersion} ✅";
+        // TikiWiki — usa testConnection() (GET /api/trackers) que siempre funciona
+        $tikiTest = $this->tikiWikiClient->testConnection();
+        if ($tikiTest['ok']) {
+            $versionLabel = '';
+            // Intento opcional de versión (puede fallar con 406 en algunos hosts)
+            $tikiVersion = $this->tikiWikiClient->getVersion();
+            if ($tikiVersion !== null) {
+                $versionLabel = " v{$tikiVersion}";
+            }
+            $lines[] = "🗄️ <b>TikiWiki:</b>{$versionLabel} ✅";
         } else {
-            $lines[] = "🗄️ <b>TikiWiki:</b> ❌ No responde — revisar <a href=\"{$this->adminUrl}\">admin panel</a>";
-            log_message("handleEstado: getVersion() falló para conexión '{$this->connectionName}' tracker #{$this->trackerId}");
+            $lines[] = "🗄️ <b>TikiWiki:</b> ❌ " . $tikiTest['message']
+                . " — revisar <a href=\"{$this->adminUrl}\">admin panel</a>";
+            log_message("handleEstado: testConnection() falló para conexión '{$this->connectionName}' tracker #{$this->trackerId}: " . $tikiTest['message']);
         }
 
         // Tracker link
