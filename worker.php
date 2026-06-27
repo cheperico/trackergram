@@ -165,7 +165,8 @@ function processBatch(string $bufferDir, int $maxEvents, ConfigManager $configMa
                 tikiWikiClient: $tikiClient,
                 telegramClient: $tgClient,
                 messageMapper: $messageMapper,
-                trackerId: (int) $connection['tracker_id']
+                trackerId: (int) $connection['tracker_id'],
+                connectionName: $connectionSlug
             );
 
             $handler->processUpdate($update);

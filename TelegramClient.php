@@ -342,6 +342,40 @@ class TelegramClient
         ];
     }
 
+    /**
+     * Enviar un mensaje de texto a un chat de Telegram
+     */
+    public function sendMessage(int|string $chatId, string $text, array $extra = []): bool
+    {
+        $url = $this->baseUrl . '/bot' . $this->botToken . '/sendMessage';
+
+        $params = array_merge([
+            'chat_id' => $chatId,
+            'text' => $text,
+            'parse_mode' => 'HTML',
+            'disable_web_page_preview' => true,
+        ], $extra);
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200) {
+            log_message("trackerGram: sendMessage falló (HTTP {$httpCode})", true);
+            return false;
+        }
+
+        $data = json_decode($response, true);
+        return isset($data['ok']) && $data['ok'] === true;
+    }
+
     public function getTopicNameFromMessage(array $message, int $chatId): string
     {
         if (($message['type'] ?? '') === 'service' && ($message['action'] ?? '') === 'topic_created') {

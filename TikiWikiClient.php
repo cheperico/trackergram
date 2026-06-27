@@ -752,7 +752,7 @@ class TikiWikiClient
      */
     /**
      * Obtener la versión de TikiWiki vía API.
-     * Llama a GET /api/version, un endpoint liviano que no requiere autenticación.
+     * Llama a GET /api/version con el token de autenticación.
      * @return string|null Versión (ej: "27.5") o null si falla
      */
     public function getVersion(): ?string
@@ -764,17 +764,23 @@ class TikiWikiClient
             "Authorization: Bearer " . $this->token,
         ]);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
         curl_close($ch);
 
         if ($httpCode !== 200) {
+            log_message("getVersion: GET /api/version HTTP {$httpCode}" . ($curlError ? " — cURL error: {$curlError}" : ""));
             return null;
         }
 
         $data = json_decode($response, true);
+        if ($data === null) {
+            log_message("getVersion: respuesta no es JSON válido: " . substr($response, 0, 200));
+            return null;
+        }
         return $data['version'] ?? null;
     }
 

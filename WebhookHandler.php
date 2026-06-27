@@ -14,6 +14,8 @@ class WebhookHandler
     private int $retryMaxAttempts;
     private int $retryDelayMicroseconds;
     private int $maxDownloadSize;
+    private string $adminUrl = '';
+    private string $connectionName = '';
 
     public function __construct(
         TikiWikiClient $tikiWikiClient,
@@ -22,7 +24,9 @@ class WebhookHandler
         int $trackerId,
         int $retryMaxAttempts = 2,
         int $retryDelayMicroseconds = 100000,
-        int $maxDownloadSize = 20971520
+        int $maxDownloadSize = 20971520,
+        string $adminUrl = '',
+        string $connectionName = ''
     ) {
         $this->tikiWikiClient = $tikiWikiClient;
         $this->telegramClient = $telegramClient;
@@ -31,6 +35,8 @@ class WebhookHandler
         $this->retryMaxAttempts = $retryMaxAttempts;
         $this->retryDelayMicroseconds = $retryDelayMicroseconds;
         $this->maxDownloadSize = $maxDownloadSize;
+        $this->adminUrl = $adminUrl;
+        $this->connectionName = $connectionName;
     }
 
     /**
@@ -214,6 +220,25 @@ class WebhookHandler
 
         if (!empty(ALLOWED_CHAT_IDS) && !in_array($chatId, ALLOWED_CHAT_IDS)) {
             log_message("Chat $chatId no está en la lista de permitidos");
+            return;
+        }
+
+        // Detectar comandos del bot (/inicio, /ayuda, /tracker, /estado)
+        $entities = $message['entities'] ?? [];
+        $commandText = '';
+        foreach ($entities as $entity) {
+            if (($entity['type'] ?? '') === 'bot_command') {
+                $cmd = substr($message['text'], $entity['offset'], $entity['length']);
+                // Strip bot username: /inicio@botname → /inicio
+                if (($pos = strpos($cmd, '@')) !== false) {
+                    $cmd = substr($cmd, 0, $pos);
+                }
+                $commandText = $cmd;
+                break;
+            }
+        }
+        if ($commandText !== '') {
+            $this->handleCommand($commandText, $chatId);
             return;
         }
 
@@ -417,6 +442,122 @@ class WebhookHandler
         if (!$this->sendToTikiWikiWithRetries($msg)) {
             log_message("ERROR: No se pudo enviar conteo de reacciones a TikiWiki: message_id={$originalMessageId}", true);
         }
+    }
+
+    /**
+     * Manejar comandos del bot
+     */
+    private function handleCommand(string $command, int $chatId): void
+    {
+        switch ($command) {
+            case '/inicio':
+                $text = "👋 <b>trackerGram " . TRACKERGRAM_VERSION . "</b>\n\n"
+                    . "Soy un puente entre Telegram y TikiWiki. "
+                    . "Los mensajes de este grupo se guardan automáticamente en un tracker de TikiWiki "
+                    . "para que queden indexados, buscables y accesibles fuera de Telegram.\n\n"
+                    . "Usá /ayuda para más información.";
+                $this->telegramClient->sendMessage($chatId, $text);
+                log_message("trackerGram: /inicio respondido en chat {$chatId}");
+                break;
+
+            case '/ayuda':
+                $text = "🤖 <b>trackerGram " . TRACKERGRAM_VERSION . " — Ayuda</b>\n\n"
+                    . "<b>¿Qué hace?</b>\n"
+                    . "trackerGram recibe los mensajes de este grupo y los guarda automáticamente "
+                    . "en un tracker de TikiWiki. Todo el contenido queda indexado y buscable.\n\n"
+                    . "<b>¿Cómo interactuar?</b>\n"
+                    . "No necesitás hacer nada especial; escribí normalmente en el grupo. "
+                    . "trackerGram registra: textos, fotos, videos, audios, stickers, ubicaciones, etc.\n\n"
+                    . "<b>Comandos disponibles:</b>\n"
+                    . "/inicio: mensaje de bienvenida;\n"
+                    . "/ayuda: mostrar esta ayuda;\n"
+                    . "/tracker: enlace al tracker en TikiWiki;\n"
+                    . "/estado: estado de la conexión.\n\n"
+                    . "<b>Sintaxis TikiWiki:</b>\n"
+                    . "Podés incorporar enlaces a páginas de la Tiki con ((página enlazada)) y #etiqueta "
+                    . "para relacionar contenido con freetags.";
+                $this->telegramClient->sendMessage($chatId, $text);
+                log_message("trackerGram: /ayuda respondido en chat {$chatId}");
+                break;
+
+            case '/tracker':
+                $webUrl = $this->tikiWikiClient->getBaseUrl();
+                $trackerLink = rtrim($webUrl, '/') . '/tiki-view_tracker.php?trackerId=' . $this->trackerId;
+                $text = "🔗 <b>Tracker en TikiWiki</b>\n\n"
+                    . "Los mensajes se guardan en el tracker <b>#{$this->trackerId}</b>.\n\n"
+                    . "Podés ver todos los mensajes acá:\n"
+                    . "<a href=\"{$trackerLink}\">{$trackerLink}</a>";
+                $this->telegramClient->sendMessage($chatId, $text);
+                log_message("trackerGram: /tracker respondido en chat {$chatId}");
+                break;
+
+            case '/estado':
+                $this->handleEstado($chatId);
+                break;
+
+            default:
+                $text = "❓ Comando desconocido: <code>{$command}</code>\n\nUsá /ayuda para ver los comandos disponibles.";
+                $this->telegramClient->sendMessage($chatId, $text);
+                log_message("trackerGram: comando desconocido '{$command}' en chat {$chatId}");
+                break;
+        }
+    }
+
+    /**
+     * Procesar el comando /estado: recopila health check de todas las conexiones
+     */
+    private function handleEstado(int $chatId): void
+    {
+        $lines = [];
+        $lines[] = "📊 <b>trackerGram " . TRACKERGRAM_VERSION . " — Estado</b>\n";
+
+        // Conexión
+        $connName = $this->connectionName ?: 'Conexión #' . $this->trackerId;
+        $lines[] = "<b>Conexión:</b> {$connName}";
+
+        // Admin panel
+        if ($this->adminUrl !== '') {
+            $lines[] = "<b>Admin:</b> <a href=\"{$this->adminUrl}\">{$this->adminUrl}</a>";
+        }
+
+        // Bot de Telegram
+        $tgTest = $this->telegramClient->testConnection();
+        if ($tgTest['ok']) {
+            $botName = $tgTest['bot_name'] ?? '';
+            $lines[] = "🤖 <b>Bot:</b> @{$botName} ✅";
+        } else {
+            $lines[] = "🤖 <b>Bot:</b> ❌ " . $tgTest['message'];
+        }
+
+        // Webhook info
+        $webhookInfo = $this->telegramClient->getWebhookInfo();
+        if ($webhookInfo['ok'] ?? $webhookInfo['url'] ?? false) {
+            $pending = $webhookInfo['pending_update_count'] ?? 0;
+            $lastError = $webhookInfo['last_error_message'] ?? '';
+            $webhookOk = $pending === 0 && $lastError === '';
+            $lines[] = "🌐 <b>Webhook:</b> " . ($webhookOk ? '✅ Activo' : '⚠️ Problemas')
+                . " ({$pending} pendientes" . ($lastError ? ", error: {$lastError}" : "") . ")";
+        } else {
+            $lines[] = "🌐 <b>Webhook:</b> ❌ No configurado";
+        }
+
+        // TikiWiki
+        $tikiVersion = $this->tikiWikiClient->getVersion();
+        if ($tikiVersion !== null) {
+            $lines[] = "🗄️ <b>TikiWiki:</b> v{$tikiVersion} ✅";
+        } else {
+            $lines[] = "🗄️ <b>TikiWiki:</b> ❌ No responde — revisar <a href=\"{$this->adminUrl}\">admin panel</a>";
+            log_message("handleEstado: getVersion() falló para conexión '{$this->connectionName}' tracker #{$this->trackerId}");
+        }
+
+        // Tracker link
+        $webUrl = $this->tikiWikiClient->getBaseUrl();
+        $trackerLink = rtrim($webUrl, '/') . '/tiki-view_tracker.php?trackerId=' . $this->trackerId;
+        $lines[] = "🎯 <b>Tracker:</b> <a href=\"{$trackerLink}\">#{$this->trackerId}</a>";
+
+        $text = implode("\n", $lines);
+        $this->telegramClient->sendMessage($chatId, $text);
+        log_message("trackerGram: /estado respondido en chat {$chatId}");
     }
 
     /**

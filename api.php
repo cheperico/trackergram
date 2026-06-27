@@ -206,11 +206,20 @@ function processUpdate(array $update, array $connection, string $connectionSlug,
     $tgClient = new TelegramClient(
         botToken: $connection['bot_token']
     );
+
+    // Derivar URL del admin panel desde el request actual
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $scriptDir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? '/'), '/');
+    $adminUrl = $protocol . '://' . $host . $scriptDir . '/admin.php';
+
     $handler = new WebhookHandler(
         tikiWikiClient: $tikiClient,
         telegramClient: $tgClient,
         messageMapper: $messageMapper,
-        trackerId: $trackerId
+        trackerId: $trackerId,
+        adminUrl: $adminUrl,
+        connectionName: $connectionSlug
     );
     $handler->processUpdate($update);
 }
