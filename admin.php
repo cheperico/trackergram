@@ -341,7 +341,8 @@ foreach ($connections as $slug => $conn) {
                 if (!empty($wh['last_error_message'])) {
                     $lastErrorDate = (int) ($wh['last_error_date'] ?? 0);
                     $lastSuccessDate = (int) ($wh['last_successful_synchronization'] ?? 0);
-                    if ($lastSuccessDate > 0 && $lastSuccessDate > $lastErrorDate) {
+                    $noPending = ($wh['pending_update_count'] ?? 1) === 0;
+                    if ($noPending || ($lastSuccessDate > 0 && $lastSuccessDate > $lastErrorDate)) {
                         // Error antiguo — webhook funciona correctamente desde entonces
                         $status['label'] = $urlMatch ? '✅ (error histórico)' : ('⚠️ ' . parse_url($wh['url'], PHP_URL_HOST));
                     } else {
@@ -603,7 +604,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     if (!empty($wh['last_error_message'])) {
                         $lastErrorDate = (int) ($wh['last_error_date'] ?? 0);
                         $lastSuccessDate = (int) ($wh['last_successful_synchronization'] ?? 0);
-                        if ($lastSuccessDate > 0 && $lastSuccessDate > $lastErrorDate) {
+                        $noPending = ($wh['pending_update_count'] ?? 1) === 0;
+                        if ($noPending || ($lastSuccessDate > 0 && $lastSuccessDate > $lastErrorDate)) {
                             $status['label'] = '✅ (error histórico)';
                         } else {
                             $status['label'] = '❌ ' . substr($wh['last_error_message'], 0, 40);
@@ -1663,7 +1665,7 @@ function testConnection(slug, btn) {
                 whLines.push('URL: ' + wh.url);
                 whLines.push('Updates pendientes: ' + (wh.pending_update_count || 0));
                 if (wh.last_error_message) {
-                    var errorStale = wh.last_successful_synchronization && wh.last_error_date && wh.last_successful_synchronization > wh.last_error_date;
+                    var errorStale = (wh.pending_update_count === 0) || (wh.last_successful_synchronization && wh.last_error_date && wh.last_successful_synchronization > wh.last_error_date);
                     if (!errorStale) {
                         whLines.push('⚠️ Último error: ' + wh.last_error_message);
                     }
@@ -1804,7 +1806,7 @@ function testBotConnection(slug, btn) {
                 var whMsg = 'URL: ' + wh.url;
                 whMsg += ' | Pendientes: ' + (wh.pending_update_count || 0);
                 if (wh.last_error_message) {
-                    var errorStale = wh.last_successful_synchronization && wh.last_error_date && wh.last_successful_synchronization > wh.last_error_date;
+                    var errorStale = (wh.pending_update_count === 0) || (wh.last_successful_synchronization && wh.last_error_date && wh.last_successful_synchronization > wh.last_error_date);
                     if (errorStale) {
                         whMsg += ' | ⚠️ Error histórico (recuperado)';
                     } else {

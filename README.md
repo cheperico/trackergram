@@ -624,9 +624,10 @@ Podés copiar todo este bloque y pegarlo en **Admin → Trackers → Importar ca
 
 1. La URL debe ser **pública** y con **HTTPS** — no funciona con localhost
 2. Verificá que el servidor web esté funcionando
-3. Si usás firewall, aseguráte de que las IPs de Telegram estén permitidas:
+3. Si usás firewall, aseguráte de que las IPs de Telegram estén permitidas (fuente oficial: https://core.telegram.org/resources/cidr.txt):
+   - 91.108.56.0/22, 91.108.4.0/22, 91.108.8.0/22, 91.108.16.0/22, 91.108.12.0/22
    - 149.154.160.0/20
-   - 91.108.4.0/22
+   - 91.105.192.0/23, 91.108.20.0/22, 185.76.151.0/24
 
 ### Error 406 de ModSecurity
 

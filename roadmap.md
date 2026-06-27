@@ -79,13 +79,14 @@ Items con impacto inmediato en la operación del día a día.
 |   |------|----------|-------|
 | 1 | **Mensajes editados/borrados** | 2 sesiones | Estrategia: archivo inmutable con eventos. Los editados/borrados son eventos adicionales. |
 | 2 | **Reproducción de mensajes previos a nuevo tracker** | 2 sesiones | Script/acción para re-enviar mensajes anteriores de un chat a un tracker recién creado. |
+| 3 | **Cloudflare reverse proxy para shared hosting** | 1 sesión | Configurar Cloudflare como proxy inverso para `trackergram.chela.org.ar` sin afectar el dominio principal. Soluciona firewall de hosting que bloquea IPs de Telegram (Connection timed out). Detalles en `opt/shared_hosting.md`. |
 
 ### 🟢 Fase 3: Features grandes / robustez (mediano plazo)
 
 | # | Item | Esfuerzo | Dependencias |
 |---|------|----------|--------------|
 | 6 | **Chat_id unificado para imports con migración** | 2 sesiones | Los exports de Telegram pueden incluir migración grupo→supergrupo. Los mensajes pre-migración tienen IDs negativos, los post-migración IDs positivos. El chat_id también cambia. Decidir estrategia (un solo chat_id para todo el grupo, o bifurcar) e implementar detección de service messages `migrate_to_supergroup`/`migrate_from_group`. |
-| 6b | **Reply: link clickeable + texto del original** | 1-2 sesiones | El enlace al mensaje respondido no funciona en tplwiki (el Smarty de TikiWiki no ejecuta `preg_match`/`regex_replace` como se espera). **Dos pendientes**: (1) lograr link clickeable al item padre, (2) mostrar texto del mensaje original. Posible solución: campo `ReplyToText` separado (poblado en webhook desde `reply_to_message.text`, en import desde API de TikiWiki). Para trackers existentes requiere migración. Referencia: `opt/visualizacion-lcc2026.md`. |
+| 6b | **Reply: link clickeable + texto del original** | 1-2 sesiones | El enlace al mensaje respondido ahora usa `preg_match` (modifier nativo de TikiWiki) para extraer el itemId en templates `tplwiki`. Pendientes: (1) probar que funcione en TikiWiki real (cache de templates_c/), (2) Opción A alternativa: campo `ReplyToText` separado para evitar concatenar texto en `ReplyToId`. Para trackers existentes requiere migración. Referencia: `opt/visualizacion-lcc2026.md`, `opt/visualizacion-tiki.md`. |
 | 7 | **Mensajes estructurados con prefijos** | 2-3 sesiones | Parser en MessageMapper para mensajes tipo `GPS user coord` o `#tag texto`. |
 | 8 | **Manejo de errores estandarizado** | 2-3 sesiones | Excepciones de dominio (`ConfigException`, `TelegramException`, `TikiWikiException`, `ImportException`). |
 | 9 | **Import CLI asíncrono** | 2 sesiones | Script CLI para exports grandes sin timeout HTTP. |

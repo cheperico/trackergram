@@ -1,5 +1,25 @@
 # Cambios - Changelog
 
+## v0.5.10
+
+### Fix: error histórico de webhook mal clasificado como activo
+
+- **admin.php (3 lugares)**: La detección de `errorStale` ahora considera `pending_update_count === 0` como evidencia de que el webhook se recuperó, aunque Telegram no haya actualizado `last_successful_synchronization`. Cuando no hay updates pendientes, el error se muestra como "histórico" en vez de activo.
+- **Fix conexo**: Misma lógica aplicada al refrescar cards de conexión post-configuración de webhook.
+
+### Docs: IPs de Telegram corregidas
+
+- **INSTALL.md, README.md**: Actualizadas de 2 a 9 subredes IPv4 según fuente oficial (https://core.telegram.org/resources/cidr.txt).
+
+### Docs: Cloudflare reverse proxy para shared hosting
+
+- **roadmap.md**: Nuevo item #3 (Fase 2: Robustez).
+- **opt/shared_hosting.md**: Guía completa de Cloudflare CNAME Setup y Full Zone para evitar firewall de hosting que bloquea Telegram.
+
+### Templates tplwiki: reply link con preg_match
+
+- **opt/visualizacion-tiki.md, opt/visualizacion-lcc2026.md**: Reemplazado `regex_replace` por `preg_match` (modifier nativo de TikiWiki) para extraer itemId y generar link clickeable al mensaje respondido.
+
 ## v0.5.9
 
 ### Feature: Hashtags como etiquetas (Freetags) en TikiWiki
