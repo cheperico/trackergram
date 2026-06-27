@@ -750,6 +750,34 @@ class TikiWikiClient
      * Intenta acceder al endpoint de trackers y verifica que la API responda.
      * @return array{ok: bool, message: string}
      */
+    /**
+     * Obtener la versión de TikiWiki vía API.
+     * Llama a GET /api/version, un endpoint liviano que no requiere autenticación.
+     * @return string|null Versión (ej: "27.5") o null si falla
+     */
+    public function getVersion(): ?string
+    {
+        $url = $this->apiUrl . 'version';
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Authorization: Bearer " . $this->token,
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200) {
+            return null;
+        }
+
+        $data = json_decode($response, true);
+        return $data['version'] ?? null;
+    }
+
     public function testConnection(): array
     {
         $url = $this->apiUrl . 'trackers';
