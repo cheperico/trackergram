@@ -538,7 +538,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 }
             }
             try {
-                $result = $tikiClient->synchronizeTrackerFields($trackerId, $prefix);
+                $result = $tikiClient->synchronizeTrackerFields($trackerId, $storedPrefix);
                 $created = $result['created'];
                 $prefixMsg = '';
                 if (!empty($result['prefix_set'])) {
@@ -547,9 +547,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $prefixMsg = ' | ⚠️ fieldPrefix no se pudo configurar en tracker (ver logs)';
                 }
                 if (empty($created)) {
-                    $successMessage = 'Tracker sincronizado: todos los campos ya existen (' . count($result['existing']) . ' campos, prefix: ' . escapeHtml($prefix) . ')' . $prefixMsg;
+                    $successMessage = 'Tracker sincronizado: todos los campos ya existen (' . count($result['existing']) . ' campos, prefix: ' . escapeHtml($storedPrefix) . ')' . $prefixMsg;
                 } else {
-                    $successMessage = 'Tracker sincronizado: creados ' . count($created) . ' campos faltantes (' . implode(', ', $created) . '). Prefix: ' . escapeHtml($prefix) . $prefixMsg;
+                    $successMessage = 'Tracker sincronizado: creados ' . count($created) . ' campos faltantes (' . implode(', ', $created) . '). Prefix: ' . escapeHtml($storedPrefix) . $prefixMsg;
                 }
             } catch (Exception $e) {
                 $errorMessage = 'Error al sincronizar tracker: ' . $e->getMessage();
