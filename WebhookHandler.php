@@ -529,14 +529,32 @@ class WebhookHandler
             $lines[] = "🤖 <b>Bot:</b> ❌ " . $tgTest['message'];
         }
 
-        // Webhook info
+        // Webhook info — pending_count bajo (< 10) no se muestra porque siempre vemos "1 pendientes"
+        // desde el propio comando /estado (BUG-002: el Bot API cuenta el update actual como pendiente
+        // hasta recibir el 200 OK de ese mismo update). Solución posta: determinar el pending real
+        // restando 1 (el propio comando), o consultar getWebhookInfo desde un health check externo.
         $webhookInfo = $this->telegramClient->getWebhookInfo();
         if ($webhookInfo['ok'] ?? $webhookInfo['url'] ?? false) {
             $pending = $webhookInfo['pending_update_count'] ?? 0;
             $lastError = $webhookInfo['last_error_message'] ?? '';
-            $webhookOk = $pending === 0 && $lastError === '';
-            $lines[] = "🌐 <b>Webhook:</b> " . ($webhookOk ? '✅ Activo' : '⚠️ Problemas')
-                . " ({$pending} pendientes" . ($lastError ? ", error: {$lastError}" : "") . ")";
+            $lastErrorDate = $webhookInfo['last_error_date'] ?? 0;
+            $lastSuccess = $webhookInfo['last_successful_synchronization'] ?? 0;
+
+            // Error histórico: el webhook ya se recuperó (success más reciente que error)
+            $errorStale = $lastError !== '' && $lastSuccess > 0 && $lastSuccess > $lastErrorDate;
+
+            if ($pending > 10 || ($lastError && !$errorStale)) {
+                $statusIcon = ($lastError && !$errorStale) ? '⚠️' : '⚠️';
+                $parts = ["{$statusIcon} <b>Webhook:</b> Activo ({$pending} pendientes)"];
+                if ($lastError && !$errorStale) {
+                    $parts[] = "error: {$lastError}";
+                } elseif ($errorStale) {
+                    $parts[] = "ⓘ error histórico: {$lastError} (ya recuperado)";
+                }
+                $lines[] = implode(' | ', $parts);
+            } else {
+                $lines[] = '🌐 <b>Webhook:</b> ✅ Activo';
+            }
         } else {
             $lines[] = "🌐 <b>Webhook:</b> ❌ No configurado";
         }

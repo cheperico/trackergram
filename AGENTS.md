@@ -62,7 +62,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 - ✅ Seguridad: CSRF, rate limiting, hash de contraseñas, path traversal protection, XSS fix (innerHTML→textContent), DoS protection, 20MB real download limit, token leak fix
 - ✅ Reacciones formateadas como texto legible (👍 3 · ❤️ 1)
 - ✅ Hashtags extraídos como etiquetas Freetags (webhook + import) en campo tipo `F`
-- ✅ Álbumes/grupos de medios (mediaGroup) en webhook
+- ✅ Álbumes/grupos de medios (mediaGroup) en webhook (cada foto en su propio item; caption propagada entre fotos del mismo álbum)
 - ✅ Auto-reparación de galería (repairFgGallery)
 - ✅ Webhook Secret obligatorio (rechaza 500 si vacío)
 - ✅ Cache de topics por chatId:threadId
@@ -503,6 +503,7 @@ ASYNC_PROCESSING=false
 - **No descargar archivos sin verificar tamaño** — Límite de 20MB (`MEDIA_DOWNLOAD_MAX_SIZE`).
 - **No asumir que el bot recibe todos los mensajes del grupo** — Por defecto los bots tienen **Privacy Mode** habilitado y solo ven mensajes de sistema, comandos, menciones y replies. Para recibir todos los mensajes, el bot debe ser **administrador del grupo** o deshabilitar privacy mode en BotFather (`/setprivacy` → Disable) y re-agregarlo. Ver: https://core.telegram.org/bots/features#privacy-mode
 - **BUG-001: `findByWebhookSecret()` no debe devolver la primera conexión que encuentra** — Cuando varias conexiones comparten el mismo `webhook_secret`, priorizar las pendientes (`chat_id=0`). Si no hay pendientes, ordenar por `created_at` descendente. Nunca devolver la primera en orden de inserción.
+- **BUG-002: `pending_update_count` de Telegram siempre >=1 durante `/estado`** — Desde el handler del webhook, `getWebhookInfo()` devuelve `pending_update_count >= 1` aunque no haya mensajes reales encolados. El Bot API parece contar el update actual (el que contiene `/estado`) como pendiente hasta recibir el 200 OK. Verificado empíricamente: siempre muestra 1 pendiente sin importar el tráfico. **Fix posta**: (a) restar 1 al pending cuando se consulta desde adentro del webhook handler, o (b) hacer health check desde un cron externo que no esté procesando un update. Workaround actual: ocultar pending bajo (< 10) en `/estado`.
 
 ### Seguridad
 

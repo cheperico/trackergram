@@ -38,7 +38,7 @@
 - ✅ Gallery resolution via endpoint `/fields`
 - ✅ Timeouts separados upload (60s) / api (30s)
 - ✅ debug.log respeta DEBUG_MODE ($force para críticos)
-- ✅ Álbumes/grupos de medios (mediaGroup) en webhook
+- ✅ Álbumes/grupos de medios (mediaGroup) en webhook (cada foto en su propio item; caption propagada entre fotos del mismo álbum)
 - ✅ Cache de topics por chatId:threadId
 - ✅ Cache de gallery ID por tracker
 - ✅ Webhook Secret obligatorio (rechaza si vacío)
@@ -85,23 +85,24 @@ Items con impacto inmediato en la operación del día a día.
 | # | Item | Esfuerzo | Dependencias |
 |---|------|----------|--------------|
 | 6 | **Chat_id unificado para imports con migración** | 2 sesiones | Los exports de Telegram pueden incluir migración grupo→supergrupo. Los mensajes pre-migración tienen IDs negativos, los post-migración IDs positivos. El chat_id también cambia. Decidir estrategia (un solo chat_id para todo el grupo, o bifurcar) e implementar detección de service messages `migrate_to_supergroup`/`migrate_from_group`. |
-| 6b | **Campo separado ReplyToText** (Opción A) | 1-2 sesiones | **Implementación alternativa** a la Opción B (v0.5.7). Crear campo `ReplyToText` separado en lugar de concatenar texto en `ReplyToId`. Para trackers existentes requiere migración. Prioridad media. |
+| 6b | **Reply: link clickeable + texto del original** | 1-2 sesiones | El enlace al mensaje respondido no funciona en tplwiki (el Smarty de TikiWiki no ejecuta `preg_match`/`regex_replace` como se espera). **Dos pendientes**: (1) lograr link clickeable al item padre, (2) mostrar texto del mensaje original. Posible solución: campo `ReplyToText` separado (poblado en webhook desde `reply_to_message.text`, en import desde API de TikiWiki). Para trackers existentes requiere migración. Referencia: `opt/visualizacion-lcc2026.md`. |
 | 7 | **Mensajes estructurados con prefijos** | 2-3 sesiones | Parser en MessageMapper para mensajes tipo `GPS user coord` o `#tag texto`. |
 | 8 | **Manejo de errores estandarizado** | 2-3 sesiones | Excepciones de dominio (`ConfigException`, `TelegramException`, `TikiWikiException`, `ImportException`). |
 | 9 | **Import CLI asíncrono** | 2 sesiones | Script CLI para exports grandes sin timeout HTTP. |
+| 10 | **Álbumes/grupos de medios en un solo item** | 2-3 sesiones | Agrupar fotos del mismo `media_group_id` en UN item del tracker con múltiples archivos en el campo FG. Actualmente cada foto crea su propio item. Requiere: (1) método para actualizar items existentes en TikiWikiClient, (2) lógica de detección de grupo y update vs create, (3) concurrencia (fotos llegan casi simultáneas). |
 
 ### 🔵 Fase 4: Visión (largo plazo)
 
 | # | Item | Esfuerzo | Notas |
 |---|------|----------|-------|
-| 10 | **Mini App** (Telegram Web App) | 5+ sesiones | Frontend embebido + backend. Formulario rico. Ver `design/002-MiniApp.md`. |
-| 11 | **Dashboard de métricas** | 2-3 sesiones | Mensajes procesados, errores, media subidos por conexión. |
-| 12 | **Tests unitarios** | Continuo | MessageMapper, WebhookHandler, clientes. |
-| 13 | **PSR-4 autoloading** | 1 sesión | Mover clases a `src/`, autoloader. |
-| 14 | **Transcripción de voz / OCR** | 3-4 sesiones | Whisper + OCR. Dependencias externas. |
-| 15 | **SQLite para cola async y rate limiting** (evaluación) | 1 sesión | **Opcional.** Evaluar si vale la pena migrar tmp/buffer/ y rate limiting de archivos JSON a SQLite. Prioridad mínima — los archivos actuales funcionan para el volumen esperado. No aplica a setup.json ni topic cache. |
-| 16 | **Rotación de logs por fecha** | 1 sesión | Además de por tamaño. |
-| 17 | **Expulsar bot desde admin panel** | 1 sesión | Botón para sacar el bot de un grupo directamente desde la interface, sin tener que hacerlo desde Telegram. |
+| 11 | **Mini App** (Telegram Web App) | 5+ sesiones | Frontend embebido + backend. Formulario rico. Ver `design/002-MiniApp.md`. |
+| 12 | **Dashboard de métricas** | 2-3 sesiones | Mensajes procesados, errores, media subidos por conexión. |
+| 13 | **Tests unitarios** | Continuo | MessageMapper, WebhookHandler, clientes. |
+| 14 | **PSR-4 autoloading** | 1 sesión | Mover clases a `src/`, autoloader. |
+| 15 | **Transcripción de voz / OCR** | 3-4 sesiones | Whisper + OCR. Dependencias externas. |
+| 16 | **SQLite para cola async y rate limiting** (evaluación) | 1 sesión | **Opcional.** Evaluar si vale la pena migrar tmp/buffer/ y rate limiting de archivos JSON a SQLite. Prioridad mínima — los archivos actuales funcionan para el volumen esperado. No aplica a setup.json ni topic cache. |
+| 17 | **Rotación de logs por fecha** | 1 sesión | Además de por tamaño. |
+| 18 | **Expulsar bot desde admin panel** | 1 sesión | Botón para sacar el bot de un grupo directamente desde la interface, sin tener que hacerlo desde Telegram. |
 
 ### ⚪ Fase 5: Pendientes de reevaluación (muy baja prioridad)
 
@@ -136,6 +137,13 @@ Items que no justifican implementación hoy pero se documentan por si el context
 *(ninguno — cobertura completa)*
 
 ---
+
+## Bugs Conocidos
+
+| ID | Descripción | Estado |
+|----|-------------|--------|
+| BUG-001 | `findByWebhookSecret()` devolvía primera conexión en vez de la pendiente | ✅ **Arreglado** en v0.5.8 |
+| BUG-002 | `pending_update_count` incluye el update actual durante `/estado` | ⚠️ Workaround (ocultar pending <10). Fix posta: restar 1 al pending o health check externo. |
 
 ## Cosas que NO vamos a hacer (por ahora)
 
