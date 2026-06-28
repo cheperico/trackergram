@@ -460,7 +460,53 @@ class MessageMapper
             $rawText = $message['text'] ?? '';
             $msg->text = is_array($rawText) ? $this->formatExportText($rawText) : (string) $rawText;
 
-            if (!empty($message['photo']) && !$this->isMediaExcluded($message['photo'])) {
+            // ── Polls / Quizzes ──
+            // El export de Telegram tiene datos reales (voters, answers), a diferencia
+            // del webhook que llega con 0 votos. Se genera texto enriquecido.
+            if (!empty($message['poll'])) {
+                $poll = $message['poll'];
+                $pollQuestion = $poll['question'] ?? $msg->text;
+                $isQuiz = !empty($poll['quiz']) || ($poll['type'] ?? '') === 'quiz';
+                $isClosed = ($poll['closed'] ?? '') === 'true';
+                $totalVoters = (int) ($poll['total_voters'] ?? 0);
+
+                // El export usa 'answers', pero se cae a 'options' por compatibilidad
+                $pollAnswers = $poll['answers'] ?? $poll['options'] ?? [];
+
+                $msg->messageType = $isQuiz ? 'quiz' : 'poll';
+
+                $icon = $isQuiz ? '🧠' : '📊';
+                $lines = ["{$icon} {$pollQuestion}"];
+
+                foreach ($pollAnswers as $answer) {
+                    $answerText = $answer['text'] ?? '?';
+                    $voters = (int) ($answer['voters'] ?? 0);
+                    $isChosen = ($answer['chosen'] ?? '') === 'true';
+                    $isCorrect = ($answer['correct'] ?? '') === 'true';
+
+                    $prefix = '•';
+                    if ($isCorrect) {
+                        $prefix = '✅';
+                    } elseif ($isChosen) {
+                        $prefix = '☑️';
+                    }
+
+                    $votoLabel = $voters === 1 ? 'voto' : 'votos';
+                    $lines[] = "{$prefix} {$answerText}: {$voters} {$votoLabel}";
+                }
+
+                if ($totalVoters > 0) {
+                    $totalLabel = $totalVoters === 1 ? 'voto' : 'votos';
+                    $lines[] = "Total: {$totalVoters} {$totalLabel}";
+                }
+
+                if ($isClosed) {
+                    $lines[] = '🔒 Cerrada';
+                }
+
+                $msg->text = implode("\n", $lines);
+                // No seguir a photo/file checks — ya se determinó que es poll
+            } elseif (!empty($message['photo']) && !$this->isMediaExcluded($message['photo'])) {
                 $msg->messageType = 'photo';
                 $msg->mediaCaption = $message['photo_caption'] ?? '';
             } elseif (!empty($message['file']) && !$this->isMediaExcluded($message['file'])) {
@@ -581,6 +627,26 @@ class MessageMapper
             $fields["fields[{$p}FileUrl]"] = $msg->fileUrl;
         }
 
+        return $fields;
+    }
+
+    /**
+     * Generar SOLO los campos que se pueden actualizar en un mensaje editado.
+     * NUNCA incluye Media, MediaUrl, MessageType, Location ni ningún campo
+     * que pueda causar pérdida de datos si el export vino sin medios.
+     *
+     * @return array Array con formato fields[permName]=valor (solo Text, EditedDate, Reactions)
+     */
+    public function toWikiFieldsEdit(NormalizedMessage $msg): array
+    {
+        $p = $this->fieldPrefix;
+        $fields = [
+            "fields[{$p}Text]" => $msg->text,
+            "fields[{$p}EditedDate]" => $msg->editedDate,
+        ];
+        if ($msg->reactions !== '') {
+            $fields["fields[{$p}Reactions]"] = $msg->reactions;
+        }
         return $fields;
     }
 

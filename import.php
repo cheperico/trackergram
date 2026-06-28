@@ -453,7 +453,9 @@ function handleProcess(): void
         log_message("trackerGram import: NO HAY galleryId para tracker {$trackerId} — no se subirán archivos", true);
     }
     $imported = 0;
+    $updated = 0;
     $skipped = 0;
+    $failed = 0;
     $mediaProcessed = 0;
     $processed = 0;
 
@@ -613,10 +615,67 @@ function handleProcess(): void
 
         $fields = $messageMapper->toWikiFields($normalized);
 
-        if ($activeTikiClient->createTrackerItem((int) $trackerId, $fields)) {
-            $imported++;
+        // ── Deduplicación (chunked batch): ¿ya existe este mensaje? ──
+        $messageIdInt = (int) $normalized->messageId;
+        $existingItemId = ($messageIdInt > 0)
+            ? $activeTikiClient->findItemByMessageId((int) $trackerId, $messageIdInt, (int) $chatId)
+            : null;
+
+        if ($existingItemId !== null) {
+            $shouldUpdate = false;
+            $edited = $normalized->editedDate;
+
+            if ($edited !== '') {
+                $existingItem = $activeTikiClient->getTrackerItem((int) $trackerId, $existingItemId);
+                if ($existingItem) {
+                    $storedEdited = $existingItem['field_' . $fieldPrefix . 'EditedDate']
+                        ?? $existingItem['fields'][$fieldPrefix . 'EditedDate']
+                        ?? '';
+                    if ($storedEdited !== $edited) {
+                        $shouldUpdate = true;
+                        log_message("trackerGram import: message_id={$messageIdInt} editado ({$storedEdited} → {$edited}), actualizando");
+                    }
+                }
+            }
+
+            // Enriquecer polls que vinieron incompletos del webhook
+            // El webhook almacena polls con messageType='other' y texto "no capturada en tiempo real"
+            $msgType = $normalized->messageType;
+            if (!$shouldUpdate && ($msgType === 'poll' || $msgType === 'quiz')) {
+                if (!isset($existingItem)) {
+                    $existingItem = $activeTikiClient->getTrackerItem((int) $trackerId, $existingItemId);
+                }
+                if ($existingItem) {
+                    $storedType = $existingItem['field_' . $fieldPrefix . 'MessageType']
+                        ?? $existingItem['fields'][$fieldPrefix . 'MessageType']
+                        ?? '';
+                    $storedText = $existingItem['field_' . $fieldPrefix . 'Text']
+                        ?? $existingItem['fields'][$fieldPrefix . 'Text']
+                        ?? '';
+                    if ($storedType === 'other' && str_contains($storedText, 'no capturada en tiempo real')) {
+                        $shouldUpdate = true;
+                        log_message("trackerGram import: poll message_id={$messageIdInt} enriquecido con datos del export");
+                    }
+                }
+            }
+
+            if ($shouldUpdate) {
+                $updateFields = $messageMapper->toWikiFieldsEdit($normalized);
+                if ($activeTikiClient->updateTrackerItem((int) $trackerId, $existingItemId, $updateFields)) {
+                    $updated++;
+                } else {
+                    $failed++;
+                }
+            } else {
+                $skipped++;
+            }
         } else {
-            $skipped++;
+            // No existe → crear normalmente
+            if ($activeTikiClient->createTrackerItem((int) $trackerId, $fields)) {
+                $imported++;
+            } else {
+                $failed++;
+            }
         }
     }
 
@@ -635,6 +694,8 @@ function handleProcess(): void
     echo json_encode([
         'success' => true,
         'imported' => $imported,
+        'updated' => $updated,
+        'failed' => $failed,
         'skipped' => $skipped,
         'media_processed' => $mediaProcessed,
         'topics_found' => count($topics),
@@ -836,7 +897,9 @@ function handleFull(): void
     }
 
     $imported = 0;
+    $updated = 0;
     $skipped = 0;
+    $failed = 0;
     $mediaProcessed = 0;
     $totalMessages = count($messages);
     $processedCount = 0;
@@ -987,10 +1050,66 @@ function handleFull(): void
 
         $fields = $messageMapper->toWikiFields($normalized);
 
-        if ($activeTikiClient->createTrackerItem((int) $trackerId, $fields)) {
-            $imported++;
+        // ── Deduplicación (full import): ¿ya existe este mensaje? ──
+        $messageIdInt = (int) $normalized->messageId;
+        $existingItemId = ($messageIdInt > 0)
+            ? $activeTikiClient->findItemByMessageId((int) $trackerId, $messageIdInt, (int) $chatId)
+            : null;
+
+        if ($existingItemId !== null) {
+            $shouldUpdate = false;
+            $edited = $normalized->editedDate;
+
+            if ($edited !== '') {
+                $existingItem = $activeTikiClient->getTrackerItem((int) $trackerId, $existingItemId);
+                if ($existingItem) {
+                    $storedEdited = $existingItem['field_' . $fieldPrefix . 'EditedDate']
+                        ?? $existingItem['fields'][$fieldPrefix . 'EditedDate']
+                        ?? '';
+                    if ($storedEdited !== $edited) {
+                        $shouldUpdate = true;
+                        log_message("trackerGram import: message_id={$messageIdInt} editado ({$storedEdited} → {$edited}), actualizando");
+                    }
+                }
+            }
+
+            // Enriquecer polls que vinieron incompletos del webhook
+            $msgType = $normalized->messageType;
+            if (!$shouldUpdate && ($msgType === 'poll' || $msgType === 'quiz')) {
+                if (!isset($existingItem)) {
+                    $existingItem = $activeTikiClient->getTrackerItem((int) $trackerId, $existingItemId);
+                }
+                if ($existingItem) {
+                    $storedType = $existingItem['field_' . $fieldPrefix . 'MessageType']
+                        ?? $existingItem['fields'][$fieldPrefix . 'MessageType']
+                        ?? '';
+                    $storedText = $existingItem['field_' . $fieldPrefix . 'Text']
+                        ?? $existingItem['fields'][$fieldPrefix . 'Text']
+                        ?? '';
+                    if ($storedType === 'other' && str_contains($storedText, 'no capturada en tiempo real')) {
+                        $shouldUpdate = true;
+                        log_message("trackerGram import: poll message_id={$messageIdInt} enriquecido con datos del export");
+                    }
+                }
+            }
+
+            if ($shouldUpdate) {
+                $updateFields = $messageMapper->toWikiFieldsEdit($normalized);
+                if ($activeTikiClient->updateTrackerItem((int) $trackerId, $existingItemId, $updateFields)) {
+                    $updated++;
+                } else {
+                    $failed++;
+                }
+            } else {
+                $skipped++;
+            }
         } else {
-            $skipped++;
+            // No existe → crear normalmente
+            if ($activeTikiClient->createTrackerItem((int) $trackerId, $fields)) {
+                $imported++;
+            } else {
+                $failed++;
+            }
         }
     }
 
@@ -999,6 +1118,8 @@ function handleFull(): void
     echo json_encode([
         'success' => true,
         'imported' => $imported,
+        'updated' => $updated,
+        'failed' => $failed,
         'skipped' => $skipped,
         'media_processed' => $mediaProcessed,
         'topics_found' => count($topics),

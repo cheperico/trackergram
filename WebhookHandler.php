@@ -474,8 +474,9 @@ class WebhookHandler
                     . "/tracker: enlace al tracker en TikiWiki;\n"
                     . "/estado: estado de la conexión.\n\n"
                     . "<b>Sintaxis TikiWiki:</b>\n"
-                    . "Podés incorporar enlaces a páginas de la Tiki con ((página enlazada)) y #etiqueta "
-                    . "para relacionar contenido con freetags.";
+                    . "El texto del mensaje soporta <a href=\"https://doc.tiki.org/Wiki-syntax\">sintaxis wiki</a>. "
+                    . "Además podés incorporar etiquetas con #etiqueta para marcar contenido "
+                    . "con <a href=\"https://doc.tiki.org/Tags\">freetags</a>.";
                 $this->telegramClient->sendMessage($chatId, $text);
                 log_message("trackerGram: /ayuda respondido en chat {$chatId}");
                 break;
@@ -496,7 +497,8 @@ class WebhookHandler
                 break;
 
             default:
-                $text = "❓ Comando desconocido: <code>{$command}</code>\n\nUsá /ayuda para ver los comandos disponibles.";
+                $safe = htmlspecialchars($command, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                $text = "❓ Comando desconocido: <code>{$safe}</code>\n\nUsá /ayuda para ver los comandos disponibles.";
                 $this->telegramClient->sendMessage($chatId, $text);
                 log_message("trackerGram: comando desconocido '{$command}' en chat {$chatId}");
                 break;
