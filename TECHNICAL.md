@@ -171,9 +171,21 @@ $fields = [
 
 **Por qué `fields[permName]`**: La API de TikiWiki no acepta JSON para crear items. Espera un POST con `application/x-www-form-urlencoded` donde cada campo tiene el formato `fields[nombreDelCampo]`. Esto es particular de TikiWiki y no es estándar en APIs REST.
 
+### Auto-detección de field prefix
+
+Cuando el tracker se crea con el botón "Crear Tracker", el usuario elige un prefix (ej: `soporte`, `qpch`, `equipo`). El prefix por defecto es `telegrammessage`.
+
+El sistema **detecta automáticamente el prefix real** si el almacenado es el default (`telegrammessage`). `TikiWikiClient::resolveFieldPriority()`:
+1. Si el prefix almacenado NO es `telegrammessage`, confía en él (el usuario lo configuró explícitamente).
+2. Si es `telegrammessage` y el flag `field_prefix_checked` no existe, fetchea `GET /api/trackers/{id}/fields`.
+3. Busca campos cuyos permNames terminen en sufijos conocidos y extrae el prefijo común.
+4. Si el detectado difiere del almacenado, lo persiste a `setup.json` y marca `field_prefix_checked: true`.
+
+**Cache**: La auto-detección se ejecuta UNA SOLA VEZ por conexión. El flag `field_prefix_checked` evita llamadas API en cada request. Esto cubre admin.php, api.php, worker.php e import.php.
+
 ### El cliente de TikiWiki
 
-`$tikiWikiClient->createTrackerItem()` hace el POST a la API (o `createTrackerItemWithMedia()` si incluye archivos multimedia):
+`$tikiWikiClient->createTrackerItem()` hace el POST a la API (los archivos multimedia se suben antes a la file gallery y se vinculan via el campo FG en `$fields`):
 
 ```php
 $url = $this->apiUrl . "trackers/$trackerId/items";
@@ -201,23 +213,27 @@ $url = $this->apiUrl . "trackers/$trackerId/items";
 
 Telegram permite archivos de hasta 20MB. Si descargamos un archivo de 20MB y lo cargamos entero en memoria, podemos saturar el servidor.
 
-**Solución**: Verificamos el tamaño antes de descargar usando un HEAD request:
+**Solución**: Verificamos el tamaño antes de descargar usando un HEAD request, y durante la descarga con streaming cancelamos si el contenido excede el límite:
 
 ```php
 curl_setopt($ch, CURLOPT_NOBODY, true); // HEAD request
 $contentLength = curl_getinfo($ch, CURLINFO_CONTENT_LENGTH_DOWNLOAD);
 if ($contentLength > MEDIA_DOWNLOAD_MAX_SIZE) {
-    // Rechazar
+    // Rechazar antes de descargar
 }
 ```
 
-Esto evita descargar archivos que exceden el límite.
+Además, durante la descarga real con streaming, hay un callback que aborta si el acumulado supera el límite, manejando casos donde Telegram no reporta el `Content-Length` en el HEAD.
 
 ### Cómo encuentra TikiWiki dónde guardar el archivo
 
 Cada tracker tiene una file gallery asociada en su configuración. `TikiWikiClient::getMediaGalleryId()` consulta la configuración del tracker, busca el campo `telegrammessageMedia` de tipo `FG` (File Gallery), y extrae el gallery ID de sus opciones.
 
 **Optimización**: Este ID se cachea en memoria (`static $mediaGalleryIdCache`) para no consultar la API de TikiWiki en cada mensaje.
+
+### Archivos excluidos en exports
+
+Cuando se exporta un chat de Telegram sin incluir los archivos multimedia, los mensajes tienen texto como `(File not included. Change data exporting settings to download.)`. `MessageMapper::isMediaExcluded()` detecta este patrón y evita intentar subir archivos inexistentes. El mensaje se guarda igual, solo sin el campo Media.
 
 ---
 
@@ -303,6 +319,42 @@ if ($tikiWikiClient->messageExists(...) > 1) {
 
 Esto no previene el duplicado pero lo detecta para logging.
 
+### Edit detection: capturar cambios en mensajes
+
+Desde v0.5.11, trackerGram **no solo evita duplicados sino que detecta edits**:
+
+**El problema**: Los mensajes de Telegram se pueden editar después de enviados. Si el webhook recibe un update con `edited_message`, queremos reflejar ese cambio en TikiWiki.
+
+**La solución dual**:
+
+1. **Webhook**: Cuando `api.php` recibe un update con `edited_message`, detecta que es una edición (el campo `edited_date` no es el mismo) y llama a `$tikiWikiClient->updateTrackerItem()` en vez de `createTrackerItem()`. Usa `toWikiFieldsEdit()` que solo genera los campos que pueden cambiar: `Text`, `EditedDate`, `Reactions`. **Nunca** toca `Media`, `MessageType` ni `Location` — eso sería destructivo.
+
+2. **Import**: Durante la importación de un ZIP, `import.php` sigue el mismo patrón: antes de crear un item, llama a `findItemByMessageId()` para verificar si ya existe. Si existe, compara `editedDate` y decide:
+   - Si difiere → `updateTrackerItem()` (edit detectado)
+   - Si el item existente tiene `MessageType='other'` y su texto es "no capturada en tiempo real..." → es un poll placeholder del webhook. Lo enriquece con datos reales del export.
+
+```php
+$itemId = $tikiWikiClient->findItemByMessageId($trackerId, $msgId, $chatId);
+if ($itemId) {
+    // Existe → verificar si necesita update
+    $existing = $tikiWikiClient->getTrackerItem($trackerId, $itemId);
+    if (esEdit(...) or esPollEnrichment(...)) {
+        $tikiWikiClient->updateTrackerItem($trackerId, $itemId, $editFields);
+    }
+} else {
+    // No existe → crear
+    $tikiWikiClient->createTrackerItem($trackerId, $fields);
+}
+```
+
+**Métodos clave**:
+- `findItemByMessageId()` — busca un item por `{prefix}TelegramMessageId` (y opcionalmente ChatId)
+- `getTrackerItem()` — obtiene un item completo con todos sus fields (para comparar edit date)
+- `updateTrackerItem()` — hace `POST /api/trackers/{id}/items/{itemId}` con solo los campos a cambiar
+- `toWikiFieldsEdit()` — genera solo `Text`, `EditedDate`, `Reactions` (seguro para updates)
+
+**Por qué `toWikiFieldsEdit()` es restringido**: Si el webhook capturó un mensaje con foto, y la importación del export no tiene la foto (porque se excluyeron del export), un update completo pisaría el media existente con vacío. EditFields protege contra eso.
+
 ### ReplyToId con texto del mensaje original
 
 El campo `telegrammessageReplyToId` originalmente solo guardaba el ID del mensaje al que se respondía. Desde v0.5.7, también incluye el texto del mensaje original:
@@ -321,7 +373,7 @@ Esto permite ver el contexto de la respuesta sin tener que abrir el mensaje orig
 
 La API de TikiWiki puede fallar temporalmente (timeout, error 500, etc.). No queremos perder un mensaje por un fallo transitorio.
 
-### La solución
+### Retry en creación de items
 
 ```php
 for ($i = 0; $i < RETRY_MAX_ATTEMPTS; $i++) {
@@ -333,6 +385,10 @@ for ($i = 0; $i < RETRY_MAX_ATTEMPTS; $i++) {
 ```
 
 **Lección aprendida**: Al principio usábamos `sleep(1)` — un segundo de espera. En un servidor con muchos mensajes, esto se acumula y satura. Cambiamos a `usleep(100000)` (0.1 segundos) que es suficiente para la mayoría de los casos sin bloquear.
+
+### Retry en descarga de media
+
+Desde v0.5.7, `downloadAndUploadMedia()` también tiene reintentos: hasta 3 intentos con backoff progresivo. Esto cubre fallos transitorios en la descarga de archivos de Telegram (timeouts de red, servidores temporariamente caídos). Si los 3 intentos fallan, el mensaje se guarda igual pero sin el archivo multimedia.
 
 ---
 
@@ -398,6 +454,23 @@ El export de Telegram Desktop tiene dos peculiaridades importantes:
 
 3. **Service messages de migración**: La frontera entre pre y post-migración está marcada por eventos `migrate_to_supergroup` (en el grupo viejo) y `migrate_from_group` (en el supergrupo nuevo). Ambos se importan correctamente pero no se pueden recibir por webhook (el webhook solo ve el supergrupo post-migración).
 
+### Polls: webhook placeholder vs import enriquecido
+
+**El problema**: La Telegram Bot API **no envía los votos** de una encuesta en tiempo real. Cuando un `poll` llega por webhook, solo tiene la pregunta y las opciones, pero `total_voter_count = 0`. Guardar eso en TikiWiki es casi inútil.
+
+**La solución híbrida**:
+
+| Camino | Qué se guarda |
+|---|---|
+| **Webhook** | `MessageType = 'other'` — se marca con texto "Encuesta no capturada en tiempo real. Usar importación de export ZIP para ver resultados completos." |
+| **Import** | `MessageType = 'poll'` — se parsean los `answers[]` del export con su `voters` real. El texto generado: `📊 Pregunta\n• Opción A: 5 votos\n• Opción B: 3 votos\nTotal: 8 votos` |
+
+**Enriquecimiento post-import**: Si el mensaje ya existe en el tracker (capturado por webhook), `import.php` lo detecta como poll placeholder (por `MessageType='other'` y contenido "no capturada...") y llama a `updateTrackerItem()` para reemplazar el texto con los datos reales y corregir `MessageType` a `poll`.
+
+El método `fromExport()` en `MessageMapper` soporta dos formatos de export:
+- **Schema oficial**: `answers[]` con `voters` (Telegram Desktop moderno)
+- **Fallback legacy**: `options[]` (exports más antiguos)
+
 ---
 
 ## Arquitectura del Proyecto
@@ -441,7 +514,7 @@ worker.php → ConfigManager → clientes por conexión → WebhookHandler
 
 **No hay un wiring central**. Cada entry point crea sus propios clientes desde las credenciales de la conexión en `setup.json`. Esto permite tener múltiples bots, wikis y trackers desde una misma instalación.
 
-### Deuda técnica (v0.5.7)
+### Deuda técnica (v0.5.11)
 
 Items **ya resueltos**:
 - ✅ **Inyección de dependencias**: Clases instanciables con dependencias inyectadas por constructor, sin wiring central en bootstrap.
@@ -458,12 +531,27 @@ Items **ya resueltos**:
 - ✅ **Chat_id -100 en import**: Detección de supergrupos y corrección del prefijo.
 - ✅ **ReplyToId con texto del original**: Webhook aprovecha `reply_to_message.text` (gratis), import busca por API.
 - ✅ **Field descriptions enviadas a TikiWiki**: Todos los campos del tracker se crean con `description` en la API.
+- ✅ **Edit detection**: Edits de Telegram reflejados en TikiWiki via `updateTrackerItem()` + `toWikiFieldsEdit()`.
+- ✅ **Polls enriquecidos**: Webhook guarda placeholder "usar import", import enriquece con voters reales.
+- ✅ **Dedup con edit detection en import**: `findItemByMessageId()` antes de crear, actualiza si existe y cambió.
+- ✅ **Freetags para hashtags**: `#tags` extraídos como campo tipo `F` en webhook e import.
+- ✅ **Botón Sync en admin**: Crea campos faltantes del tracker automáticamente.
+- ✅ **checkPermissions sin side effects**: Test de permisos usa `DELETE /api/galleries/99999999/delete` (no crea galerías reales).
+- ✅ **Webhook_secret compartido**: Conexiones con mismo `bot_token` reusan el mismo `webhook_secret`.
+- ✅ **BUG-001 fix**: `findByWebhookSecret()` prioriza conexiones pendientes; `assignDetection()` no sobrescribe `chat_id`.
+- ✅ **Media upload timeout separado**: 60s para upload vs 30s para API general.
+- ✅ **Accesibilidad ARIA completa**: Roles, landmarks, focus trap, aria-live en admin.php.
 
 Items aún pendientes:
-- ⬜ **Manejo de errores inconsistente**: Algunas funciones retornan `null`, otras `false`, otras usan `die()`. Pendiente migrar a excepciones de dominio (ver roadmap Fase 3 #8).
-- ⬜ **Tests unitarios**: Las clases son instanciables y testeables, pero faltan los tests.
+- ⬜ **Race condition en rate limiting**: `api.php` escribe archivos rate limit sin `LOCK_EX`. Potencial corrupción bajo alta concurrencia.
+- ⬜ **Race condition en ConfigManager::load()**: Sin flock, puede leer datos inconsistentes si dos procesos escriben simultáneamente.
+- ⬜ **TOCTOU en dedup webhook**: Entre `messageExists()` y `createTrackerItem()` hay una ventana donde otro webhook puede insertar el mismo mensaje.
+- ⬜ **DNS Rebinding SSRF**: `TikiWikiClient` valida URL pero no resuelve contra IPs internas. Proteger con `CURLOPT_RESOLVE`.
+- ⬜ **GC de archivos rate limit**: Los archivos de rate limiting se acumulan. No hay cleanup automático.
+- ⬜ **Manejo de errores inconsistente**: Algunas funciones retornan `null`, otras `false`, otras usan `die()`.
+- ⬜ **Backoff exponencial en GET**: `messageExists()` y `getTrackerItem()` hacen GET sin backoff. Bajo error 429/503, saturan la API.
+- ⬜ **Tests unitarios**: Las clases son instanciables y testeables, pero faltan los tests. JsonFileStorage utility como primer candidato.
 - ⬜ **PSR-4 autoloading**: Sin autoloader, todo se incluye con `require_once`.
-- ⬜ **Detección de migración grupo→supergrupo en webhook**: Si el grupo migra, el `chat_id` cambia y el webhook deja de reconocerlo (ver roadmap Fase 1 #2).
 
 ---
 
@@ -522,6 +610,551 @@ Tanto el webhook como el login del admin tienen rate limiting por IP. Sin esto, 
 2. ⬜ **Tests unitarios desde el principio**: Muchos bugs se hubieran detectado automáticamente.
 3. ✅ ~~Un modelo intermedio único para mensajes~~ — **Ya implementado** (NormalizedMessage, v0.1.9)
 4. ⬜ **Excepciones de dominio**: En vez de mezclar `null`, `false` y `die()`, usar excepciones tipadas.
+
+---
+
+## Apéndice: Schema completo del tracker para trackerGram
+
+Este apéndice describe **qué campos debe tener un tracker de TikiWiki** para ser compatible con trackerGram, y cómo crearlo manualmente (sin usar el botón "Crear Tracker" del admin).
+
+### Requisitos del tracker
+
+| Aspecto | Requisito |
+|---|---|
+| **Campos** | Debe tener **los 26 campos** listados abajo. Faltan → sincronizables con botón 🛠️ Sync. Sobran → no importa. |
+| **Field prefix** | El permName de cada campo sigue el patrón `{prefix} + Sufijo`. El prefix por defecto es `telegrammessage`, pero puede ser cualquiera (ej: `soporte`, `qpch`, `equipo`). |
+| **Auto-detección** | Si el prefix storeado es `telegrammessage`, el sistema lo verifica contra los campos reales vía API y lo corrige automáticamente. |
+| **File Gallery** | El campo `{prefix}Media` (tipo `FG`) necesita un gallery ID asignado. Al crear el tracker desde el admin, se crea una galería automática. |
+| **Dropdown MessageType** | El campo `{prefix}MessageType` (tipo `D`) debe tener las options: `["text","photo","video","audio","document","sticker","voice","video_note","system","animation","contact","poll","location","other"]`. |
+| **Mandatory** | Solo `{prefix}TelegramMessageId` es obligatorio (isMandatory). Los demás pueden estar vacíos. |
+
+### Lista completa de campos
+
+| # | PermName (sufijo) | Tipo | Descripción | Main | Mandatory | Searchable | TblVisible |
+|---|---|---|---|---|---|---|---|
+| 1 | `TelegramMessageId` | `t` (text) | ID único del mensaje en Telegram | ✅ | ✅ | ✅ | ✅ |
+| 2 | `ChatId` | `t` (text) | ID del chat/grupo en Telegram | | | | |
+| 3 | `ChatTitle` | `t` (text) | Título del chat o grupo | | | ✅ | ✅ |
+| 4 | `TopicId` | `t` (text) | ID del tema/foro (0 si General) | | | | |
+| 5 | `TopicTitle` | `t` (text) | Nombre del tema/foro | | | ✅ | ✅ |
+| 6 | `UserId` | `t` (text) | ID numérico del usuario | | | | |
+| 7 | `Username` | `t` (text) | @username del usuario | | | ✅ | ✅ |
+| 8 | `FirstName` | `t` (text) | Nombre (en import: display name completo) | | | | |
+| 9 | `LastName` | `t` (text) | Apellido (solo webhook) | | | | |
+| 10 | `DisplayName` | `t` (text) | Nombre completo para mostrar (unificado) | | | ✅ | ✅ |
+| 11 | `MessageType` | `D` (dropdown) | Tipo de mensaje (ver options arriba) | | | | |
+| 12 | `Text` | `a` (textarea) | Contenido del mensaje (incluye captions) | | | ✅ | ✅ |
+| 13 | `MessageDate` | `f` (datetime) | Fecha/hora (timestamp UNIX) | | | ✅ | ✅ |
+| 14 | `Media` | `FG` (file gallery) | Archivo multimedia adjunto | | | | ✅ |
+| 15 | `MediaUrl` | `t` (text) | URL pública del archivo en TikiWiki | | | | |
+| 16 | `FileUrl` | `t` (text) | URL original en Telegram | | | | |
+| 17 | `MediaType` | `t` (text) | Tipo MIME del archivo (ej: image/jpeg) | | | | |
+| 18 | `MediaSize` | `n` (number) | Tamaño del archivo en bytes | | | ✅ | |
+| 19 | `MediaCaption` | `t` (text) | Descripción asociada al media | | | | |
+| 20 | `MediaWidth` | `n` (number) | Ancho en píxeles | | | | |
+| 21 | `MediaHeight` | `n` (number) | Alto en píxeles | | | | |
+| 22 | `MediaDuration` | `DUR` (duration) | Duración en segundos (hh:mm:ss) | | | | |
+| 23 | `Location` | `G` (geolocation) | Coordenadas GPS (lon, lat, zoom) | | | | ✅ |
+| 24 | `EditedDate` | `t` (text) | Timestamp UNIX de última edición | | | | |
+| 25 | `ReplyToId` | `t` (text) | ID del mensaje al que responde | | | | |
+| 26 | `Reactions` | `a` (textarea) | Reacciones formateadas (👍 3 · ❤️ 1) | | | | ✅ |
+| 27 | `Hashtags` | `F` (freetags) | Hashtags como etiquetas (sin #) | | | ✅ | ✅ |
+
+### INI para importar campos manualmente en TikiWiki
+
+Si querés crear el tracker manualmente desde **Admin → Trackers → Crear/Editar → Importar campos**, copiá este bloque INI completo:
+
+```ini
+[FIELD1]
+name = telegram_message_id
+permName = telegrammessageTelegramMessageId
+type = t
+description = ID único del mensaje en Telegram
+isMain = y
+isMandatory = y
+isTblVisible = y
+isSearchable = y
+isPublic = y
+isHidden = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD2]
+name = chat_id
+permName = telegrammessageChatId
+type = t
+description = ID del chat/grupo en Telegram
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD3]
+name = chat_title
+permName = telegrammessageChatTitle
+type = t
+description = Título del chat o grupo
+isTblVisible = y
+isSearchable = y
+isMain = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD4]
+name = topic_id
+permName = telegrammessageTopicId
+type = t
+description = ID del tema o foro (0 si es General)
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD5]
+name = topic_title
+permName = telegrammessageTopicTitle
+type = t
+description = Nombre del tema o foro
+isTblVisible = y
+isSearchable = y
+isMain = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD6]
+name = message_date
+permName = telegrammessageMessageDate
+type = f
+description = Fecha/hora del mensaje (timestamp UNIX)
+isTblVisible = y
+isSearchable = y
+isMain = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD7]
+name = user_id
+permName = telegrammessageUserId
+type = t
+description = ID numérico del usuario que envió el mensaje
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD8]
+name = username
+permName = telegrammessageUsername
+type = t
+description = @username del usuario en Telegram
+isTblVisible = y
+isSearchable = y
+isMain = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD9]
+name = first_name
+permName = telegrammessageFirstName
+type = t
+description = Nombre del usuario (en import: display name completo)
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD10]
+name = last_name
+permName = telegrammessageLastName
+type = t
+description = Apellido del usuario (solo disponible en webhook)
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD11]
+name = display_name
+permName = telegrammessageDisplayName
+type = t
+description = Nombre completo para mostrar (unificado webhook e import)
+isMain = n
+isSearchable = y
+isTblVisible = y
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD12]
+name = message_type
+permName = telegrammessageMessageType
+type = D
+options = {"options":["text","photo","video","audio","document","sticker","voice","video_note","system","animation","contact","poll","location","other"]}
+description = Tipo de mensaje: text, photo, video, audio, document, sticker, voice, system, etc.
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD13]
+name = text
+permName = telegrammessageText
+type = a
+description = Contenido textual del mensaje (incluye captions de media)
+isTblVisible = y
+isSearchable = y
+isMain = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD14]
+name = media
+permName = telegrammessageMedia
+type = FG
+options = {"galleryId":0}
+description = Archivo multimedia adjunto (referencia a File Gallery de TikiWiki)
+isTblVisible = y
+isMain = n
+isSearchable = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD15]
+name = media_url
+permName = telegrammessageMediaUrl
+type = t
+description = URL pública del archivo multimedia en TikiWiki
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD16]
+name = file_url
+permName = telegrammessageFileUrl
+type = t
+description = URL original del archivo en los servidores de Telegram
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD17]
+name = media_type
+permName = telegrammessageMediaType
+type = t
+description = Tipo MIME del archivo adjunto (ej: image/jpeg, video/mp4)
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD18]
+name = media_size
+permName = telegrammessageMediaSize
+type = n
+description = Tamaño del archivo adjunto en bytes
+isSearchable = y
+isMain = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD19]
+name = media_caption
+permName = telegrammessageMediaCaption
+type = t
+description = Texto de descripción asociado al archivo multimedia
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD20]
+name = message_Location
+permName = telegrammessageLocation
+type = G
+description = Coordenadas GPS del mensaje (formato: lon, lat, zoom)
+isTblVisible = y
+isMain = n
+isSearchable = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD21]
+name = media_width
+permName = telegrammessageMediaWidth
+type = n
+description = Ancho de la imagen/video en píxeles
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD22]
+name = media_height
+permName = telegrammessageMediaHeight
+type = n
+description = Alto de la imagen/video en píxeles
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD23]
+name = media_duration
+permName = telegrammessageMediaDuration
+type = DUR
+description = Duración del audio/video/voice en segundos (se muestra como hh:mm:ss)
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD24]
+name = edited_date
+permName = telegrammessageEditedDate
+type = t
+description = Fecha de última edición (timestamp UNIX, vacío si no fue editado)
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD25]
+name = reply_to_id
+permName = telegrammessageReplyToId
+type = t
+description = ID del mensaje al que responde (para conversaciones en hilo)
+isMain = n
+isSearchable = n
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD26]
+name = reactions
+permName = telegrammessageReactions
+type = a
+description = Reacciones al mensaje formateadas como texto (ej: 👍 3 · ❤️ 1)
+isTblVisible = y
+isMain = n
+isSearchable = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD27]
+name = hashtags
+permName = telegrammessageHashtags
+type = F
+description = Hashtags de Telegram como etiquetas (espacio-separados, sin #)
+isTblVisible = y
+isMain = n
+isSearchable = y
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+```
+
+> **Nota**: Reemplazá `telegrammessage` por tu field prefix si usás uno custom. Reemplazá `{"galleryId":0}` con el ID real de tu file gallery en TikiWiki.
 
 ---
 

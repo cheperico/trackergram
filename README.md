@@ -13,7 +13,10 @@ Puente entre Telegram y TikiWiki. Recibe mensajes de un grupo de Telegram y los 
 - **Captura eventos del grupo**: Creación de topics, miembros que entran o salen, mensajes fijados, cambios de título
 - **Importa historial**: Podés exportar conversaciones existentes desde Telegram e importarlas
 - **Crea trackers automáticamente**: No necesitás configurar los campos a mano
+- **Captura mensajes editados**: Si un mensaje se edita en Telegram, trackerGram detecta el cambio y actualiza el texto en TikiWiki automáticamente
+- **Importa historial con enriquecimiento de polls**: Los exports ZIP de Telegram se importan con datos reales de votantes en encuestas y quizzes
 - **Multi-conexión**: Un mismo webhook atiende múltiples bots, wikis y trackers. Cada conexión se rutea por `(chat_id + webhook_secret)`. Compartir el mismo `bot_token` entre conexiones es válido (el `webhook_secret` se reusa automáticamente).
+- **Auto-detección de field prefix**: Detecta automáticamente el prefijo de campos del tracker, sin configuración manual
 
 ## Qué Necesitás Antes de Empezar
 
@@ -53,7 +56,7 @@ Para instrucciones detalladas, incluyendo cómo crear el bot, configurar permiso
 | `video_note` | ✅ | ✅ | Video circular |
 | `location` | ✅ | ✅ | Ubicación con coordenadas |
 | `contact` | ✅ | ✅ | Contacto compartido |
-| `poll` | ✅ | ✅ | Encuesta |
+| `poll` | ⚠️ | ✅ | Encuesta — en webhook se marca como "no capturada en tiempo real" (sin datos de votos). Import de export ZIP la enriquece con opciones y votantes reales |
 | `animation` | ✅ | ✅ | GIF/animación |
 
 ### Eventos del grupo (service messages)
@@ -110,500 +113,40 @@ Accedé a `https://tu-dominio.com/trackergram/admin.php` con tus credenciales de
 
 ## Campos del Tracker
 
-Si querés crear el tracker manualmente en TikiWiki (sin usar el botón "Crear Tracker" del panel), los campos que necesitás son:
+El tracker usa **26 campos** con permNames que siguen el patrón `{prefix}TelegramMessageId`, `{prefix}ChatId`, etc. El prefijo por defecto es `telegrammessage` (auto-detectable por conexión).
 
-```ini
-[FIELD1]
-name = telegram_message_id
-permName = telegrammessageTelegramMessageId
-type = t
-description = ID único del mensaje en Telegram
-isMain = y
-isMandatory = y
-isTblVisible = y
-isSearchable = y
-isPublic = y
-isHidden = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
+| PermName (sufijo) | Tipo | Descripción |
+|---|---|---|
+| `TelegramMessageId` | `t` (text) | ID único del mensaje en Telegram |
+| `ChatId` | `t` (text) | ID del chat/grupo en Telegram |
+| `ChatTitle` | `t` (text) | Título del chat o grupo |
+| `TopicId` | `t` (text) | ID del tema/foro (0 si General) |
+| `TopicTitle` | `t` (text) | Nombre del tema/foro |
+| `UserId` | `t` (text) | ID numérico del usuario |
+| `Username` | `t` (text) | @username en Telegram |
+| `FirstName` | `t` (text) | Nombre (en import: display name completo) |
+| `LastName` | `t` (text) | Apellido (solo webhook) |
+| `DisplayName` | `t` (text) | Nombre completo (unificado) |
+| `MessageType` | `D` (dropdown) | Tipo: text, photo, video, audio, document, sticker, voice, etc. |
+| `Text` | `a` (textarea) | Contenido del mensaje (incluye captions) |
+| `MessageDate` | `f` (datetime) | Fecha/hora (timestamp UNIX) |
+| `Media` | `FG` (file gallery) | Archivo multimedia adjunto |
+| `MediaUrl` | `t` (text) | URL pública del archivo en TikiWiki |
+| `FileUrl` | `t` (text) | URL original en Telegram |
+| `MediaType` | `t` (text) | Tipo MIME |
+| `MediaSize` | `n` (number) | Tamaño en bytes |
+| `MediaCaption` | `t` (text) | Descripción del media |
+| `MediaWidth` / `MediaHeight` | `n` (number) | Dimensiones en píxeles |
+| `MediaDuration` | `DUR` (duration) | Duración en segundos (hh:mm:ss) |
+| `Location` | `G` (geolocation) | Coordenadas GPS (lon, lat, zoom) |
+| `EditedDate` | `t` (text) | Timestamp de última edición |
+| `ReplyToId` | `t` (text) | ID del mensaje al que responde |
+| `Reactions` | `a` (textarea) | Reacciones formateadas (👍 3 · ❤️ 1) |
+| `Hashtags` | `F` (freetags) | Hashtags como etiquetas |
 
-[FIELD2]
-name = chat_id
-permName = telegrammessageChatId
-type = t
-description = ID del chat/grupo en Telegram
-isMain = n
-isSearchable = n
-isTblVisible = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD3]
-name = chat_title
-permName = telegrammessageChatTitle
-type = t
-description = Título del chat o grupo
-isTblVisible = y
-isSearchable = y
-isMain = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD4]
-name = topic_id
-permName = telegrammessageTopicId
-type = t
-description = ID del tema o foro (0 si es General)
-isMain = n
-isSearchable = n
-isTblVisible = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD5]
-name = topic_title
-permName = telegrammessageTopicTitle
-type = t
-description = Nombre del tema o foro
-isTblVisible = y
-isSearchable = y
-isMain = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD6]
-name = message_date
-permName = telegrammessageMessageDate
-type = f
-description = Fecha/hora del mensaje (timestamp UNIX)
-isTblVisible = y
-isSearchable = y
-isMain = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD7]
-name = user_id
-permName = telegrammessageUserId
-type = t
-description = ID numérico del usuario que envió el mensaje
-isMain = n
-isSearchable = n
-isTblVisible = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD8]
-name = username
-permName = telegrammessageUsername
-type = t
-description = @username del usuario en Telegram
-isTblVisible = y
-isSearchable = y
-isMain = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD9]
-name = first_name
-permName = telegrammessageFirstName
-type = t
-description = Nombre del usuario (en import: display name completo)
-isMain = n
-isSearchable = n
-isTblVisible = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD10]
-name = last_name
-permName = telegrammessageLastName
-type = t
-description = Apellido del usuario (solo disponible en webhook)
-isMain = n
-isSearchable = n
-isTblVisible = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD26]
-name = display_name
-permName = telegrammessageDisplayName
-type = t
-description = Nombre completo para mostrar (unificado webhook e import)
-isMain = n
-isSearchable = y
-isTblVisible = y
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD11]
-name = message_type
-permName = telegrammessageMessageType
-type = D
-options = {"options":["text","photo","video","audio","document","sticker","voice","video_note","system","animation","contact","poll","location","other"]}
-description = Tipo de mensaje: text, photo, video, audio, document, sticker, voice, system, etc.
-isMain = n
-isSearchable = n
-isTblVisible = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD12]
-name = text
-permName = telegrammessageText
-type = a
-description = Contenido textual del mensaje (incluye captions de media)
-isTblVisible = y
-isSearchable = y
-isMain = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD13]
-name = media
-permName = telegrammessageMedia
-type = FG
-options = {"galleryId":36}
-description = Archivo multimedia adjunto (referencia a File Gallery de TikiWiki)
-isTblVisible = y
-isMain = n
-isSearchable = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD14]
-name = media_url
-permName = telegrammessageMediaUrl
-type = t
-description = URL pública del archivo multimedia en TikiWiki
-isMain = n
-isSearchable = n
-isTblVisible = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD15]
-name = file_url
-permName = telegrammessageFileUrl
-type = t
-description = URL original del archivo en los servidores de Telegram
-isMain = n
-isSearchable = n
-isTblVisible = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD16]
-name = media_type
-permName = telegrammessageMediaType
-type = t
-description = Tipo MIME del archivo adjunto (ej: image/jpeg, video/mp4)
-isMain = n
-isSearchable = n
-isTblVisible = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD17]
-name = media_size
-permName = telegrammessageMediaSize
-type = n
-description = Tamaño del archivo adjunto en bytes
-isSearchable = y
-isMain = n
-isTblVisible = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD18]
-name = media_caption
-permName = telegrammessageMediaCaption
-type = t
-description = Texto de descripción asociado al archivo multimedia
-isMain = n
-isSearchable = n
-isTblVisible = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD19]
-name = message_Location
-permName = telegrammessageLocation
-type = G
-description = Coordenadas GPS del mensaje (formato: lon, lat, zoom)
-isTblVisible = y
-isMain = n
-isSearchable = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD20]
-name = media_width
-permName = telegrammessageMediaWidth
-type = n
-description = Ancho de la imagen/video en píxeles
-isMain = n
-isSearchable = n
-isTblVisible = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD21]
-name = media_height
-permName = telegrammessageMediaHeight
-type = n
-description = Alto de la imagen/video en píxeles
-isMain = n
-isSearchable = n
-isTblVisible = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD22]
-name = media_duration
-permName = telegrammessageMediaDuration
-type = DUR
-description = Duración del audio/video/voice en segundos (se muestra como hh:mm:ss)
-isMain = n
-isSearchable = n
-isTblVisible = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD23]
-name = edited_date
-permName = telegrammessageEditedDate
-type = t
-description = Fecha de última edición (timestamp UNIX, vacío si no fue editado)
-isMain = n
-isSearchable = n
-isTblVisible = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD24]
-name = reply_to_id
-permName = telegrammessageReplyToId
-type = t
-description = ID del mensaje al que responde (para conversaciones en hilo)
-isMain = n
-isSearchable = n
-isTblVisible = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD25]
-name = reactions
-permName = telegrammessageReactions
-type = a
-description = Reacciones al mensaje formateadas como texto (ej: 👍 3 · ❤️ 1)
-isTblVisible = y
-isMain = n
-isSearchable = n
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-
-[FIELD26]
-name = hashtags
-permName = telegrammessageHashtags
-type = F
-description = Hashtags de Telegram como etiquetas (espacio-separados, sin #)
-isTblVisible = y
-isMain = n
-isSearchable = y
-isPublic = y
-isHidden = n
-isMandatory = n
-isMultilingual = n
-descriptionIsParsed = n
-excludeFromNotification = n
-visibleInViewMode = y
-visibleInEditMode = y
-visibleInHistoryMode = y
-```
-Podés copiar todo este bloque y pegarlo en **Admin → Trackers → Importar campos** al crear o editar un tracker.
-
-> **Alternativa más fácil**: Usá la pestaña "Crear Tracker" del panel de admin de trackerGram — genera todos los campos automáticamente y te ahorra el copy-paste.
+> **Alternativa más fácil**: Usá la pestaña "Crear Tracker" del panel de admin — genera todos los campos automáticamente.
+>
+> Si necesitás la configuración INI completa para importar campos manualmente en TikiWiki, consultá el [Apéndice en TECHNICAL.md](TECHNICAL.md#apéndice-schema-completo-del-tracker-para-trackergram).
 
 ## Problemas Comunes
 
