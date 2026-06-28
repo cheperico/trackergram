@@ -247,60 +247,14 @@ class MessageMapper
         }
 
         if (isset($message['poll'])) {
-            $poll = $message['poll'];
-            $isQuiz = ($poll['type'] ?? 'regular') === 'quiz';
-            $msg->messageType = $isQuiz ? 'quiz' : 'poll';
-            $msg->mediaType = 'poll';
-            $q = $poll['question'] ?? 'Sin pregunta';
-            $opts = $poll['options'] ?? [];
-            $totalVotes = $poll['total_voter_count'] ?? 0;
-            $correctIds = $poll['correct_option_ids'] ?? (isset($poll['correct_option_id']) ? [$poll['correct_option_id']] : []);
-            $desc = $poll['description'] ?? '';
-
-            // Construir representación rica en texto
-            $lines = [];
-            $lines[] = ($isQuiz ? '🧠 Quiz' : '📊 Encuesta') . ': ' . $q;
-
-            if ($desc !== '') {
-                $lines[] = '📝 ' . $desc;
-            }
-
-            foreach ($opts as $i => $opt) {
-                $text = $opt['text'] ?? '';
-                $votes = $opt['voter_count'] ?? 0;
-                $isCorrect = in_array($i, $correctIds, true);
-                $prefix = '  • ';
-                if ($isQuiz && $isCorrect) {
-                    $prefix = '  ✅ ';
-                } elseif ($isQuiz) {
-                    $prefix = '  ❌ ';
-                }
-                $line = $prefix . $text;
-                if ($votes > 0) {
-                    $line .= ' (' . $votes . ' voto' . ($votes !== 1 ? 's' : '') . ')';
-                }
-                $lines[] = $line;
-            }
-
-            if ($totalVotes > 0) {
-                $lines[] = '👥 Total: ' . $totalVotes . ' voto' . ($totalVotes !== 1 ? 's' : '');
-            }
-
-            $flags = [];
-            if ($poll['allows_multiple_answers'] ?? false) $flags[] = '📝 Respuesta múltiple';
-            if ($poll['is_closed'] ?? false) $flags[] = '🔒 Cerrada';
-            if ($poll['is_anonymous'] ?? true) $flags[] = '🙈 Anónima';
-            if ($poll['allows_revoting'] ?? false) $flags[] = '🔄 Revotación permitida';
-            if ($poll['shuffle_options'] ?? false) $flags[] = '🔀 Opciones mezcladas';
-            if ($poll['hide_results_until_closes'] ?? false) $flags[] = '⏳ Resultados ocultos hasta cierre';
-            if ($poll['members_only'] ?? false) $flags[] = '👥 Solo miembros';
-            if (!empty($poll['country_codes'])) $flags[] = '🌍 Solo países: ' . implode(', ', $poll['country_codes']);
-
-            if (!empty($flags)) {
-                $lines[] = implode(' · ', $flags);
-            }
-
-            $msg->text = implode("\n", $lines);
+            // Las encuestas en webhook siempre llegan con 0 votos (apenas se crean).
+            // trackerGram es append-only, no puede actualizar el item con resultados posteriores.
+            // Las encuestas con datos reales solo se capturan correctamente via import (export ZIP).
+            $q = $message['poll']['question'] ?? 'Sin pregunta';
+            $isQuiz = ($message['poll']['type'] ?? 'regular') === 'quiz';
+            $icon = $isQuiz ? '🧠 Quiz' : '📊 Encuesta';
+            $msg->messageType = 'other';
+            $msg->text = $icon . ': "' . $q . '" — no capturada en tiempo real (usar import)';
             return $msg;
         }
 
@@ -506,10 +460,10 @@ class MessageMapper
             $rawText = $message['text'] ?? '';
             $msg->text = is_array($rawText) ? $this->formatExportText($rawText) : (string) $rawText;
 
-            if (!empty($message['photo'])) {
+            if (!empty($message['photo']) && !$this->isMediaExcluded($message['photo'])) {
                 $msg->messageType = 'photo';
                 $msg->mediaCaption = $message['photo_caption'] ?? '';
-            } elseif (!empty($message['file'])) {
+            } elseif (!empty($message['file']) && !$this->isMediaExcluded($message['file'])) {
                 $fileType = $message['media_type'] ?? '';
                 $fileName = $message['file_name'] ?? basename((string) $message['file']);
                 if ($fileType === 'sticker' || strpos($message['file'] ?? '', 'sticker') !== false) {
@@ -628,6 +582,15 @@ class MessageMapper
         }
 
         return $fields;
+    }
+
+    /**
+     * Detectar si un campo de media del export de Telegram contiene el placeholder
+     * de media excluida: "(File not included. Change data exporting settings to download.)"
+     */
+    private function isMediaExcluded(?string $fieldValue): bool
+    {
+        return $fieldValue !== null && str_starts_with($fieldValue, '(File not included');
     }
 
     // --- Static helpers para casos donde el msg no tiene extractDate ---
