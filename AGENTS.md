@@ -41,7 +41,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 | | |
 |---|---|
-| **Versión** | v0.5.9 |
+| **Versión** | v0.5.11 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
 | **Repositorio** | https://github.com/cheperico/trackergram |
@@ -535,6 +535,7 @@ Ver [CAMBIOS.md](CAMBIOS.md) para el detalle completo por versión.
 
 | Versión | Cambio principal |
 |---|---|---|
+| **v0.5.11** | **Dedup con edit detection + polls enriquecidos**: `updateTrackerItem()` para reflejar edits; `toWikiFieldsEdit()` seguro (solo Text+EditedDate+Reactions); polls del export parsean `answers[]` con voters reales; import.php dedup pre-create con field access en ambos formatos API; `$updated`/`$failed` counters. WebhookHandler: /ayuda con links a sintaxis wiki, XSS fix. |
 | v0.5.9 | **Hashtags como etiquetas (Freetags)**: Extracción de `#tags` de mensajes Telegram (webhook + import) a campo tipo `F` en TikiWiki. Se integran al ecosistema de etiquetas (tag cloud, búsqueda). Nuevo campo `{prefix}Hashtags` en getTrackerFieldDefinitions(). |
 | v0.5.8 | **BUG-001 fix + Privacy Mode doc + htmlspecialchars fix**: findByWebhookSecret() prioriza conexiones pendientes. assignDetection() no sobrescribe chat_id existente. Documentado requisito de bot admin (Privacy Mode de Telegram). Eliminado htmlspecialchars() de toWikiFields() que corrompía comillas y otros caracteres. |
 | v0.5.7 | **ReplyToId con texto del original + reintentos en download + fix concurrencia**: ReplyToId incluye texto del mensaje original (webhook gratis, import via API). downloadAndUploadMedia() con 3 reintentos. Race condition fix en cache de captions. worker.php alineado con api.php. |

@@ -1,5 +1,24 @@
 # Cambios - Changelog
 
+## v0.5.11
+
+### Dedup con edit detection + polls enriquecidos desde export
+
+- **TikiWikiClient**: Nuevo método `updateTrackerItem()` para reflejar edits de Telegram vía `POST /api/trackers/{id}/items/{itemId}`.
+- **TikiWikiClient**: `checkPermissions()` ahora testea `modify_tracker_items` (POST a item inexistente).
+- **MessageMapper**: Nuevo método `toWikiFieldsEdit()` que genera SOLO campos editables (Text + EditedDate + Reactions). Nunca incluye Media/MessageType/Location para evitar pérdida por exports parciales.
+- **MessageMapper::fromExport()**: Polls y quizzes ahora parsean `answers[]` con `voters` reales del export ZIP. Genera texto enriquecido tipo `📊 Pregunta\n• Opción A: 5 votos\nTotal: 8 votos`. Soporta `answers` (schema oficial) y `options` (fallback legacy).
+- **MessageMapper::isMediaExcluded()**: Detecta placeholder `"(File not included..."` de Telegram en exports sin media. Cuando se detecta, el mensaje se trata como texto en vez de media faltante.
+- **import.php (ambos flujos)**: Dedup pre-create con `findItemByMessageId()`. Si el mensaje ya existe:
+  - Si `editedDate` difiere del almacenado → actualiza con `toWikiFieldsEdit()`
+  - Si es poll/quiz con stored `MessageType === 'other'` y texto contiene "no capturada en tiempo real" → enriquece con datos del export
+  - Si no hay cambios → skipped
+- **import.php**: Field access corrige ambos formatos de API de TikiWiki (`field_{prefix}Name` y `fields[{prefix}Name]`).
+- **import.php**: Nuevos contadores `$updated` y `$failed` en respuestas JSON.
+- **WebhookHandler**: Ayuda `/ayuda` actualizada con links a documentación de sintaxis wiki y freetags.
+- **WebhookHandler**: XSS fix en comando desconocido default con `htmlspecialchars()`.
+- **config.php**: `TRACKERGRAM_VERSION` → v0.5.11.
+
 ## v0.5.10
 
 ### Fix: error histórico de webhook mal clasificado como activo

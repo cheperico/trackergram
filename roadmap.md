@@ -8,6 +8,7 @@
 > - `reports/security_audit_report.md`
 > - `reports/template-wiki-feed.md`
 > - `CAMBIOS.md`
+> - `reports/2024-06-28-code-review-exhaustivo.md`
 
 ---
 
@@ -15,7 +16,7 @@
 
 | | |
 |---|---|
-| **Versión actual** | v0.5.9 |
+| **Versión actual** | v0.5.11 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Instancias activas** | Dev (tracker 26) · Prod (tracker 22) |
 | **Filosofía** | Sin DB con servidor · JSON files para estado local (no SQLite) · PHP puro sin framework · MVP pragmático |
@@ -60,6 +61,10 @@
 - ✅ **Field descriptions en API**: todos los campos del tracker se crean con `description` descriptivo enviado a la API de TikiWiki.
 - ✅ **Auto-detección de field prefix**: si el prefix almacenado en `setup.json` es `telegrammessage` (default), el sistema lo verifica contra los campos reales del tracker vía API y lo corrige automáticamente si es distinto. Se persiste tras el primer webhook. Cobertura: webhook, async worker, import.
 - ✅ **Hashtags como etiquetas (Freetags)**: `#tags` extraídos de mensajes de Telegram (webhook e import) guardados en campo tipo `F` (Freetags). Se integran al ecosistema de etiquetas de TikiWiki (tag cloud, búsqueda).
+- ✅ **Deduplicación pre-create con edit detection**: antes de crear un item en import, busca si ya existe por (chat_id, message_id). Si existe y tiene editedDate distinto, actualiza solo Text+EditedDate+Reactions.
+- ✅ **Polls/quizzes enriquecidos desde export**: el import parsea `answers[]` con `voters` reales del export ZIP, generando texto tipo `📊 Pregunta\n• Opción A: 5 votos\nTotal: 8 votos`. Reemplaza el placeholder del webhook.
+- ✅ **updateTrackerItem()**: método en TikiWikiClient para reflejar edits de Telegram. Solo actualiza Text+EditedDate+Reactions (nunca Media/MessageType/Location) para evitar pérdida por exports parciales.
+- ✅ **toWikiFieldsEdit()**: genera SOLO campos editables (Text, EditedDate, Reactions), seguro para usar con exports parciales.
 
 ---
 
@@ -72,6 +77,7 @@ Items con impacto inmediato en la operación del día a día.
 | # | Item | Esfuerzo | Notas |
 |   |------|----------|-------|
 | 1 | **Detección de migración grupo→supergrupo en webhook** | 1 sesión | Detectar `migrate_to_chat_id` en updates de Telegram y actualizar `chat_id` en `setup.json` automáticamente. Sin esto, si el grupo migra, el webhook deja de reconocerlo. También manejar error 400 de Bot API con `parameters.migrate_to_chat_id`. |
+| 2 | **Race condition en rate limiting (api.php)** | 1 sesión | El rate limiting usa `file_get_contents` + `file_put_contents` sin `LOCK_EX`. Bajo concurrencia, múltiples procesos leen el mismo archivo antes de actualizarlo, eludiendo el límite. Fix: `fopen()` + `flock($fp, LOCK_EX)`. Detectado en code review externo. |
 
 ### 🟡 Fase 2: Robustez (1-2 semanas)
 
@@ -80,6 +86,9 @@ Items con impacto inmediato en la operación del día a día.
 | 1 | **Mensajes editados/borrados** | 2 sesiones | Estrategia: archivo inmutable con eventos. Los editados/borrados son eventos adicionales. |
 | 2 | **Reproducción de mensajes previos a nuevo tracker** | 2 sesiones | Script/acción para re-enviar mensajes anteriores de un chat a un tracker recién creado. |
 | 3 | **Cloudflare reverse proxy para shared hosting** | 1 sesión | Configurar Cloudflare como proxy inverso para `trackergram.chela.org.ar` sin afectar el dominio principal. Soluciona firewall de hosting que bloquea IPs de Telegram (Connection timed out). Detalles en `opt/shared_hosting.md`. |
+| 4 | **Race condition: ConfigManager::load() sin flock** | 1 sesión | `file_get_contents()` sin `LOCK_EX` en `ConfigManager::load()`. Si otro proceso escribe `setup.json` concurrentemente, puede leer JSON truncado. Fix: `fopen()` + `flock(LOCK_SH)`. |
+| 5 | **TOCTOU en dedup del webhook** | 1 sesión | Ventana entre `messageExists()` y `createTrackerItem()`. Dos webhooks concurrentes pueden crear el mismo mensaje. Ya hay detección post-insert (linea 354). Mejorar con lock basado en `message_id` o aceptar duplicados raros. |
+| 6 | **Garbage collection de archivos rate limit** | 1 sesión | `api.php` deja archivos `tmp/tg_rate_*` indefinidamente. Agregar limpieza periódica (worker o probabilidad aleatoria) para evitar llenar inodos. |
 
 ### 🟢 Fase 3: Features grandes / robustez (mediano plazo)
 
@@ -91,6 +100,8 @@ Items con impacto inmediato en la operación del día a día.
 | 8 | **Manejo de errores estandarizado** | 2-3 sesiones | Excepciones de dominio (`ConfigException`, `TelegramException`, `TikiWikiException`, `ImportException`). |
 | 9 | **Import CLI asíncrono** | 2 sesiones | Script CLI para exports grandes sin timeout HTTP. |
 | 10 | **Álbumes/grupos de medios en un solo item** | 2-3 sesiones | Agrupar fotos del mismo `media_group_id` en UN item del tracker con múltiples archivos en el campo FG. Actualmente cada foto crea su propio item. Requiere: (1) método para actualizar items existentes en TikiWikiClient, (2) lógica de detección de grupo y update vs create, (3) concurrencia (fotos llegan casi simultáneas). |
+| 11 | **DNS Rebinding en validación SSRF** | 1 sesión | `ConfigManager::validateConnectionData()` resuelve host a IP y verifica que no sea privada, pero no fuerza a cURL a usar esa IP. Si el DNS cambia entre validación y request, un atacante puede redirigir a IP interna. Fix: `CURLOPT_RESOLVE` para pinear la IP. |
+| 12 | **Backoff exponencial en GET requests de TikiWikiClient** | 1 sesión | Las requests GET (`messageExists`, `findItemByMessageId`, `getTrackerItem`) no tienen retry. Si TikiWiki está sobrecargado, el webhook falla sin reintentar. Añadir backoff como ya existe para uploads. |
 
 ### 🔵 Fase 4: Visión (largo plazo)
 
@@ -104,6 +115,7 @@ Items con impacto inmediato en la operación del día a día.
 | 16 | **SQLite para cola async y rate limiting** (evaluación) | 1 sesión | **Opcional.** Evaluar si vale la pena migrar tmp/buffer/ y rate limiting de archivos JSON a SQLite. Prioridad mínima — los archivos actuales funcionan para el volumen esperado. No aplica a setup.json ni topic cache. |
 | 17 | **Rotación de logs por fecha** | 1 sesión | Además de por tamaño. |
 | 18 | **Expulsar bot desde admin panel** | 1 sesión | Botón para sacar el bot de un grupo directamente desde la interface, sin tener que hacerlo desde Telegram. |
+| 19 | **JsonFileStorage utility class** | 1-2 sesiones | Centralizar acceso a archivos JSON con `flock()` (LOCK_EX/LOCK_SH). Resolvería race conditions en rate limiting, ConfigManager, topics cache y media group captions de un solo golpe. |
 
 ### ⚪ Fase 5: Pendientes de reevaluación (muy baja prioridad)
 
@@ -169,4 +181,4 @@ Los documentos en `design/` contienen exploraciones detalladas de features que e
 
 Los reportes históricos en `reports/` se conservan como referencia de investigaciones pasadas. Los items accionables ya están consolidados en este documento.
 
-> **Última actualización**: 26/06/2026
+> **Última actualización**: 28/06/2026
