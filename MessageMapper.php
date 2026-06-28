@@ -248,11 +248,59 @@ class MessageMapper
 
         if (isset($message['poll'])) {
             $poll = $message['poll'];
-            $msg->messageType = 'poll';
+            $isQuiz = ($poll['type'] ?? 'regular') === 'quiz';
+            $msg->messageType = $isQuiz ? 'quiz' : 'poll';
             $msg->mediaType = 'poll';
             $q = $poll['question'] ?? 'Sin pregunta';
-            $opts = count($poll['options'] ?? []);
-            $msg->text = '📊 Encuesta: ' . $q . ' (' . $opts . ' opciones)';
+            $opts = $poll['options'] ?? [];
+            $totalVotes = $poll['total_voter_count'] ?? 0;
+            $correctIds = $poll['correct_option_ids'] ?? (isset($poll['correct_option_id']) ? [$poll['correct_option_id']] : []);
+            $desc = $poll['description'] ?? '';
+
+            // Construir representación rica en texto
+            $lines = [];
+            $lines[] = ($isQuiz ? '🧠 Quiz' : '📊 Encuesta') . ': ' . $q;
+
+            if ($desc !== '') {
+                $lines[] = '📝 ' . $desc;
+            }
+
+            foreach ($opts as $i => $opt) {
+                $text = $opt['text'] ?? '';
+                $votes = $opt['voter_count'] ?? 0;
+                $isCorrect = in_array($i, $correctIds, true);
+                $prefix = '  • ';
+                if ($isQuiz && $isCorrect) {
+                    $prefix = '  ✅ ';
+                } elseif ($isQuiz) {
+                    $prefix = '  ❌ ';
+                }
+                $line = $prefix . $text;
+                if ($votes > 0) {
+                    $line .= ' (' . $votes . ' voto' . ($votes !== 1 ? 's' : '') . ')';
+                }
+                $lines[] = $line;
+            }
+
+            if ($totalVotes > 0) {
+                $lines[] = '👥 Total: ' . $totalVotes . ' voto' . ($totalVotes !== 1 ? 's' : '');
+            }
+
+            $flags = [];
+            if ($poll['allows_multiple_answers'] ?? false) $flags[] = '📝 Respuesta múltiple';
+            if ($poll['is_closed'] ?? false) $flags[] = '🔒 Cerrada';
+            if ($poll['is_anonymous'] ?? true) $flags[] = '🙈 Anónima';
+            if ($poll['allows_revoting'] ?? false) $flags[] = '🔄 Revotación permitida';
+            if ($poll['shuffle_options'] ?? false) $flags[] = '🔀 Opciones mezcladas';
+            if ($poll['hide_results_until_closes'] ?? false) $flags[] = '⏳ Resultados ocultos hasta cierre';
+            if ($poll['members_only'] ?? false) $flags[] = '👥 Solo miembros';
+            if (!empty($poll['country_codes'])) $flags[] = '🌍 Solo países: ' . implode(', ', $poll['country_codes']);
+
+            if (!empty($flags)) {
+                $lines[] = implode(' · ', $flags);
+            }
+
+            $msg->text = implode("\n", $lines);
             return $msg;
         }
 
