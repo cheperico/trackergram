@@ -431,6 +431,48 @@ class TikiWikiClient
         return true;
     }
 
+    /**
+     * Actualizar un item existente en el tracker (POST /api/trackers/{trackerId}/items/{itemId}).
+     * @param int   $trackerId ID del tracker
+     * @param int   $itemId    ID interno del item en TikiWiki
+     * @param array $fields    Array de campos a actualizar (formato: fields[permName]=valor)
+     * @return bool
+     */
+    public function updateTrackerItem(int $trackerId, int $itemId, array $fields): bool
+    {
+        $url = $this->apiUrl . "trackers/$trackerId/items/$itemId";
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($fields));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Authorization: Bearer " . $this->token,
+            "Content-Type: application/x-www-form-urlencoded",
+            "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($error) {
+            log_message("TikiWikiClient: cURL error al actualizar item {$itemId}: $error", true);
+            return false;
+        }
+
+        if ($httpCode !== 200 && $httpCode !== 201) {
+            log_message("TikiWikiClient: HTTP $httpCode al actualizar item {$itemId} — Response: " . substr($response, 0, 300), true);
+            return false;
+        }
+
+        log_message("TikiWikiClient: Item actualizado - itemId={$itemId}");
+        return true;
+    }
+
     public function messageExists(int $trackerId, int $messageId, ?int $chatId = null): int
     {
         $prefix = $this->resolveFieldPrefix($trackerId);
@@ -840,6 +882,7 @@ class TikiWikiClient
             'view_trackers' => false,
             'admin_trackers' => null,   // null = no testeado (sin tracker ID)
             'create_tracker_items' => null, // null = no testeado (sin tracker ID)
+            'modify_tracker_items' => null, // null = no testeado
             'view_file_gallery' => false,
             'upload_files' => false,
             'admin_file_galleries' => false,
@@ -904,6 +947,32 @@ class TikiWikiClient
             }
         } else {
             $parts[] = 'create_tracker_items: no testeado (sin tracker ID)';
+        }
+
+        // 3b. modify_tracker_items (POST /api/trackers/{id}/items/{itemId}) — para updates de editados
+        if ($trackerId > 0) {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $this->apiUrl . "trackers/$trackerId/items/999999999");
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, '');
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Authorization: Bearer " . $this->token,
+                "Accept: application/json",
+                "User-Agent: Mozilla/5.0"
+            ]);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+            curl_exec($ch);
+            $modifyHttp = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            // 404 = permiso OK pero item no existe. 403 = falta permiso.
+            $result['modify_tracker_items'] = ($modifyHttp === 404);
+            $parts[] = 'modify_tracker_items: ' . ($result['modify_tracker_items'] ? 'OK' : "FALTA (HTTP {$modifyHttp})");
+            if (!$result['modify_tracker_items']) {
+                log_message("TikiWikiClient: checkPermissions — POST /trackers/{$trackerId}/items/999999999 HTTP {$modifyHttp} (needs modify_tracker_items)", true);
+            }
+        } else {
+            $parts[] = 'modify_tracker_items: no testeado (sin tracker ID)';
         }
 
         // 4. view_file_gallery (GET /api/galleries)

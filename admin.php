@@ -1706,6 +1706,14 @@ function testConnection(slug, btn) {
                     if (!p.create_tracker_items) allOk = false;
                 }
                 
+                // modify_tracker_items (null = no testeado)
+                if (p.modify_tracker_items === null) {
+                    permLines.push('⏭️ modify_tracker_items: no testeado (sin tracker ID)');
+                } else {
+                    permLines.push((p.modify_tracker_items ? '✅' : '❌') + ' modify_tracker_items: ' + (p.modify_tracker_items ? 'OK' : 'FALTA — no se pueden editar mensajes'));
+                    if (!p.modify_tracker_items) allOk = false;
+                }
+                
                 permLines.push((p.view_file_gallery ? '✅' : '❌') + ' view_file_gallery: ' + (p.view_file_gallery ? 'OK' : 'FALTA'));
                 permLines.push((p.upload_files ? '✅' : '❌') + ' upload_files: ' + (p.upload_files ? 'OK' : 'FALTA'));
                 permLines.push((p.admin_file_galleries ? '✅' : '⚠️') + ' admin_file_galleries: ' + (p.admin_file_galleries ? 'OK' : 'FALTA — auto-repair no disponible'));
@@ -1881,6 +1889,14 @@ function testTikiConnection(slug, btn) {
                 } else {
                     permLines.push((p.create_tracker_items ? '✅' : '❌') + ' create_tracker_items: ' + (p.create_tracker_items ? 'OK' : 'FALTA'));
                     if (!p.create_tracker_items) allOk = false;
+                }
+                
+                // modify_tracker_items (null = no testeado)
+                if (p.modify_tracker_items === null) {
+                    permLines.push('⏭️ modify_tracker_items: no testeado');
+                } else {
+                    permLines.push((p.modify_tracker_items ? '✅' : '❌') + ' modify_tracker_items: ' + (p.modify_tracker_items ? 'OK' : 'FALTA'));
+                    if (!p.modify_tracker_items) allOk = false;
                 }
                 
                 permLines.push((p.view_file_gallery ? '✅' : '❌') + ' view_file_gallery: ' + (p.view_file_gallery ? 'OK' : 'FALTA'));
