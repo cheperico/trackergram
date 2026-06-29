@@ -12,7 +12,7 @@
 1. [Contexto](#1-contexto)
 2. [Problema general](#2-problema-general)
 3. [Fase 1 — Reply-to: resolución de referencias](#3-fase-1--reply-to-resolución-de-referencias)
-4. [Fase 2 — Editar mensajes (postergado)](#4-fase-2--editar-mensajes-postergado)
+4. [Fase 2 — Editar mensajes (implementado)](#4-fase-2--editar-mensajes-implementado-en-v0511-v0512)
 5. [Fase 3 — Borrar mensajes (postergado)](#5-fase-3--borrar-mensajes-postergado)
 6. [Visualización (capa de instalación/deployment)](#6-visualización-capa-de-instalacióndeployment)
 7. [Resumen de tareas](#7-resumen-de-tareas)
@@ -39,7 +39,7 @@ Cada una de estas operaciones implica **trabajar sobre mensajes que ya existen e
 | Operación | Webhook | Import | ¿Qué pasa hoy? |
 |-----------|---------|--------|----------------|
 | **Responder** | ✅ Guarda `replyToId` | ✅ Guarda `replyToId` | Guarda el message_id de Telegram como texto plano — no lleva al mensaje original |
-| **Editar** | ❌ Ignorado | ❌ Ignorado | `edited_message` ni se procesa en `processUpdate()` |
+| **Editar** | ✅ Implementado | ✅ Implementado | `edited_message` se rutea a `processEditedMessage()` desde v0.5.12 |
 | **Borrar** | ❌ N/A | ❌ N/A | Telegram no notifica borrados en grupos; exports no incluyen mensajes borrados |
 
 ### 2.1 Principio general
@@ -95,13 +95,13 @@ Posible mejora futura: resolución diferida.
 
 ---
 
-## 4. Fase 2 — Editar mensajes (postergado)
+## 4. Fase 2 — Editar mensajes (implementado en v0.5.11-0.5.12)
 
-> **Estado**: En diseño — no implementar aún
+> **Estado**: ✅ Implementado. Ver `TikiWikiClient::updateTrackerItem()`, `MessageMapper::toWikiFieldsEdit()`, `WebhookHandler::processEditedMessage()`.
 
 ### 4.1 El problema
 
-Telegram envía `edited_message` cuando un usuario modifica un mensaje. Hoy `processUpdate()` lo ignora completamente (no está en el `if/elseif`).
+Telegram envía `edited_message` cuando un usuario modifica un mensaje. Desde v0.5.12 se rutea a `processEditedMessage()` en vez de ignorarse.
 
 El tracker muestra el texto original, pero en Telegram el mensaje fue actualizado. Hay una discrepancia.
 
@@ -201,14 +201,14 @@ Cada instalación de trackerGram configura su propia visualización en TikiWiki.
 | 2 | En webhook, resolver reply_to antes de guardar: extraer replyToId, buscar itemId, formatear output | `WebhookHandler.php` | ✅ |
 | 3 | En import, misma lógica de resolución | `import.php` | ✅ |
 
-### Fase 2 — Editar mensajes (postergado)
+### Fase 2 — Editar mensajes (implementado ✅)
 
-| # | Tarea | Dependencia |
-|---|-------|-------------|
-| 4 | Investigar API de TikiWiki para modificar items (`PUT /api/trackers/{id}/items/{itemId}` ?) | — |
-| 5 | Agregar `updateTrackerItem()` a TikiWikiClient | Tarea 4 |
-| 6 | Procesar `edited_message` en `processUpdate()` | Tarea 5 + tarea 1 (para encontrar el item) |
-| 7 | Evaluar permisos: `tiki_p_modify_tracker_items` | — |
+| # | Tarea | Estado |
+|---|-------|--------|
+| 4 | Investigar API de TikiWiki para modificar items (`PUT /api/trackers/{id}/items/{itemId}`) | ✅ Usa `POST /api/trackers/{id}/items/{itemId}` |
+| 5 | Agregar `updateTrackerItem()` a TikiWikiClient | ✅ Implementado en v0.5.11 |
+| 6 | Procesar `edited_message` en `processUpdate()` | ✅ Implementado en v0.5.12 |
+| 7 | Evaluar permisos: `tiki_p_modify_tracker_items` | ✅ Agregado a `checkPermissions()` |
 
 ### Fase 3 — Visualización (instalación)
 
@@ -226,7 +226,7 @@ Cada instalación de trackerGram configura su propia visualización en TikiWiki.
 | **Campo reply-to** | Reutilizar `ReplyToId` existente | No requiere schema change ni migración |
 | **Búsqueda reply-to** | Por `(chat_id, message_id)` | Previene falsos positivos entre grupos |
 | **Resolución reply-to** | En captura, no en display | Más eficiente; el dato queda resuelto desde el momento en que se guarda |
-| **Editar mensajes** | Postergado | Requiere cambiar arquitectura append-only |
+| **Editar mensajes** | Implementado | Excepción a append-only: solo Text+EditedDate+Reactions se actualizan (no Media/MessageType/Location) |
 | **Borrar mensajes** | Postergado | No hay forma confiable de detectar borrados |
 | **Visualización** | Fuera de trackerGram | Es parte de la instalación de TikiWiki, no del core |
 

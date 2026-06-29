@@ -23,21 +23,40 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
     }
 
     // 2. Rate limiting ANTES de parsear JSON (previene DoS con parsing pesado)
+    // Usa flock(LOCK_EX) para evitar race condition entre requests concurrentes
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     $rateFile = TEMP_DIR . '/tg_rate_' . md5($ip);
     $window = 60;
     $maxRequests = 30;
     $now = time();
     $requests = [];
-    if (file_exists($rateFile)) {
-        $content = @file_get_contents($rateFile);
-        if ($content) {
+
+    $fp = @fopen($rateFile, 'c+');
+    if ($fp) {
+        flock($fp, LOCK_EX);
+        $content = @stream_get_contents($fp);
+        if ($content !== false && $content !== '') {
             $requests = json_decode($content, true) ?? [];
-            $requests = array_values(array_filter($requests, fn($t) => $t > $now - $window));
+        }
+        $requests = array_values(array_filter($requests, fn($t) => $t > $now - $window));
+        $requests[] = $now;
+        ftruncate($fp, 0);
+        rewind($fp);
+        fwrite($fp, json_encode($requests));
+        fflush($fp);
+        flock($fp, LOCK_UN);
+        fclose($fp);
+    }
+
+    // GC probabilístico: 1% de las veces limpia archivos rate limit stale ( > 1 hora sin actividad)
+    if (mt_rand(1, 100) === 1) {
+        $staleThreshold = $now - 3600;
+        foreach (glob(TEMP_DIR . '/tg_rate_*') as $staleFile) {
+            if (filemtime($staleFile) < $staleThreshold) {
+                @unlink($staleFile);
+            }
         }
     }
-    $requests[] = $now;
-    @file_put_contents($rateFile, json_encode($requests));
 
     if (count($requests) > $maxRequests) {
         http_response_code(429);
@@ -57,6 +76,10 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
     $chatId = 0;
     if (isset($update['message']['chat']['id'])) {
         $chatId = $update['message']['chat']['id'];
+    } elseif (isset($update['edited_message']['chat']['id'])) {
+        $chatId = $update['edited_message']['chat']['id'];
+    } elseif (isset($update['edited_channel_post']['chat']['id'])) {
+        $chatId = $update['edited_channel_post']['chat']['id'];
     } elseif (isset($update['message_reaction']['chat']['id'])) {
         $chatId = $update['message_reaction']['chat']['id'];
     } elseif (isset($update['message_reaction_count']['chat']['id'])) {
@@ -72,6 +95,45 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
     // 6. Buscar TODAS las conexiones por chat_id + webhook_secret (fan-out)
     $allFound = $chatId ? $configManager->findAllByChatId((int) $chatId, $secretToken) : [];
 
+    // 6b. Detectar migración grupo→supergrupo ANTES de detección pasiva
+    // Cuando un grupo básico migra a supergrupo, Telegram envía un mensaje con migrate_to_chat_id
+    // en el último mensaje del grupo viejo. Actualizamos la conexión automáticamente.
+    if (isset($update['message']['migrate_to_chat_id'])) {
+        $migrateToChatId = (int) $update['message']['migrate_to_chat_id'];
+        if (!empty($allFound)) {
+            // Actualizar chat_id de todas las conexiones que matchean
+            foreach ($allFound as $found) {
+                $configManager->updateConnectionFields($found['_slug'], [
+                    'chat_id' => $migrateToChatId,
+                ]);
+                log_message("trackerGram: 🚚 Migración grupo→supergrupo: chat_id {$chatId} → {$migrateToChatId} para conexión '{$found['_slug']}'");
+            }
+            // Usar el nuevo chat_id para el resto del procesamiento
+            $chatId = $migrateToChatId;
+            // Re-buscar conexiones con el nuevo chat_id (ya actualizadas en setup.json)
+            $allFound = $chatId ? $configManager->findAllByChatId((int) $chatId, $secretToken) : [];
+        } else {
+            // Mensaje de migración sin conexión previa — loguear y proseguir con detección pasiva
+            log_message("trackerGram: Migración detectada ({$chatId} → {$migrateToChatId}) pero sin conexión previa — se usará detección pasiva");
+        }
+    }
+    // También manejar migrate_from_chat_id: mensaje en el nuevo supergrupo que referencia el grupo viejo
+    elseif (isset($update['message']['migrate_from_chat_id']) && empty($allFound)) {
+        $migrateFromChatId = (int) $update['message']['migrate_from_chat_id'];
+        // Buscar conexión por el chat_id viejo
+        $oldConnections = $configManager->findAllByChatId($migrateFromChatId, $secretToken);
+        if (!empty($oldConnections)) {
+            foreach ($oldConnections as $oldConn) {
+                $configManager->updateConnectionFields($oldConn['_slug'], [
+                    'chat_id' => $chatId,
+                ]);
+                log_message("trackerGram: 🚚 Post-migración: chat_id actualizado de {$migrateFromChatId} a {$chatId} para conexión '{$oldConn['_slug']}'");
+            }
+            // Re-buscar con el nuevo chat_id
+            $allFound = $chatId ? $configManager->findAllByChatId((int) $chatId, $secretToken) : [];
+        }
+    }
+
     // 7. Detectar pasivamente chats no configurados, incluso si chat_id=0 (test webhook)
     if (empty($allFound) && $secretToken !== '') {
         // 7a. Buscar conexión pendiente (chat_id=0)
@@ -85,12 +147,20 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
         
         if ($detectedConn !== null) {
             if ($chatId) {
-                // Hay chat real → registrar detección
+                // Determinar título del chat
                 $chatTitle = '';
                 if (isset($update['message']['chat']['title'])) {
                     $chatTitle = $update['message']['chat']['title'];
                 } elseif (isset($update['message']['chat']['username'])) {
                     $chatTitle = '@' . $update['message']['chat']['username'];
+                } elseif (isset($update['edited_message']['chat']['title'])) {
+                    $chatTitle = $update['edited_message']['chat']['title'];
+                } elseif (isset($update['edited_message']['chat']['username'])) {
+                    $chatTitle = '@' . $update['edited_message']['chat']['username'];
+                } elseif (isset($update['edited_channel_post']['chat']['title'])) {
+                    $chatTitle = $update['edited_channel_post']['chat']['title'];
+                } elseif (isset($update['edited_channel_post']['chat']['username'])) {
+                    $chatTitle = '@' . $update['edited_channel_post']['chat']['username'];
                 } elseif (isset($update['my_chat_member']['chat']['title'])) {
                     $chatTitle = $update['my_chat_member']['chat']['title'];
                 }
@@ -98,18 +168,36 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
                     $chatTitle = 'Chat ' . $chatId;
                 }
 
-                $slug = $detectedConn['_slug'];
-                addDetection($slug, (int) $chatId, $chatTitle);
-                log_message("trackerGram: Chat detectado '{$chatTitle}' ({$chatId}) para conexión '{$slug}'");
+                // Detectar migración post-facto: la conexión ya tiene chat_id asignado (básico)
+                // pero el incoming chat es nuevo y parece supergrupo (-100...)
+                $connChatId = (int) ($detectedConn['chat_id'] ?? 0);
+                if ($connChatId !== 0 && $connChatId !== (int) $chatId && str_starts_with((string) $chatId, '-100')) {
+                    // Probablemente migración básico→supergrupo — auto-asignar sin detección manual
+                    $configManager->updateConnectionFields($detectedConn['_slug'], [
+                        'chat_id' => (int) $chatId,
+                    ]);
+                    log_message("trackerGram: 🚚 Post-migración auto-asignada: chat_id {$connChatId} → {$chatId} para conexión '{$detectedConn['_slug']}' (chat: {$chatTitle})");
+                    // Refrescar allFound y continuar al fan-out normalmente
+                    $allFound = $chatId ? $configManager->findAllByChatId((int) $chatId, $secretToken) : [];
+                } else {
+                    // Chat genuinamente nuevo — registrar detección para el admin
+                    $slug = $detectedConn['_slug'];
+                    addDetection($slug, (int) $chatId, $chatTitle);
+                    log_message("trackerGram: Chat detectado '{$chatTitle}' ({$chatId}) para conexión '{$slug}'");
+
+                    // Responder 200 para no saturar logs de errores en Telegram
+                    http_response_code(200);
+                    die(json_encode(['status' => 'detected', 'slug' => $slug]));
+                }
             } else {
                 // Test webhook sin chat — el webhook funciona correctamente
                 $slug = $detectedConn['_slug'];
                 log_message("trackerGram: Webhook OK (test) para conexión '{$slug}'");
-            }
 
-            // Responder 200 para no saturar logs de errores en Telegram
-            http_response_code(200);
-            die(json_encode(['status' => 'detected', 'slug' => $slug]));
+                // Responder 200
+                http_response_code(200);
+                die(json_encode(['status' => 'detected', 'slug' => $slug]));
+            }
         }
         
         // 7c. Si no matchea ninguna conexión, el webhook_secret es desconocido

@@ -8,6 +8,7 @@ debug.log
 # Archivos temporales
 *.tmp
 *.temp
+tmp/
 
 # Archivos de backup
 *.bak

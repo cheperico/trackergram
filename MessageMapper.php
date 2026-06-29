@@ -86,7 +86,7 @@ class MessageMapper
             $msg->width = (string) ($photo['width'] ?? '');
             $msg->height = (string) ($photo['height'] ?? '');
             if (isset($message['caption'])) {
-                $msg->text .= ' - ' . htmlspecialchars($message['caption']);
+                $msg->text .= ' - ' . $message['caption'];
             }
             return $msg;
         }
@@ -107,7 +107,7 @@ class MessageMapper
             $msg->height = (string) ($video['height'] ?? '');
             $msg->duration = (string) ($video['duration'] ?? '');
             if (isset($message['caption'])) {
-                $msg->text .= ' - ' . htmlspecialchars($message['caption']);
+                $msg->text .= ' - ' . $message['caption'];
             }
             return $msg;
         }
@@ -124,7 +124,7 @@ class MessageMapper
             $msg->text = 'Audio: ' . $mime;
             $msg->duration = (string) ($audio['duration'] ?? '');
             if (isset($audio['title'])) {
-                $msg->text .= ' - ' . htmlspecialchars($audio['title']);
+                $msg->text .= ' - ' . $audio['title'];
             }
             return $msg;
         }
@@ -139,7 +139,7 @@ class MessageMapper
             $msg->mediaCaption = $message['caption'] ?? '';
             $fn = $doc['file_name'] ?? 'Documento';
             $msg->fileName = $fn;
-            $msg->text = 'Documento: ' . $msg->mediaType . ' - ' . htmlspecialchars($fn);
+            $msg->text = 'Documento: ' . $msg->mediaType . ' - ' . $fn;
             return $msg;
         }
 
@@ -322,7 +322,7 @@ class MessageMapper
 
         if (isset($message['new_chat_title'])) {
             $msg->messageType = 'system';
-            $msg->text = '✏️ Título cambiado a: ' . htmlspecialchars($message['new_chat_title']);
+            $msg->text = '✏️ Título cambiado a: ' . $message['new_chat_title'];
             return $msg;
         }
 

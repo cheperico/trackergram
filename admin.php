@@ -586,7 +586,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             ];
             
             $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $apiUrl . '?' . http_build_query($params));
+            curl_setopt($ch, CURLOPT_URL, $apiUrl);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 10);
             $response = curl_exec($ch);
@@ -1628,6 +1630,15 @@ function openEditModal(slug) {
     });
 }
 
+function safeRender(el, lines) {
+    // Renderiza un array de strings como texto seguro (textContent) separado por <br>
+    el.innerHTML = '';
+    for (var i = 0; i < lines.length; i++) {
+        if (i > 0) el.appendChild(document.createElement('br'));
+        el.appendChild(document.createTextNode(lines[i]));
+    }
+}
+
 function testConnection(slug, btn) {
     var resultDiv = btn.closest('.conn-actions').querySelector('.test-result');
     resultDiv.style.display = 'block';
@@ -1683,7 +1694,7 @@ function testConnection(slug, btn) {
         // TikiWiki test
         if (result.tikiwiki) {
             var twOk = result.tikiwiki.ok;
-            var twMsg = (twOk ? '✅' : '❌') + ' TikiWiki: ' + result.tikiwiki.message;
+            lines.push((twOk ? '✅' : '❌') + ' TikiWiki: ' + result.tikiwiki.message);
             
             // Agregar detalle de permisos si la API responde
             if (result.tikiwiki.api_access) {
@@ -1721,15 +1732,17 @@ function testConnection(slug, btn) {
                 if (!p.view_file_gallery) allOk = false;
                 if (!p.upload_files) allOk = false;
                 
-                twMsg += '<br>&nbsp;&nbsp;' + permLines.join('<br>&nbsp;&nbsp;');
+                // Push each permission line with indentation (sin HTML)
+                for (var pi = 0; pi < permLines.length; pi++) {
+                    lines.push('    ' + permLines[pi]);
+                }
             }
             
-            lines.push(twMsg);
             if (!twOk) allOk = false;
         }
         
         resultDiv.className = 'test-result ' + (allOk ? 'ok' : 'fail');
-        resultDiv.innerHTML = lines.join('<br>');
+        safeRender(resultDiv, lines);
         
         // Actualizar card con bot_name y chat_title si llegaron
         if (result.bot_name) {
@@ -1770,7 +1783,7 @@ function testConnection(slug, btn) {
     })
     .catch(function(err) {
         resultDiv.className = 'test-result fail';
-        resultDiv.innerHTML = 'Error de red: ' + err.message;
+        resultDiv.textContent = 'Error de red: ' + err.message;
     })
     .finally(function() {
         btn.disabled = false;
@@ -1833,11 +1846,11 @@ function testBotConnection(slug, btn) {
         }
         
         resultDiv.className = 'test-result ' + (allOk ? 'ok' : 'fail');
-        resultDiv.innerHTML = lines.join('<br>');
+        safeRender(resultDiv, lines);
     })
     .catch(function(err) {
         resultDiv.className = 'test-result fail';
-        resultDiv.innerHTML = 'Error de red: ' + err.message;
+        resultDiv.textContent = 'Error de red: ' + err.message;
     })
     .finally(function() {
         btn.disabled = false;
@@ -1871,7 +1884,7 @@ function testTikiConnection(slug, btn) {
         
         if (result.tikiwiki) {
             var twOk = result.tikiwiki.ok;
-            var twMsg = (twOk ? '✅' : '❌') + ' TikiWiki: ' + result.tikiwiki.message;
+            lines.push((twOk ? '✅' : '❌') + ' TikiWiki: ' + result.tikiwiki.message);
             
             if (result.tikiwiki.api_access) {
                 var p = result.tikiwiki;
@@ -1906,10 +1919,12 @@ function testTikiConnection(slug, btn) {
                 if (!p.view_file_gallery) allOk = false;
                 if (!p.upload_files) allOk = false;
                 
-                twMsg += '<br>&nbsp;&nbsp;' + permLines.join('<br>&nbsp;&nbsp;');
+                // Push each permission line with indentation (sin HTML)
+                for (var pi = 0; pi < permLines.length; pi++) {
+                    lines.push('    ' + permLines[pi]);
+                }
             }
             
-            lines.push(twMsg);
             if (!twOk) allOk = false;
         } else {
             lines.push('❌ TikiWiki: Sin datos');
@@ -1917,11 +1932,11 @@ function testTikiConnection(slug, btn) {
         }
         
         resultDiv.className = 'test-result ' + (allOk ? 'ok' : 'fail');
-        resultDiv.innerHTML = lines.join('<br>');
+        safeRender(resultDiv, lines);
     })
     .catch(function(err) {
         resultDiv.className = 'test-result fail';
-        resultDiv.innerHTML = 'Error de red: ' + err.message;
+        resultDiv.textContent = 'Error de red: ' + err.message;
     })
     .finally(function() {
         btn.disabled = false;
@@ -1937,7 +1952,7 @@ function checkPrivacy(slug, btn) {
     var resultDiv = actionsContainer.querySelector('.test-result');
     resultDiv.style.display = 'block';
     resultDiv.className = 'test-result';
-    resultDiv.innerHTML = 'Consultando updates recientes...';
+    resultDiv.textContent = 'Consultando updates recientes...';
     btn.disabled = true;
     
     var data = new URLSearchParams();
@@ -1961,7 +1976,7 @@ function checkPrivacy(slug, btn) {
                 lines.push('   Updates pendientes: ' + result.pending);
             }
             resultDiv.className = 'test-result ok';
-            resultDiv.innerHTML = lines.join('<br>');
+            safeRender(resultDiv, lines);
             btn.disabled = false;
             return;
         }
@@ -1969,7 +1984,7 @@ function checkPrivacy(slug, btn) {
         if (!result.ok) {
             lines.push('❌ Error: ' + (result.error || 'sin respuesta'));
             resultDiv.className = 'test-result fail';
-            resultDiv.innerHTML = lines.join('<br>');
+            safeRender(resultDiv, lines);
             return;
         }
         
@@ -2019,11 +2034,11 @@ function checkPrivacy(slug, btn) {
         }
         
         resultDiv.className = 'test-result ' + (result.privacy_mode_on === false ? 'ok' : 'fail');
-        resultDiv.innerHTML = lines.join('<br>');
+        safeRender(resultDiv, lines);
     })
     .catch(function(err) {
         resultDiv.className = 'test-result fail';
-        resultDiv.innerHTML = 'Error de red: ' + err.message;
+        resultDiv.textContent = 'Error de red: ' + err.message;
     })
     .finally(function() {
         btn.disabled = false;

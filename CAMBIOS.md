@@ -1,5 +1,53 @@
 # Cambios - Changelog
 
+## v0.5.12
+
+### Fix: edited_message ahora se rutea por webhook (code review #3)
+
+- **api.php**: Extrae `chat_id` de `edited_message` y `edited_channel_post` (además de `message`, `message_reaction`, etc.).
+- **WebhookHandler::processUpdate()**: Deriva `edited_message` y `edited_channel_post` a nuevo método `processEditedMessage()`.
+- **WebhookHandler::processEditedMessage()**: Busca item existente por `(chat_id, message_id)` vía `findItemByMessageId()`. Si existe → aplica `toWikiFieldsEdit()` + `updateTrackerItem()` (solo Text+EditedDate+Reactions). Si no existe (edición anterior a trackerGram) → `processMessage()` como nuevo.
+- Fix de **bug funcional**: los docs prometían la feature pero el ruteo nunca la invocaba. Los edits se perdían silenciosamente.
+
+### Fix: Token de bot en POST body en vez de URL GET (code review #7)
+
+- **admin.php (configure_webhook)**: Cambiado de `CURLOPT_URL` con query string a `CURLOPT_POST` + `CURLOPT_POSTFIELDS` con `http_build_query()`. El token ya no viaja en la URL, evitando que quede en logs de proxy, access_log, etc.
+
+### Fix: innerHTML reemplazado por safeRender() en admin.php (code review #5)
+
+- **admin.php**: Nueva función JS `safeRender(el, lines)` que renderiza texto seguro con `textContent` + nodos `<br>`, sin exponerse a XSS.
+- Las 4 funciones que renderizaban datos de APIs externas (Telegram) y 3 adicionales ahora usan `safeRender()` en vez de `innerHTML = lines.join('<br>')`.
+
+### Fix: htmlspecialchars eliminado de fromWebhook() (code review #8)
+
+- **MessageMapper::fromWebhook()**: Eliminados 5 `htmlspecialchars()` en captions de photo/video, audio title, document filename, y new_chat_title.
+- **WebhookHandler::propagateMediaGroupCaption()**: Eliminado `htmlspecialchars()` en caption propagada entre fotos del mismo álbum.
+- Esto es distinto al fix de v0.5.8 (que fue en `toWikiFields()`). Este es en `fromWebhook()`, antes de que los datos entren al modelo. Sin esto, captions con comillas llegaban a TikiWiki como `&quot;` literal.
+
+### Limpieza: tmp/test_create.php eliminado (code review #1)
+
+- **tmp/test_create.php**: Borrado. Contenía token TikiWiki hardcodeado (`1970212e...5a57a1`).
+- **.gitignore**: `tmp/` agregado para evitar que archivos temporales se versionen accidentalmente.
+
+### Fix: Race condition en rate limiting con flock(LOCK_EX)
+
+- **api.php (rate limiting)**: Reemplazado `file_get_contents()` + `file_put_contents()` por `fopen('c+')` + `flock(LOCK_EX)` + `ftruncate()`. Dos webhooks concurrentes ya no pueden eludir el límite leyendo el archivo antes de que el otro lo actualice.
+- **api.php**: Agregado GC probabilístico (1% por request) que limpia archivos `tmp/tg_rate_*` con más de 1 hora sin actividad.
+
+### Fix: Detección de migración grupo→supergrupo
+
+- **api.php**: Nueva detección de `migrate_to_chat_id` en updates de Telegram. Cuando un grupo básico migra a supergrupo, actualiza automáticamente el `chat_id` de todas las conexiones que matchean.
+- **api.php**: Soporte para `migrate_from_chat_id` (post-migración): mensajes en el nuevo supergrupo que referencian el grupo viejo.
+- **api.php (detección pasiva)**: Auto-asignación inteligente: si la conexión ya tiene un `chat_id` asignado y el incoming chat es un supergrupo (-100...), lo trata como migración post-facto y actualiza automáticamente sin requerir intervención del admin.
+- **ConfigManager**: `updateConnectionFields()` ya existente se reutiliza para persistir el cambio.
+
+### Docs sincronizados
+
+- **design/004-trabajo-sobre-existentes.md**: Actualizado — edited_message ya no es ignorado.
+- **roadmap.md**: Items de rate limiting (Fase 1 #2) y GC rate files (Fase 2 #6) movidos a "funciona sólido". Item de migración grupo→supergrupo (Fase 1 #1) también.
+- **AGENTS.md**: "Qué funciona" actualizado con edited_message routing, safeRender, configure_webhook POST, rate limiting con flock, migración auto-detectada.
+- **config.php**: TRACKERGRAM_VERSION → v0.5.12.
+
 ## v0.5.11
 
 ### Dedup con edit detection + polls enriquecidos desde export

@@ -359,6 +359,73 @@ class WebhookHandler
     }
 
     /**
+     * Procesar edición de mensaje (edited_message / edited_channel_post)
+     *
+     * Si el item existe en TikiWiki, actualiza solo Text + EditedDate + Reactions
+     * (campos seguros según toWikiFieldsEdit). Si no existe, lo crea como nuevo
+     * (puede ser un edit de un mensaje anterior a la instalación de trackerGram).
+     */
+    public function processEditedMessage(array $message): void
+    {
+        $requiredFields = ['message_id', 'chat', 'date', 'edit_date'];
+        foreach ($requiredFields as $field) {
+            if (!isset($message[$field])) {
+                log_message("ERROR: edited_message - campo requerido '$field' no encontrado", true);
+                return;
+            }
+        }
+
+        $chatId = $message['chat']['id'];
+        $messageId = $message['message_id'];
+        $chatTitle = $message['chat']['title'] ?? $message['chat']['username'] ?? 'Chat ' . $chatId;
+
+        if (!empty(ALLOWED_CHAT_IDS) && !in_array($chatId, ALLOWED_CHAT_IDS)) {
+            log_message("Chat $chatId no está en la lista de permitidos");
+            return;
+        }
+
+        // Buscar el item existente en TikiWiki por (chat_id, message_id)
+        $existingItemId = $this->tikiWikiClient->findItemByMessageId(
+            $this->trackerId,
+            $messageId,
+            $chatId
+        );
+
+        if ($existingItemId === null) {
+            // No existe en tracker — tratarlo como mensaje nuevo
+            // (puede ser un edit de un mensaje anterior a trackerGram)
+            log_message("trackerGram: edited_message #{$messageId} no existe en tracker — creando como nuevo");
+            $this->processMessage($message);
+            return;
+        }
+
+        // Existe — parsear solo los campos editables via fromWebhook
+        $msg = $this->messageMapper->fromWebhook($message);
+
+        // Completar contexto (solo para log / album caption propagation)
+        $msg->messageId = (string) $messageId;
+        $msg->chatId = (string) $chatId;
+        $msg->chatTitle = $chatTitle;
+        $msg->userId = (string) ($message['from']['id'] ?? '');
+        $msg->username = $message['from']['username'] ?? '';
+        $msg->firstName = $message['from']['first_name'] ?? '';
+        $msg->lastName = $message['from']['last_name'] ?? '';
+        $msg->displayName = trim($msg->firstName . ' ' . $msg->lastName);
+        // editedDate ya lo extrajo fromWebhook() de $message['edit_date']
+
+        // Propagar caption si es parte de álbum (pueden editarse captions)
+        $this->propagateMediaGroupCaption($msg, $message);
+
+        // Generar solo campos editables y actualizar
+        $editFields = $this->messageMapper->toWikiFieldsEdit($msg);
+        if ($this->tikiWikiClient->updateTrackerItem($this->trackerId, $existingItemId, $editFields)) {
+            log_message("trackerGram: Editado #{$messageId} → itemId={$existingItemId} en tracker {$this->trackerId}");
+        } else {
+            log_message("ERROR: No se pudo actualizar edit para #{$messageId} itemId={$existingItemId}", true);
+        }
+    }
+
+    /**
      * Procesar reacción a mensaje (message_reaction)
      */
     public function processMessageReaction(array $reaction): void
@@ -600,6 +667,10 @@ class WebhookHandler
 
         if (isset($update['message'])) {
             $this->processMessage($update['message']);
+        } elseif (isset($update['edited_message'])) {
+            $this->processEditedMessage($update['edited_message']);
+        } elseif (isset($update['edited_channel_post'])) {
+            $this->processEditedMessage($update['edited_channel_post']);
         } elseif (isset($update['message_reaction'])) {
             $this->processMessageReaction($update['message_reaction']);
         } elseif (isset($update['message_reaction_count'])) {
@@ -710,7 +781,7 @@ class WebhookHandler
                 $msg->mediaCaption = $saved;
                 // Actualizar text si es tipo "Foto:" sin caption
                 if ($msg->text !== '' && strpos($msg->text, ':') !== false && strpos($msg->text, $saved) === false) {
-                    $msg->text .= ' - ' . htmlspecialchars($saved);
+                    $msg->text .= ' - ' . $saved;
                 }
             }
         }

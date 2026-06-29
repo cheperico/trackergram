@@ -41,7 +41,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 | | |
 |---|---|
-| **Versión** | v0.5.11 |
+| **Versión** | v0.5.12 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
 | **Repositorio** | https://github.com/cheperico/trackergram |
@@ -102,6 +102,12 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 - ✅ **checkPermissions sin side effects**: test de `admin_file_galleries` usa `DELETE /api/galleries/99999999/delete` (galería inexistente), no crea galerías reales
 - ✅ **Fan-out con try-catch individual**: si una conexión falla en el fan-out (timeout, error TikiWiki), no rompe las demás conexiones. Log gea el error individualmente y responde 200 con resultados por conexión.
 - ✅ **Cache auto-detección field prefix**: flag `field_prefix_checked` evita que admin.php y api.php llamen a la API de TikiWiki en cada request. Se ejecuta UNA SOLA VEZ por conexión.
+- ✅ **Mensajes editados capturados en webhook**: `edited_message` y `edited_channel_post` ruteados a `processEditedMessage()` que busca item existente por `(chat_id, message_id)` y aplica `updateTrackerItem()` con solo Text+EditedDate+Reactions. Si no existe, crea item nuevo.
+- ✅ **safeRender() para datos de APIs externas**: admin.php usa función `safeRender()` con `textContent` + nodos `<br>` en vez de `innerHTML` para evitar XSS con datos de Telegram.
+- ✅ **configure_webhook usa POST**: el token de bot viaja en body HTTP, no en URL query string, evitando exposición en logs.
+- ✅ **Rate limiting con flock(LOCK_EX)**: `fopen('c+')` + `flock()` en vez de `file_put_contents()` sin lock, eliminando race condition entre requests concurrentes.
+- ✅ **GC probabilístico de rate files**: limpieza automática (1% por request) de archivos `tmp/tg_rate_*` con más de 1 hora sin actividad.
+- ✅ **Migración grupo→supergrupo detectada automáticamente**: `migrate_to_chat_id` actualiza el `chat_id` de la conexión. Post-migración con `migrate_from_chat_id` y auto-asignación por heurística en detección pasiva.
 
 ---
 
@@ -507,7 +513,7 @@ ASYNC_PROCESSING=false
 
 ### Seguridad
 
-- **No exponer credenciales en URLs o logs** — Los tokens en URLs de descarga se filtraban.
+- **No exponer credenciales en URLs o logs** — Los tokens en URLs de descarga se filtraban. También: `configure_webhook` debe usar POST body, no GET query string.
 - **No comparar contraseñas en texto plano** — Se usa `password_verify()` con bcrypt.
 - **No saltar validación CSRF en admin POST** — Todas las acciones mutantes la requieren.
 - **No extraer ZIPs sin validar path traversal** — Verificar que ningún entry contenga `..`.
@@ -535,6 +541,7 @@ Ver [CAMBIOS.md](CAMBIOS.md) para el detalle completo por versión.
 
 | Versión | Cambio principal |
 |---|---|---|
+| **v0.5.12** | **Fixes de code review externo**: edited_message ruteado por webhook (bug funcional), configure_webhook usa POST (token fuera de URLs), safeRender() elimina innerHTML residual (XSS fix), htmlspecialchars eliminado de fromWebhook() (caption data fix), tmp/test_create.php eliminado (token hardcodeado). Docs sincronizados. |
 | **v0.5.11** | **Dedup con edit detection + polls enriquecidos**: `updateTrackerItem()` para reflejar edits; `toWikiFieldsEdit()` seguro (solo Text+EditedDate+Reactions); polls del export parsean `answers[]` con voters reales; import.php dedup pre-create con field access en ambos formatos API; `$updated`/`$failed` counters. WebhookHandler: /ayuda con links a sintaxis wiki, XSS fix. |
 | v0.5.9 | **Hashtags como etiquetas (Freetags)**: Extracción de `#tags` de mensajes Telegram (webhook + import) a campo tipo `F` en TikiWiki. Se integran al ecosistema de etiquetas (tag cloud, búsqueda). Nuevo campo `{prefix}Hashtags` en getTrackerFieldDefinitions(). |
 | v0.5.8 | **BUG-001 fix + Privacy Mode doc + htmlspecialchars fix**: findByWebhookSecret() prioriza conexiones pendientes. assignDetection() no sobrescribe chat_id existente. Documentado requisito de bot admin (Privacy Mode de Telegram). Eliminado htmlspecialchars() de toWikiFields() que corrompía comillas y otros caracteres. |

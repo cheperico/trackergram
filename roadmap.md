@@ -16,7 +16,7 @@
 
 | | |
 |---|---|
-| **Versión actual** | v0.5.11 |
+| **Versión actual** | v0.5.12 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Instancias activas** | Dev (tracker 26) · Prod (tracker 22) |
 | **Filosofía** | Sin DB con servidor · JSON files para estado local (no SQLite) · PHP puro sin framework · MVP pragmático |
@@ -65,6 +65,13 @@
 - ✅ **Polls/quizzes enriquecidos desde export**: el import parsea `answers[]` con `voters` reales del export ZIP, generando texto tipo `📊 Pregunta\n• Opción A: 5 votos\nTotal: 8 votos`. Reemplaza el placeholder del webhook.
 - ✅ **updateTrackerItem()**: método en TikiWikiClient para reflejar edits de Telegram. Solo actualiza Text+EditedDate+Reactions (nunca Media/MessageType/Location) para evitar pérdida por exports parciales.
 - ✅ **toWikiFieldsEdit()**: genera SOLO campos editables (Text, EditedDate, Reactions), seguro para usar con exports parciales.
+- ✅ **edited_message ruteado por webhook**: `edited_message` y `edited_channel_post` se procesan vía `processEditedMessage()`, que busca item existente y aplica update seguro (solo Text+EditedDate+Reactions) o crea item nuevo si no existe.
+- ✅ **safeRender() en admin.php**: toda renderización de datos de APIs externas usa `textContent` + nodos `<br>` en vez de `innerHTML`, eliminando riesgo XSS.
+- ✅ **configure_webhook usa POST**: el token de bot viaja en body HTTP, no en URL query string.
+- ✅ **htmlspecialchars eliminado de fromWebhook()**: captions y titles se guardan crudos; el escape HTML es responsabilidad de la capa de vista.
+- ✅ **Rate limiting con flock(LOCK_EX)**: `fopen('c+')` + `flock()` reemplaza a `file_get_contents()`/`file_put_contents()` sin lock, eliminando race condition entre requests concurrentes.
+- ✅ **Detección de migración grupo→supergrupo**: `migrate_to_chat_id` detectado automáticamente y `chat_id` actualizado en la conexión. Soporte para post-migración con `migrate_from_chat_id` y auto-asignación por heurística (basic→supergroup).
+- ✅ **GC de archivos rate limit**: limpieza probabilística (1%) de archivos `tmp/tg_rate_*` con más de 1 hora de inactividad.
 
 ---
 
@@ -72,23 +79,16 @@
 
 ### 🔴 Fase 1: Lo que más duele ahora (días)
 
-Items con impacto inmediato en la operación del día a día.
-
-| # | Item | Esfuerzo | Notas |
-|   |------|----------|-------|
-| 1 | **Detección de migración grupo→supergrupo en webhook** | 1 sesión | Detectar `migrate_to_chat_id` en updates de Telegram y actualizar `chat_id` en `setup.json` automáticamente. Sin esto, si el grupo migra, el webhook deja de reconocerlo. También manejar error 400 de Bot API con `parameters.migrate_to_chat_id`. |
-| 2 | **Race condition en rate limiting (api.php)** | 1 sesión | El rate limiting usa `file_get_contents` + `file_put_contents` sin `LOCK_EX`. Bajo concurrencia, múltiples procesos leen el mismo archivo antes de actualizarlo, eludiendo el límite. Fix: `fopen()` + `flock($fp, LOCK_EX)`. Detectado en code review externo. |
+*(Todos los items de Fase 1 completados ✅)*
 
 ### 🟡 Fase 2: Robustez (1-2 semanas)
 
 | # | Item | Esfuerzo | Notas |
 |   |------|----------|-------|
-| 1 | **Mensajes editados/borrados** | 2 sesiones | Estrategia: archivo inmutable con eventos. Los editados/borrados son eventos adicionales. |
-| 2 | **Reproducción de mensajes previos a nuevo tracker** | 2 sesiones | Script/acción para re-enviar mensajes anteriores de un chat a un tracker recién creado. |
-| 3 | **Cloudflare reverse proxy para shared hosting** | 1 sesión | Configurar Cloudflare como proxy inverso para `trackergram.chela.org.ar` sin afectar el dominio principal. Soluciona firewall de hosting que bloquea IPs de Telegram (Connection timed out). Detalles en `opt/shared_hosting.md`. |
-| 4 | **Race condition: ConfigManager::load() sin flock** | 1 sesión | `file_get_contents()` sin `LOCK_EX` en `ConfigManager::load()`. Si otro proceso escribe `setup.json` concurrentemente, puede leer JSON truncado. Fix: `fopen()` + `flock(LOCK_SH)`. |
-| 5 | **TOCTOU en dedup del webhook** | 1 sesión | Ventana entre `messageExists()` y `createTrackerItem()`. Dos webhooks concurrentes pueden crear el mismo mensaje. Ya hay detección post-insert (linea 354). Mejorar con lock basado en `message_id` o aceptar duplicados raros. |
-| 6 | **Garbage collection de archivos rate limit** | 1 sesión | `api.php` deja archivos `tmp/tg_rate_*` indefinidamente. Agregar limpieza periódica (worker o probabilidad aleatoria) para evitar llenar inodos. |
+| 1 | **Reproducción de mensajes previos a nuevo tracker** | 2 sesiones | Script/acción para re-enviar mensajes anteriores de un chat a un tracker recién creado. |
+| 2 | **Cloudflare reverse proxy para shared hosting** | 1 sesión | Configurar Cloudflare como proxy inverso para `trackergram.chela.org.ar` sin afectar el dominio principal. Soluciona firewall de hosting que bloquea IPs de Telegram (Connection timed out). Detalles en `opt/shared_hosting.md`. |
+| 3 | **Race condition: ConfigManager::load() sin flock** | 1 sesión | `file_get_contents()` sin `LOCK_EX` en `ConfigManager::load()`. Si otro proceso escribe `setup.json` concurrentemente, puede leer JSON truncado. Fix: `fopen()` + `flock(LOCK_SH)`. |
+| 4 | **TOCTOU en dedup del webhook** | 1 sesión | Ventana entre `messageExists()` y `createTrackerItem()`. Dos webhooks concurrentes pueden crear el mismo mensaje. Ya hay detección post-insert (linea 354). Mejorar con lock basado en `message_id` o aceptar duplicados raros. |
 
 ### 🟢 Fase 3: Features grandes / robustez (mediano plazo)
 
@@ -116,6 +116,7 @@ Items con impacto inmediato en la operación del día a día.
 | 17 | **Rotación de logs por fecha** | 1 sesión | Además de por tamaño. |
 | 18 | **Expulsar bot desde admin panel** | 1 sesión | Botón para sacar el bot de un grupo directamente desde la interface, sin tener que hacerlo desde Telegram. |
 | 19 | **JsonFileStorage utility class** | 1-2 sesiones | Centralizar acceso a archivos JSON con `flock()` (LOCK_EX/LOCK_SH). Resolvería race conditions en rate limiting, ConfigManager, topics cache y media group captions de un solo golpe. |
+| 20 | **Refactor admin.php (~2467 líneas)** | 2-3 sesiones | Separar JS inline a `admin.js` (~500 líneas), CSS a `admin.css`, y handlers de acciones a archivos separados. Mejora mantenibilidad y legibilidad. Prioridad media-baja — el archivo funciona, pero es difícil de navegar. |
 
 ### ⚪ Fase 5: Pendientes de reevaluación (muy baja prioridad)
 
