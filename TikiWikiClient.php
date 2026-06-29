@@ -17,6 +17,13 @@ class TikiWikiClient
     private array $resolvedPrefixCache = [];
     /** Trackers where repairFgGallery was already attempted (prevents loops) */
     private array $repairedTrackers = [];
+    /**
+     * Entradas CURLOPT_RESOLVE para prevenir DNS rebinding (SSRF #2).
+     * Mapea hostname → IP resuelta y validada, forzando a cURL a conectar
+     * siempre a esa IP aunque el DNS cambie entre requests.
+     * null = no se pudo resolver (se procede sin pin, fail open).
+     */
+    private ?array $curlResolveEntries = null;
 
     /**
      * Setear field prefix para todos los permNames (ej: 'qpch', 'soporte')
@@ -75,7 +82,7 @@ class TikiWikiClient
 
         $url = $this->apiUrl . "trackers/$trackerId/fields";
 
-        $ch = curl_init();
+        $ch = $this->createCurlHandle();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             "Authorization: Bearer " . $this->token,
@@ -138,6 +145,73 @@ class TikiWikiClient
         $this->token = $token;
         $this->timeout = $timeout;
         $this->uploadTimeout = $uploadTimeout;
+        $this->initCurlResolve();
+    }
+
+    /**
+     * Resolver el hostname de la API a una IP y validarla para CURLOPT_RESOLVE.
+     * Previene ataques DNS rebinding: fuerza a cURL a conectar siempre a la IP
+     * resuelta en el momento de la construcción, incluso si el DNS cambia.
+     * 
+     * La resolución se hace en cada request (porque en PHP compartido cada request
+     * es un proceso nuevo), y el resultado aplica para todos los calls de esa
+     * instancia de TikiWikiClient.
+     * 
+     * Si falla la resolución (hostname inválido, DNS temporalmente caído) se procede
+     * sin pin — fail open, mejor perder protección que romper la app.
+     */
+    private function initCurlResolve(): void
+    {
+        $host = parse_url($this->apiUrl, PHP_URL_HOST);
+        $scheme = parse_url($this->apiUrl, PHP_URL_SCHEME);
+        $port = parse_url($this->apiUrl, PHP_URL_PORT);
+
+        if ($host === null || $host === '') {
+            return;
+        }
+
+        // Si el host ya es una IP (IPv4 o IPv6), no hay riesgo de rebinding
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            return;
+        }
+
+        // Resolver hostname a IP
+        $ip = @gethostbyname($host);
+        if ($ip === $host) {
+            log_message("TikiWikiClient: No se pudo resolver host '{$host}' para CURLOPT_RESOLVE — se procede sin pin", true);
+            return;
+        }
+
+        // Validar que no sea IP privada/reservada
+        $isPrivate = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
+        if ($isPrivate) {
+            log_message("TikiWikiClient: Host '{$host}' resuelve a IP privada/reservada '{$ip}' — CURLOPT_RESOLVE aplicado igual para prevenir DNS rebinding", true);
+        }
+
+        // Puerto por defecto según scheme
+        if ($port === null || $port === 0) {
+            $port = ($scheme === 'https') ? 443 : 80;
+        }
+
+        $this->curlResolveEntries = ["{$host}:{$port}:{$ip}"];
+        log_message("TikiWikiClient: DNS pinned — '{$host}' → '{$ip}' (puerto {$port})");
+    }
+
+    /**
+     * Crear un handle curl con las opciones comunes de seguridad aplicadas.
+     * Reemplaza a curl_init() en toda la clase.
+     */
+    private function createCurlHandle(): \CurlHandle
+    {
+        $ch = $this->createCurlHandle();
+        // Prevenir DNS rebinding: fuerza conexión a la IP resuelta y validada
+        if ($this->curlResolveEntries !== null) {
+            curl_setopt($ch, CURLOPT_RESOLVE, $this->curlResolveEntries);
+        }
+        // SSL verification siempre activa
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+        return $ch;
     }
 
     public function getBaseUrl(): string
@@ -277,7 +351,7 @@ class TikiWikiClient
             'description' => $description
         ];
 
-        $ch = curl_init();
+        $ch = $this->createCurlHandle();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
@@ -351,7 +425,7 @@ class TikiWikiClient
             'description' => $description,
         ]);
 
-        $ch = curl_init();
+        $ch = $this->createCurlHandle();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
@@ -393,7 +467,7 @@ class TikiWikiClient
     {
         $url = $this->apiUrl . "trackers/$trackerId/items";
 
-        $ch = curl_init();
+        $ch = $this->createCurlHandle();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postFields));
@@ -442,7 +516,7 @@ class TikiWikiClient
     {
         $url = $this->apiUrl . "trackers/$trackerId/items/$itemId";
 
-        $ch = curl_init();
+        $ch = $this->createCurlHandle();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($fields));
@@ -473,7 +547,11 @@ class TikiWikiClient
         return true;
     }
 
-    public function messageExists(int $trackerId, int $messageId, ?int $chatId = null): int
+    /**
+     * Verificar si un mensaje ya existe en el tracker.
+     * @return int|null Cantidad de items encontrados (0 = no existe), o null si hubo error de conexión/timeout
+     */
+    public function messageExists(int $trackerId, int $messageId, ?int $chatId = null): ?int
     {
         $prefix = $this->resolveFieldPrefix($trackerId);
         $url = $this->apiUrl . "trackers/$trackerId/items?filter[fields][{$prefix}TelegramMessageId]=$messageId";
@@ -482,7 +560,7 @@ class TikiWikiClient
             $url .= "&filter[fields][{$prefix}ChatId]=$chatId";
         }
 
-        $ch = curl_init();
+        $ch = $this->createCurlHandle();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             "Authorization: Bearer " . $this->token,
@@ -495,12 +573,12 @@ class TikiWikiClient
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        if ($httpCode === 200) {
-            $data = json_decode($response, true);
-            return count($data['data'] ?? []);
+        if ($httpCode !== 200) {
+            return null; // Error de red/timeout/5xx — no se puede determinar si existe
         }
 
-        return 0;
+        $data = json_decode($response, true);
+        return count($data['data'] ?? []);
     }
 
     /**
@@ -519,7 +597,7 @@ class TikiWikiClient
             . "&filter[fields][{$prefix}ChatId]=" . urlencode((string) $chatId)
             . "&maxRecords=1";
 
-        $ch = curl_init();
+        $ch = $this->createCurlHandle();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             "Authorization: Bearer " . $this->token,
@@ -562,7 +640,7 @@ class TikiWikiClient
     {
         $url = $this->apiUrl . "trackers/$trackerId/items?itemId=" . urlencode((string) $itemId) . "&maxRecords=1";
 
-        $ch = curl_init();
+        $ch = $this->createCurlHandle();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             "Authorization: Bearer " . $this->token,
@@ -608,7 +686,7 @@ class TikiWikiClient
                 'parentId' => $parentId,
             ]);
 
-            $ch = curl_init();
+            $ch = $this->createCurlHandle();
             curl_setopt($ch, CURLOPT_URL, $url);
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
@@ -658,7 +736,7 @@ class TikiWikiClient
         // Obtener fieldId del campo FG desde GET /api/trackers/{id}/fields
         $url = $this->apiUrl . "trackers/{$trackerId}/fields";
 
-        $ch = curl_init();
+        $ch = $this->createCurlHandle();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             "Authorization: Bearer " . $this->token,
@@ -709,7 +787,7 @@ class TikiWikiClient
             'option[excessBehavior]' => $excessBehavior,
         ]);
 
-        $ch = curl_init();
+        $ch = $this->createCurlHandle();
         curl_setopt($ch, CURLOPT_URL, $updateUrl);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
@@ -800,7 +878,7 @@ class TikiWikiClient
     public function getVersion(): ?string
     {
         $url = $this->apiUrl . 'version';
-        $ch = curl_init();
+        $ch = $this->createCurlHandle();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             "Authorization: Bearer " . $this->token,
@@ -831,7 +909,7 @@ class TikiWikiClient
     {
         $url = $this->apiUrl . 'trackers';
 
-        $ch = curl_init();
+        $ch = $this->createCurlHandle();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             "Authorization: Bearer " . $this->token,
@@ -903,7 +981,7 @@ class TikiWikiClient
         // 2. admin_trackers global (GET /api/trackers/{trackerId}) — CRÍTICO
         //    La ruta correcta es /api/trackers/{id} (sin /items). Ver ApiBridge.php línea 137.
         if ($trackerId > 0) {
-            $ch = curl_init();
+            $ch = $this->createCurlHandle();
             curl_setopt($ch, CURLOPT_URL, $this->apiUrl . "trackers/$trackerId?maxRecords=1");
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
                 "Authorization: Bearer " . $this->token,
@@ -926,7 +1004,7 @@ class TikiWikiClient
 
         // 3. create_tracker_items (POST /api/trackers/{id}/items) — CRÍTICO
         if ($trackerId > 0) {
-            $ch = curl_init();
+            $ch = $this->createCurlHandle();
             curl_setopt($ch, CURLOPT_URL, $this->apiUrl . "trackers/$trackerId/items");
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS, '');
@@ -951,7 +1029,7 @@ class TikiWikiClient
 
         // 3b. modify_tracker_items (POST /api/trackers/{id}/items/{itemId}) — para updates de editados
         if ($trackerId > 0) {
-            $ch = curl_init();
+            $ch = $this->createCurlHandle();
             curl_setopt($ch, CURLOPT_URL, $this->apiUrl . "trackers/$trackerId/items/999999999");
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS, '');
@@ -976,7 +1054,7 @@ class TikiWikiClient
         }
 
         // 4. view_file_gallery (GET /api/galleries)
-        $ch = curl_init();
+        $ch = $this->createCurlHandle();
         curl_setopt($ch, CURLOPT_URL, $this->apiUrl . 'galleries');
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             "Authorization: Bearer " . $this->token,
@@ -997,7 +1075,7 @@ class TikiWikiClient
 
         // 5. upload_files (POST /api/galleries/upload con galleryId inválido)
         //    Verificamos que NO dé 403 (si da 403, falta upload_files)
-        $ch = curl_init();
+        $ch = $this->createCurlHandle();
         curl_setopt($ch, CURLOPT_URL, $this->apiUrl . 'galleries/upload');
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, 'galleryId=1');
@@ -1022,7 +1100,7 @@ class TikiWikiClient
         //    Envía DELETE a una galería inexistente. Si tenemos admin_file_galleries,
         //    la API responde HTTP 200 (la galería no existe pero el permiso es válido).
         //    Si NO tenemos el permiso, responde 403. Sin efectos secundarios.
-        $ch = curl_init();
+        $ch = $this->createCurlHandle();
         curl_setopt($ch, CURLOPT_URL, $this->apiUrl . 'galleries/99999999/delete');
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
@@ -1152,7 +1230,7 @@ class TikiWikiClient
         }
         $postFields = http_build_query($postData);
 
-        $ch = curl_init();
+        $ch = $this->createCurlHandle();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
@@ -1200,7 +1278,7 @@ class TikiWikiClient
         }
         $postFields = http_build_query($postData);
 
-        $ch = curl_init();
+        $ch = $this->createCurlHandle();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
@@ -1231,7 +1309,7 @@ class TikiWikiClient
     public function getTrackerInfo(int $trackerId): ?array
     {
         $url = $this->apiUrl . "trackers/{$trackerId}";
-        $ch = curl_init();
+        $ch = $this->createCurlHandle();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HTTPGET, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
@@ -1273,7 +1351,7 @@ class TikiWikiClient
             'confirm' => 1,
         ]);
 
-        $ch = curl_init();
+        $ch = $this->createCurlHandle();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);

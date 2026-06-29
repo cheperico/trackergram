@@ -236,9 +236,15 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
                     'update' => $update,
                 ];
                 $bufferFile = $bufferDir . '/event_' . time() . '_' . bin2hex(random_bytes(4)) . '.json';
-                $written = @file_put_contents($bufferFile, json_encode($bufferData), LOCK_EX);
+                $tmpFile = $bufferFile . '.tmp'; // escritura temporal + rename atómico
+                $written = @file_put_contents($tmpFile, json_encode($bufferData), LOCK_EX);
                 if ($written === false) {
+                    @unlink($tmpFile);
                     log_message("trackerGram: No se pudo escribir buffer async — procesando sincrónicamente", true);
+                    processUpdate($update, $connection, $connectionSlug, $messageMapper);
+                } elseif (!@rename($tmpFile, $bufferFile)) {
+                    @unlink($tmpFile);
+                    log_message("trackerGram: No se pudo renombrar buffer async — procesando sincrónicamente", true);
                     processUpdate($update, $connection, $connectionSlug, $messageMapper);
                 }
             } else {
@@ -252,8 +258,25 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
         }
     }
 
-    // Responder 200 OK con resultados individuales
-    echo json_encode(['status' => 'ok', 'connections' => $fanOutResults]);
+    // Determinar código de respuesta según resultados del fan-out
+    // Si al menos una conexión procesó OK → 200 (las que fallaron tienen error en el detalle)
+    // Si TODAS fallaron → 502 para que Telegram reintente el webhook
+    $anyOk = false;
+    foreach ($fanOutResults as $result) {
+        if ($result === 'ok') {
+            $anyOk = true;
+            break;
+        }
+    }
+
+    if ($anyOk || empty($fanOutResults)) {
+        http_response_code(200);
+    } else {
+        http_response_code(502);
+        log_message("trackerGram: Todas las conexiones fallaron en fan-out — respondiendo 502 para reintento de Telegram", true);
+    }
+
+    echo json_encode(['status' => $anyOk ? 'ok' : 'error', 'connections' => $fanOutResults]);
 }
 
 /**

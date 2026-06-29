@@ -28,7 +28,16 @@ class ConfigManager
             return true;
         }
 
-        $content = @file_get_contents($this->configPath);
+        // Leer con flock(LOCK_SH) para evitar leer JSON truncado si otro proceso escribe concurrentemente
+        $fp = @fopen($this->configPath, 'r');
+        if (!$fp) {
+            return false;
+        }
+        flock($fp, LOCK_SH);
+        $content = @stream_get_contents($fp);
+        flock($fp, LOCK_UN);
+        fclose($fp);
+
         if ($content === false) {
             return false;
         }
@@ -505,10 +514,15 @@ class ConfigManager
             $host = parse_url(trim($data['tiki_api_url']), PHP_URL_HOST);
             if ($host !== null) {
                 $ip = gethostbyname($host);
-                if ($ip !== $host) { // si es un hostname que resuelve
+                if ($ip === $host) {
+                    // Si el host NO es una IP literal, significa que la resolución DNS falló
+                    if (!filter_var($host, FILTER_VALIDATE_IP)) {
+                        $errors[] = 'tiki_api_url: no se pudo resolver el hostname (' . $host . ')';
+                    }
+                } else {
                     $isPrivate = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
                     if ($isPrivate) {
-                        $errors[] = 'tiki_api_url no puede apuntar a una IP privada o reservada';
+                        $errors[] = 'tiki_api_url no puede apuntar a una IP privada o reservada (resuelve a ' . $ip . ')';
                     }
                 }
             }

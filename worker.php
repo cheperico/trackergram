@@ -84,20 +84,28 @@ function processBatch(string $bufferDir, int $maxEvents, ConfigManager $configMa
 
         $baseName = basename($file);
 
-        // Lock para evitar duplicados entre workers
-        $lockFile = $file . '.lock';
-        $lockFp = @fopen($lockFile, 'x');
+        // Lock sobre el .json mismo (evita lock files huérfanos si worker crashea)
+        $lockFp = @fopen($file, 'r');
         if ($lockFp === false) {
+            echo "[" . date('Y-m-d H:i:s') . "] ERROR: No se pudo abrir {$baseName} para lock\n";
+            $processed++;
+            $failed++;
             continue;
         }
-        flock($lockFp, LOCK_EX);
+        if (!flock($lockFp, LOCK_EX | LOCK_NB)) {
+            // Otro worker ya está procesando este evento
+            @fclose($lockFp);
+            continue;
+        }
 
         // Leer evento
-        $json = @file_get_contents($file);
-        if ($json === false) {
-            echo "[" . date('Y-m-d H:i:s') . "] ERROR: No se pudo leer {$baseName}\n";
+        rewind($lockFp);
+        $json = @stream_get_contents($lockFp);
+        if ($json === false || $json === '') {
+            echo "[" . date('Y-m-d H:i:s') . "] ERROR: No se pudo leer {$baseName} (vacío o inaccesible)\n";
+            flock($lockFp, LOCK_UN);
             @fclose($lockFp);
-            @unlink($lockFile);
+            @rename($file, $file . '.failed');
             $processed++;
             $failed++;
             continue;
@@ -106,8 +114,8 @@ function processBatch(string $bufferDir, int $maxEvents, ConfigManager $configMa
         $bufferData = json_decode($json, true);
         if (!$bufferData || !isset($bufferData['connection_slug']) || !isset($bufferData['update'])) {
             echo "[" . date('Y-m-d H:i:s') . "] ERROR: Formato inválido en {$baseName}\n";
+            flock($lockFp, LOCK_UN);
             @fclose($lockFp);
-            @unlink($lockFile);
             @rename($file, $file . '.failed');
             $processed++;
             $failed++;
@@ -122,8 +130,8 @@ function processBatch(string $bufferDir, int $maxEvents, ConfigManager $configMa
 
         if (!$connection || empty($connection['enabled'])) {
             echo "[" . date('Y-m-d H:i:s') . "] SKIP {$baseName}: conexión '{$connectionSlug}' no encontrada o deshabilitada\n";
+            flock($lockFp, LOCK_UN);
             @fclose($lockFp);
-            @unlink($lockFile);
             @rename($file, $file . '.failed');
             $processed++;
             $failed++;
@@ -173,15 +181,15 @@ function processBatch(string $bufferDir, int $maxEvents, ConfigManager $configMa
 
             $elapsed = round((microtime(true) - $startTime) * 1000);
 
+            flock($lockFp, LOCK_UN);
             @fclose($lockFp);
-            @unlink($lockFile);
             @rename($file, $file . '.done');
 
             echo "[" . date('Y-m-d H:i:s') . "] OK {$baseName} ({$connectionSlug}, {$elapsed}ms)\n";
             $success++;
         } catch (Throwable $e) {
+            flock($lockFp, LOCK_UN);
             @fclose($lockFp);
-            @unlink($lockFile);
             @rename($file, $file . '.failed_' . time());
 
             echo "[" . date('Y-m-d H:i:s') . "] ERROR {$baseName} ({$connectionSlug}): {$e->getMessage()}\n";
@@ -197,18 +205,27 @@ function processBatch(string $bufferDir, int $maxEvents, ConfigManager $configMa
 }
 
 /**
- * Limpiar archivos .done viejos para que no se acumulen
+ * Limpiar archivos temporales viejos del buffer para que no se acumulen.
+ * Barre: .done (procesados OK), .failed* (errores), .lock (legacy), .tmp (partial writes).
  */
 function cleanupDoneFiles(string $bufferDir, int $maxAgeSeconds): void
 {
-    $files = glob($bufferDir . '/event_*.json.done');
-    if (empty($files)) {
-        return;
-    }
+    $patterns = [
+        $bufferDir . '/event_*.json.done',
+        $bufferDir . '/event_*.json.failed*',
+        $bufferDir . '/event_*.json.lock',
+        $bufferDir . '/event_*.json.tmp',
+    ];
     $now = time();
-    foreach ($files as $file) {
-        if ($now - filemtime($file) > $maxAgeSeconds) {
-            @unlink($file);
+    foreach ($patterns as $pattern) {
+        $files = glob($pattern);
+        if (empty($files)) {
+            continue;
+        }
+        foreach ($files as $file) {
+            if ($now - @filemtime($file) > $maxAgeSeconds) {
+                @unlink($file);
+            }
         }
     }
 }

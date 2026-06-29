@@ -1,5 +1,30 @@
 # Cambios - Changelog
 
+## v0.5.13
+
+### 🔒 Fix: DNS Rebinding en SSRF (hallazgo #2 code review)
+
+- **TikiWikiClient**: Nueva propiedad `$curlResolveEntries` que resuelve el hostname de `$apiUrl` a IP durante la construcción (`initCurlResolve()`), y fuerza a cURL a conectarse siempre a esa IP validada mediante `CURLOPT_RESOLVE`. Esto previene ataques de DNS rebinding: si el DNS cambia entre la validación en ConfigManager y el request real de cURL, la conexión sigue yendo a la IP originalmente validada.
+- **TikiWikiClient**: Nuevo método `createCurlHandle()` reemplaza a `curl_init()` en toda la clase. Configura automáticamente `CURLOPT_RESOLVE` y `CURLOPT_SSL_VERIFYPEER`/`CURLOPT_SSL_VERIFYHOST`, garantizando que **todos** los 23 calls curl tengan protección SSRF y SSL activa.
+- **ConfigManager::validateConnectionData()**: Refuerzo en la validación anti-SSRF — ahora rechaza hostnames que **no se puedan resolver** (antes pasaban silenciosamente), y el mensaje de error para IPs privadas incluye la IP detectada.
+
+### 🔒 Fix: Host header poisoning (hallazgo #6 code review)
+
+- **TikiWikiClient (implícito)**: `CURLOPT_RESOLVE` previene Host header poisoning porque cURL siempre envía el Host header derivado del hostname original de la URL, no del IP al que se conecta. Al pinar la IP resuelta, no hay posibilidad de que un atacante controle el servidor de destino mediante DNS rebinding y reciba requests con Host header válido para explotar virtual hosting.
+- Verificación: todas las llamadas curl en `TelegramClient` y `admin.php` se conectan a `api.telegram.org` (hardcoded, confiable), no requieren protección.
+
+### Fix: Archivos parciales en cola async (hallazgo #4)
+
+- **api.php (escritura de buffer)**: Cambiado de `file_put_contents($bufferFile, ...)` directo a escritura en `$bufferFile.tmp` + `rename()` atómico. Si el proceso crashea a la mitad de la escritura, queda un `.tmp` invisible para el worker en vez de un `.json` truncado.
+- **worker.php (reader)**: Eliminado el lock separado (`event_*.json.lock` con `fopen('x')`) que dejaba locks huérfanos si el worker crasheaba — el evento quedaba bloqueado para siempre. Reemplazado por `flock(LOCK_EX | LOCK_NB)` directo sobre el archivo `.json`. Si el worker muere, el SO libera el lock automáticamente y otro worker puede retomar el evento.
+- **worker.php (cleanup)**: `cleanupDoneFiles()` extendida para barrer también `.failed*` (errores), `.lock` (legacy) y `.tmp` (partial writes) con más de 1 hora de antigüedad.
+
+### Docs sincronizados
+
+- **AGENTS.md**: "Qué funciona" actualizado con SSRF reforzado, CURLOPT_RESOLVE y fix de cola async.
+- **roadmap.md**: Items #11 (DNS rebinding), #6 (Host header), y #4 (partial async) movidos a "funciona sólido".
+- **config.php**: TRACKERGRAM_VERSION → v0.5.13.
+
 ## v0.5.12
 
 ### Fix: edited_message ahora se rutea por webhook (code review #3)
@@ -41,10 +66,28 @@
 - **api.php (detección pasiva)**: Auto-asignación inteligente: si la conexión ya tiene un `chat_id` asignado y el incoming chat es un supergrupo (-100...), lo trata como migración post-facto y actualiza automáticamente sin requerir intervención del admin.
 - **ConfigManager**: `updateConnectionFields()` ya existente se reutiliza para persistir el cambio.
 
+### Fix: ConfigManager::load() con flock(LOCK_SH) (Fase 2 #2)
+
+- **ConfigManager::load()**: Reemplazado `file_get_contents()` sin lock por `fopen('r')` + `flock(LOCK_SH)` + `stream_get_contents()`. Previene leer JSON truncado si otro proceso escribe `setup.json` concurrentemente.
+
+### Fix: messageExists() retorna null en error (hallazgo #11 code review)
+
+- **TikiWikiClient::messageExists()**: Cambiado tipo de retorno de `int` a `?int`. Ahora retorna `null` si la API de TikiWiki no responde (timeout/5xx), en vez de `0` que se interpretaba como "mensaje no existe" y generaba duplicados transitorios.
+- **WebhookHandler::processMessage()**: Actualizado para manejar `null` de messageExists(). Si hay error de conexión, logea warning pero procede con creación (fail open — mejor un duplicado raro que perder un mensaje).
+
+### Fix: Fan-out responde 502 si todas las conexiones fallan (hallazgo #10)
+
+- **api.php (fan-out)**: Ahora verifica si TODAS las conexiones fallaron en el fan-out. Si ninguna respondió `ok`, responde HTTP 502 para que Telegram reintente el webhook. Si al menos una funcionó, responde 200 con detalles de error por conexión.
+
+### Fix: TOCTOU en dedup con lock por message_id (Fase 2 #3)
+
+- **WebhookHandler::processMessage()**: Nuevo lock exclusivo por `(chatId:messageId)` en `TEMP_DIR/dedup_locks/`. Se adquiere ANTES del `messageExists()` inicial y se libera después de `sendToTikiWikiWithRetries()`. Elimina la ventana entre verificar y crear donde otro webhook concurrente podía insertar el mismo mensaje.
+- Diferentes mensajes no compiten (distinto lock file). El lock es blocking — el segundo webhook para el mismo mensaje espera a que el primero termine.
+
 ### Docs sincronizados
 
 - **design/004-trabajo-sobre-existentes.md**: Actualizado — edited_message ya no es ignorado.
-- **roadmap.md**: Items de rate limiting (Fase 1 #2) y GC rate files (Fase 2 #6) movidos a "funciona sólido". Item de migración grupo→supergrupo (Fase 1 #1) también.
+- **roadmap.md**: Items de rate limiting (Fase 1 #2) y GC rate files (Fase 2 #6) movidos a "funciona sólido". Item de migración grupo→supergrupo (Fase 1 #1) también. Cloudflare removido (no es código del proyecto). Items de Fase 2 reordenados.
 - **AGENTS.md**: "Qué funciona" actualizado con edited_message routing, safeRender, configure_webhook POST, rate limiting con flock, migración auto-detectada.
 - **config.php**: TRACKERGRAM_VERSION → v0.5.12.
 

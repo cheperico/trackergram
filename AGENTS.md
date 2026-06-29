@@ -108,9 +108,14 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 - ✅ **Rate limiting con flock(LOCK_EX)**: `fopen('c+')` + `flock()` en vez de `file_put_contents()` sin lock, eliminando race condition entre requests concurrentes.
 - ✅ **GC probabilístico de rate files**: limpieza automática (1% por request) de archivos `tmp/tg_rate_*` con más de 1 hora sin actividad.
 - ✅ **Migración grupo→supergrupo detectada automáticamente**: `migrate_to_chat_id` actualiza el `chat_id` de la conexión. Post-migración con `migrate_from_chat_id` y auto-asignación por heurística en detección pasiva.
+- ✅ **SSRF DNS rebinding prevenido**: `TikiWikiClient` resuelve el hostname de la API a IP durante la construcción y fuerza a cURL a usar esa IP (`CURLOPT_RESOLVE`) en todos los 23 calls curl. Un ataque de DNS rebinding que cambie la IP entre validación y conexión real queda bloqueado.
+- ✅ **SSL verification forzada en todos los calls curl de TikiWikiClient**: `createCurlHandle()` aplica `CURLOPT_SSL_VERIFYPEER` y `CURLOPT_SSL_VERIFYHOST` por defecto en cada handle.
+- ✅ **ConfigManager::validateConnectionData() más estricta**: ahora rechaza hostnames que no se puedan resolver DNS, y reporta la IP resuelta en errores de IP privada.
+- ✅ **Escritura atómica de buffer async**: `api.php` escribe a `.tmp` + `rename()`. Si el proceso crashea a mitad de escritura, no queda JSON truncado.
+- ✅ **Lock directo sobre .json en worker**: `flock(LOCK_EX | LOCK_NB)` sobre el `.json` en vez de lock separado. Si el worker crashea, el SO limpia el lock y otro worker retoma el evento.
+- ✅ **GC de buffer**: `cleanupDoneFiles()` barre `.failed*`, `.lock` y `.tmp` viejos además de `.done`.
 
 ---
-
 ## 2. Decisiones Arquitectónicas
 
 ### Sin base de datos con servidor (y sin SQLite)

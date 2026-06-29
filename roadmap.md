@@ -72,6 +72,17 @@
 - ✅ **Rate limiting con flock(LOCK_EX)**: `fopen('c+')` + `flock()` reemplaza a `file_get_contents()`/`file_put_contents()` sin lock, eliminando race condition entre requests concurrentes.
 - ✅ **Detección de migración grupo→supergrupo**: `migrate_to_chat_id` detectado automáticamente y `chat_id` actualizado en la conexión. Soporte para post-migración con `migrate_from_chat_id` y auto-asignación por heurística (basic→supergroup).
 - ✅ **GC de archivos rate limit**: limpieza probabilística (1%) de archivos `tmp/tg_rate_*` con más de 1 hora de inactividad.
+- ✅ **ConfigManager::load() con flock(LOCK_SH)**: lectura de `setup.json` con lock compartido, previniendo JSON truncado por escritura concurrente.
+- ✅ **TOCTOU en dedup eliminado**: lock exclusivo por `(chatId:messageId)` serializa la creación de items, cerrando la ventana entre verificación e inserción.
+- ✅ **Fan-out con 502 en fallo total**: si todas las conexiones fallan, responde HTTP 502 para que Telegram reintente.
+- ✅ **messageExists() con null en error**: timeout/5xx de TikiWiki ya no se interpreta como "mensaje no existe", evitando duplicados transitorios.
+- ✅ **SSRF DNS rebinding prevenido**: TikiWikiClient resuelve hostname a IP en construcción y fuerza cURL a usar esa IP mediante `CURLOPT_RESOLVE` en todos los 23 calls curl. Un ataque de DNS rebinding no puede redirigir la conexión a IP interna.
+- ✅ **Host header poisoning prevenido**: `CURLOPT_RESOLVE` + no-follow-redirects garantiza que el Host header siempre deriva del hostname original, no del IP de conexión. Host header no puede ser manipulado por DNS rebinding.
+- ✅ **SSL verification forzada en todos los calls curl de TikiWikiClient**: `createCurlHandle()` centraliza `CURLOPT_SSL_VERIFYPEER` y `CURLOPT_SSL_VERIFYHOST` para toda la clase.
+- ✅ **ConfigManager::validateConnectionData() más estricta**: rechaza hostnames sin resolución DNS, reporta IP detectada en errores de IP privada.
+- ✅ **Escritura atómica de buffer async**: `api.php` escribe a `.json.tmp` + `rename()` atómico. Si el proceso crashea, no queda `.json` truncado en la cola.
+- ✅ **Lock directo sobre .json en worker**: reemplazado lock separado (`fopen('x')`) por `flock(LOCK_EX | LOCK_NB)` sobre el archivo `.json` mismo. Si el worker crashea, el SO libera el lock y otro worker puede retomar el evento.
+- ✅ **GC de buffer**: `cleanupDoneFiles()` barre `.failed*`, `.lock` y `.tmp` viejos además de `.done`.
 
 ---
 
@@ -83,12 +94,7 @@
 
 ### 🟡 Fase 2: Robustez (1-2 semanas)
 
-| # | Item | Esfuerzo | Notas |
-|   |------|----------|-------|
-| 1 | **Reproducción de mensajes previos a nuevo tracker** | 2 sesiones | Script/acción para re-enviar mensajes anteriores de un chat a un tracker recién creado. |
-| 2 | **Cloudflare reverse proxy para shared hosting** | 1 sesión | Configurar Cloudflare como proxy inverso para `trackergram.chela.org.ar` sin afectar el dominio principal. Soluciona firewall de hosting que bloquea IPs de Telegram (Connection timed out). Detalles en `opt/shared_hosting.md`. |
-| 3 | **Race condition: ConfigManager::load() sin flock** | 1 sesión | `file_get_contents()` sin `LOCK_EX` en `ConfigManager::load()`. Si otro proceso escribe `setup.json` concurrentemente, puede leer JSON truncado. Fix: `fopen()` + `flock(LOCK_SH)`. |
-| 4 | **TOCTOU en dedup del webhook** | 1 sesión | Ventana entre `messageExists()` y `createTrackerItem()`. Dos webhooks concurrentes pueden crear el mismo mensaje. Ya hay detección post-insert (linea 354). Mejorar con lock basado en `message_id` o aceptar duplicados raros. |
+*(Todos los items de Fase 2 completados ✅)*
 
 ### 🟢 Fase 3: Features grandes / robustez (mediano plazo)
 
@@ -100,7 +106,6 @@
 | 8 | **Manejo de errores estandarizado** | 2-3 sesiones | Excepciones de dominio (`ConfigException`, `TelegramException`, `TikiWikiException`, `ImportException`). |
 | 9 | **Import CLI asíncrono** | 2 sesiones | Script CLI para exports grandes sin timeout HTTP. |
 | 10 | **Álbumes/grupos de medios en un solo item** | 2-3 sesiones | Agrupar fotos del mismo `media_group_id` en UN item del tracker con múltiples archivos en el campo FG. Actualmente cada foto crea su propio item. Requiere: (1) método para actualizar items existentes en TikiWikiClient, (2) lógica de detección de grupo y update vs create, (3) concurrencia (fotos llegan casi simultáneas). |
-| 11 | **DNS Rebinding en validación SSRF** | 1 sesión | `ConfigManager::validateConnectionData()` resuelve host a IP y verifica que no sea privada, pero no fuerza a cURL a usar esa IP. Si el DNS cambia entre validación y request, un atacante puede redirigir a IP interna. Fix: `CURLOPT_RESOLVE` para pinear la IP. |
 | 12 | **Backoff exponencial en GET requests de TikiWikiClient** | 1 sesión | Las requests GET (`messageExists`, `findItemByMessageId`, `getTrackerItem`) no tienen retry. Si TikiWiki está sobrecargado, el webhook falla sin reintentar. Añadir backoff como ya existe para uploads. |
 
 ### 🔵 Fase 4: Visión (largo plazo)
@@ -158,6 +163,7 @@ Items que no justifican implementación hoy pero se documentan por si el context
 |----|-------------|--------|
 | BUG-001 | `findByWebhookSecret()` devolvía primera conexión en vez de la pendiente | ✅ **Arreglado** en v0.5.8 |
 | BUG-002 | `pending_update_count` incluye el update actual durante `/estado` | ⚠️ Workaround (ocultar pending <10). Fix posta: restar 1 al pending o health check externo. |
+| BUG-003 | **debug.log no se escribe en producción** — Cuando `DEBUG_MODE=false`, `log_message()` solo escribe si `$force=true`. Pero `$force` solo se usa en errores críticos. Eventos importantes (mensajes procesados, errores de API, detecciones) no quedan registrados, haciendo imposible troubleshootear sin activar debug mode. | Pendiente de diagnóstico. Posible fix: log levels (INFO/WARN/ERROR) o rotación agresiva y siempre-escribir con límite de tamaño. |
 
 ## Cosas que NO vamos a hacer (por ahora)
 
@@ -167,6 +173,7 @@ Items que no justifican implementación hoy pero se documentan por si el context
 | Framework PHP (Laravel/Symfony) | Overhead innecesario para un puente de ~10 archivos. |
 | Soporte multi-idioma | No agrega valor al caso de uso actual. |
 | Modo espejo (vs archivo) | Decidido: trackerGram es **archivo inmutable con eventos**. Los editados/borrados se guardan como eventos adicionales, no modifican el original. |
+| Reproducción de mensajes previos a nuevo tracker | El flujo real (export ZIP manual) ya cubre este caso. No agrega valor tenerlo integrado. |
 
 ---
 

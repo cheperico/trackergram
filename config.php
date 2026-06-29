@@ -57,7 +57,7 @@ loadEnv();
 
 // Configuración de la aplicación
 define('APP_NAME', 'trackerGram');
-define('TRACKERGRAM_VERSION', 'v0.5.12');
+define('TRACKERGRAM_VERSION', 'v0.5.13');
 define('TIMEZONE', 'America/Argentina/Buenos_Aires');
 
 // Configuración de múltiples chats

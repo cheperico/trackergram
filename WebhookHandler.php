@@ -281,6 +281,21 @@ class WebhookHandler
         $msg->date = (string) $message['date'];
 
 
+        // ── Lock TOCTOU: prevenir duplicados por race condition ──
+        // Adquirimos un lock exclusivo por (chatId:messageId) que se mantiene
+        // hasta después de la creación del item. Dos webhooks concurrentes
+        // para el mismo mensaje se serializan aquí.
+        $lockDir = defined('TEMP_DIR') ? TEMP_DIR . '/dedup_locks' : sys_get_temp_dir() . '/trackergram_dedup';
+        if (!is_dir($lockDir)) {
+            @mkdir($lockDir, 0700, true);
+        }
+        $lockKey = md5($chatId . ':' . $message['message_id']);
+        $lockFile = $lockDir . '/' . $lockKey . '.lock';
+        $lockFp = @fopen($lockFile, 'c+');
+        if ($lockFp) {
+            flock($lockFp, LOCK_EX);
+        }
+
         // Cachear topic names for forum_topic_created/edited
         $chatIdInt = $chatId;
         if (isset($message['forum_topic_created']) && isset($message['message_thread_id'])) {
@@ -297,8 +312,16 @@ class WebhookHandler
         }
 
         // Deduplicación
-        if ($this->tikiWikiClient->messageExists($this->trackerId, $message['message_id'], $chatId) > 0) {
+        $exists = $this->tikiWikiClient->messageExists($this->trackerId, $message['message_id'], $chatId);
+        if ($exists === null) {
+            log_message("WARNING: No se pudo verificar duplicado para message_id={$message['message_id']} — error de conexión TikiWiki. Se procede con creación.", true);
+        } elseif ($exists > 0) {
             log_message("trackerGram: SKIPPING duplicate message_id={$message['message_id']}");
+            // Liberar lock antes de salir
+            if (isset($lockFp) && $lockFp) {
+                flock($lockFp, LOCK_UN);
+                fclose($lockFp);
+            }
             return;
         }
 
@@ -351,8 +374,17 @@ class WebhookHandler
         // Enviar a TikiWiki
         if (!$this->sendToTikiWikiWithRetries($msg)) {
             log_message("ERROR: No se pudo enviar mensaje a TikiWiki después de {$this->retryMaxAttempts} intentos: message_id={$msg->messageId}", true);
-        } elseif ($this->tikiWikiClient->messageExists($this->trackerId, $message['message_id'], $chatId) > 1) {
-            log_message("WARNING: duplicado detectado post-insert para message_id={$message['message_id']} — posible race condition", true);
+        } else {
+            $postInsertCount = $this->tikiWikiClient->messageExists($this->trackerId, $message['message_id'], $chatId);
+            if ($postInsertCount !== null && $postInsertCount > 1) {
+                log_message("WARNING: duplicado detectado post-insert para message_id={$message['message_id']} — posible race condition", true);
+            }
+        }
+
+        // Liberar lock TOCTOU
+        if (isset($lockFp) && $lockFp) {
+            flock($lockFp, LOCK_UN);
+            fclose($lockFp);
         }
 
         log_message("Mensaje procesado: Topic $topicId, User {$message['from']['first_name']}");
