@@ -85,7 +85,7 @@ function processBatch(string $bufferDir, int $maxEvents, ConfigManager $configMa
         $baseName = basename($file);
 
         // Lock sobre el .json mismo (evita lock files huérfanos si worker crashea)
-        $lockFp = @fopen($file, 'r');
+        $lockFp = fopen($file, 'r');
         if ($lockFp === false) {
             echo "[" . date('Y-m-d H:i:s') . "] ERROR: No se pudo abrir {$baseName} para lock\n";
             $processed++;
@@ -94,18 +94,18 @@ function processBatch(string $bufferDir, int $maxEvents, ConfigManager $configMa
         }
         if (!flock($lockFp, LOCK_EX | LOCK_NB)) {
             // Otro worker ya está procesando este evento
-            @fclose($lockFp);
+            fclose($lockFp);
             continue;
         }
 
         // Leer evento
         rewind($lockFp);
-        $json = @stream_get_contents($lockFp);
+        $json = stream_get_contents($lockFp);
         if ($json === false || $json === '') {
             echo "[" . date('Y-m-d H:i:s') . "] ERROR: No se pudo leer {$baseName} (vacío o inaccesible)\n";
             flock($lockFp, LOCK_UN);
-            @fclose($lockFp);
-            @rename($file, $file . '.failed');
+            fclose($lockFp);
+            rename($file, $file . '.failed');
             $processed++;
             $failed++;
             continue;
@@ -115,8 +115,8 @@ function processBatch(string $bufferDir, int $maxEvents, ConfigManager $configMa
         if (!$bufferData || !isset($bufferData['connection_slug']) || !isset($bufferData['update'])) {
             echo "[" . date('Y-m-d H:i:s') . "] ERROR: Formato inválido en {$baseName}\n";
             flock($lockFp, LOCK_UN);
-            @fclose($lockFp);
-            @rename($file, $file . '.failed');
+            fclose($lockFp);
+            rename($file, $file . '.failed');
             $processed++;
             $failed++;
             continue;
@@ -131,8 +131,8 @@ function processBatch(string $bufferDir, int $maxEvents, ConfigManager $configMa
         if (!$connection || empty($connection['enabled'])) {
             echo "[" . date('Y-m-d H:i:s') . "] SKIP {$baseName}: conexión '{$connectionSlug}' no encontrada o deshabilitada\n";
             flock($lockFp, LOCK_UN);
-            @fclose($lockFp);
-            @rename($file, $file . '.failed');
+            fclose($lockFp);
+            rename($file, $file . '.failed');
             $processed++;
             $failed++;
             continue;
@@ -164,6 +164,9 @@ function processBatch(string $bufferDir, int $maxEvents, ConfigManager $configMa
                     $updateFields['field_prefix'] = $resolvedPrefix;
                 }
                 $configManager->updateConnectionFields($connectionSlug, $updateFields);
+            } elseif ($trackerId > 0 && $prefixChecked && ($connection['field_prefix'] ?? 'telegrammessage') === 'telegrammessage') {
+                // Prefix ya verificado y es el default — marcar verified
+                $tikiClient->setPrefixVerified(true);
             }
 
             $tgClient = new TelegramClient(
@@ -182,15 +185,15 @@ function processBatch(string $bufferDir, int $maxEvents, ConfigManager $configMa
             $elapsed = round((microtime(true) - $startTime) * 1000);
 
             flock($lockFp, LOCK_UN);
-            @fclose($lockFp);
-            @rename($file, $file . '.done');
+            fclose($lockFp);
+            rename($file, $file . '.done');
 
             echo "[" . date('Y-m-d H:i:s') . "] OK {$baseName} ({$connectionSlug}, {$elapsed}ms)\n";
             $success++;
         } catch (Throwable $e) {
             flock($lockFp, LOCK_UN);
-            @fclose($lockFp);
-            @rename($file, $file . '.failed_' . time());
+            fclose($lockFp);
+            rename($file, $file . '.failed_' . time());
 
             echo "[" . date('Y-m-d H:i:s') . "] ERROR {$baseName} ({$connectionSlug}): {$e->getMessage()}\n";
             $failed++;

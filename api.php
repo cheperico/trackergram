@@ -24,17 +24,18 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
 
     // 2. Rate limiting ANTES de parsear JSON (previene DoS con parsing pesado)
     // Usa flock(LOCK_EX) para evitar race condition entre requests concurrentes
-    $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-    $rateFile = TEMP_DIR . '/tg_rate_' . md5($ip);
+    // Key por secret_token (cada bot tiene su propio budget) con fallback a IP
+    $rateKey = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $rateFile = TEMP_DIR . '/tg_rate_' . md5($rateKey);
     $window = 60;
     $maxRequests = 30;
     $now = time();
     $requests = [];
 
-    $fp = @fopen($rateFile, 'c+');
+    $fp = fopen($rateFile, 'c+');
     if ($fp) {
         flock($fp, LOCK_EX);
-        $content = @stream_get_contents($fp);
+        $content = stream_get_contents($fp);
         if ($content !== false && $content !== '') {
             $requests = json_decode($content, true) ?? [];
         }
@@ -312,6 +313,10 @@ function processUpdate(array $update, array $connection, string $connectionSlug,
         }
         $cm = new ConfigManager();
         $cm->updateConnectionFields($connectionSlug, $updateFields);
+    } elseif ($trackerId > 0 && $prefixChecked && ($connection['field_prefix'] ?? 'telegrammessage') === 'telegrammessage') {
+        // Prefix ya verificado y es el default — marcar verified para evitar
+        // que getMediaGalleryId() haga otra llamada API.
+        $tikiClient->setPrefixVerified(true);
     }
 
     $tgClient = new TelegramClient(

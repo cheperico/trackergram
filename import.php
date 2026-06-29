@@ -227,13 +227,13 @@ function handleExtract(): void
     }
 
     // Parsear JSON
-    $jsonContent = @file_get_contents($jsonFile);
+    $jsonContent = file_get_contents($jsonFile);
     if ($jsonContent === false || $jsonContent === '') {
         rrmdir($tempDir);
         jsonError('No se pudo leer result.json');
     }
 
-    $data = @json_decode($jsonContent, true);
+    $data = json_decode($jsonContent, true);
     if (!$data || !isset($data['messages'])) {
         rrmdir($tempDir);
         jsonError('Formato de export inválido: no se encontraron mensajes');

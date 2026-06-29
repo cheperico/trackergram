@@ -40,19 +40,57 @@ class WebhookHandler
     }
 
     /**
-     * Obtener el nombre de un topic de Telegram desde cache local
+     * Obtener el nombre de un topic de Telegram desde cache local.
+     * Operación atómica con LOCK_EX para evitar TOCTOU con escrituras concurrentes.
      */
     public function getTopicName(int $chatId, int $messageThreadId): string
     {
-        $cacheFile = __DIR__ . '/topic_names.json';
-        if (file_exists($cacheFile)) {
-            $topics = json_decode(file_get_contents($cacheFile), true);
-            $key = $chatId . ':' . $messageThreadId;
-            if (isset($topics[$key])) {
-                return $topics[$key];
+        $found = null;
+        $this->withTopicNamesLock(function(array $topics) use ($chatId, $messageThreadId, &$found): array {
+            $found = $topics[$chatId . ':' . $messageThreadId] ?? null;
+            return $topics; // solo lectura, no mutar
+        });
+        return $found ?? 'General';
+    }
+
+    /**
+     * Operación atómica sobre topic_names.json: fopen('c+') + flock(LOCK_EX),
+     * ejecuta callback, escribe resultado, libera.
+     *
+     * @param callable $mutate fn(array $topics): array
+     * @return mixed Retorno opcional del callback (pasado por referencia)
+     */
+    private function withTopicNamesLock(callable $mutate): void
+    {
+        $file = (defined('TEMP_DIR') ? TEMP_DIR : __DIR__) . '/topic_names.json';
+        $fp = fopen($file, 'c+');
+        if (!$fp) {
+            log_message("trackerGram: No se pudo abrir topic_names.json para lock atómico", true);
+            // Fallback: ejecutar callback con array vacío
+            $mutate([]);
+            return;
+        }
+        flock($fp, LOCK_EX);
+
+        $content = stream_get_contents($fp);
+        $topics = [];
+        if ($content !== false && $content !== '') {
+            $decoded = json_decode($content, true);
+            if (is_array($decoded)) {
+                $topics = $decoded;
             }
         }
-        return 'General';
+
+        $topics = $mutate($topics);
+
+        rewind($fp);
+        $written = fwrite($fp, json_encode($topics));
+        if ($written !== false) {
+            ftruncate($fp, ftell($fp));
+        }
+
+        flock($fp, LOCK_UN);
+        fclose($fp);
     }
 
     /**
@@ -247,10 +285,10 @@ class WebhookHandler
         $topicName = null;
         if (isset($message['reply_to_message']['forum_topic_created']['name'])) {
             $topicName = $message['reply_to_message']['forum_topic_created']['name'];
-            $cacheFile = __DIR__ . '/topic_names.json';
-            $topics = file_exists($cacheFile) ? json_decode(file_get_contents($cacheFile), true) : [];
-            $topics[$chatId . ':' . $topicId] = $topicName;
-            file_put_contents($cacheFile, json_encode($topics), LOCK_EX);
+            $this->withTopicNamesLock(function(array $topics) use ($chatId, $topicId, $topicName): array {
+                $topics[$chatId . ':' . $topicId] = $topicName;
+                return $topics;
+            });
         } elseif ($topicId > 0) {
             $topicName = $this->getTopicName($chatId, $topicId);
         }
@@ -296,19 +334,19 @@ class WebhookHandler
             flock($lockFp, LOCK_EX);
         }
 
-        // Cachear topic names for forum_topic_created/edited
+        // Cachear topic names for forum_topic_created/edited (atómico)
         $chatIdInt = $chatId;
         if (isset($message['forum_topic_created']) && isset($message['message_thread_id'])) {
-            $cacheFile = __DIR__ . '/topic_names.json';
-            $topics = file_exists($cacheFile) ? json_decode(file_get_contents($cacheFile), true) : [];
-            $topics[$chatIdInt . ':' . $message['message_thread_id']] = $msg->topicName ?? $topicName;
-            file_put_contents($cacheFile, json_encode($topics), LOCK_EX);
+            $this->withTopicNamesLock(function(array $topics) use ($chatIdInt, $message, $topicName): array {
+                $topics[$chatIdInt . ':' . $message['message_thread_id']] = $topicName;
+                return $topics;
+            });
         }
         if (isset($message['forum_topic_edited']) && isset($message['message_thread_id'])) {
-            $cacheFile = __DIR__ . '/topic_names.json';
-            $topics = file_exists($cacheFile) ? json_decode(file_get_contents($cacheFile), true) : [];
-            $topics[$chatIdInt . ':' . $message['message_thread_id']] = $msg->topicName ?? $topicName;
-            file_put_contents($cacheFile, json_encode($topics), LOCK_EX);
+            $this->withTopicNamesLock(function(array $topics) use ($chatIdInt, $message, $topicName): array {
+                $topics[$chatIdInt . ':' . $message['message_thread_id']] = $topicName;
+                return $topics;
+            });
         }
 
         // Deduplicación
@@ -759,38 +797,61 @@ class WebhookHandler
 
     private function getMediaGroupCaptionFile(): string
     {
-        return __DIR__ . '/media_group_captions.json';
+        return defined('TEMP_DIR') ? TEMP_DIR . '/media_group_captions.json' : __DIR__ . '/media_group_captions.json';
     }
 
-    private function loadMediaGroupCaptions(): array
+    /**
+     * Operación atómica sobre media_group_captions.json: adquiere LOCK_EX, lee,
+     * ejecuta el callback con los datos, escribe el resultado, libera.
+     * Previene race conditions entre requests concurrentes del mismo álbum.
+     *
+     * @param callable $mutate fn(array $captions): array Recibe datos actuales, retorna modificados
+     */
+    private function withMediaGroupCaptionsLock(callable $mutate): void
     {
         $file = $this->getMediaGroupCaptionFile();
-        if (!file_exists($file)) return [];
-        $fp = fopen($file, 'r');
-        if (!$fp) return [];
-        flock($fp, LOCK_SH); // Read lock: espera si otro proceso está escribiendo
-        $content = stream_get_contents($fp);
-        flock($fp, LOCK_UN);
-        fclose($fp);
-        $data = json_decode($content, true);
-        return is_array($data) ? $data : [];
-    }
+        $fp = fopen($file, 'c+');
+        if (!$fp) {
+            log_message("trackerGram: No se pudo abrir media_group_captions.json para lock atómico", true);
+            return;
+        }
+        flock($fp, LOCK_EX);
 
-    private function saveMediaGroupCaptions(array $captions): void
-    {
-        // Limpiar entradas con más de 60 segundos
-        $now = time();
-        foreach ($captions as $key => $entry) {
-            if (($now - $entry['time']) > 60) {
-                unset($captions[$key]);
+        // Leer estado actual
+        $content = stream_get_contents($fp);
+        $captions = [];
+        if ($content !== false && $content !== '') {
+            $decoded = json_decode($content, true);
+            if (is_array($decoded)) {
+                $captions = $decoded;
             }
         }
-        file_put_contents($this->getMediaGroupCaptionFile(), json_encode($captions), LOCK_EX);
+
+        // Limpiar entradas expiradas (>60s) antes de mutar
+        $now = time();
+        foreach ($captions as $k => $entry) {
+            if (($now - ($entry['time'] ?? 0)) > 60) {
+                unset($captions[$k]);
+            }
+        }
+
+        // Aplicar mutación
+        $captions = $mutate($captions);
+
+        // Escribir atómicamente
+        rewind($fp);
+        $written = fwrite($fp, json_encode($captions));
+        if ($written !== false) {
+            ftruncate($fp, ftell($fp));
+        }
+
+        flock($fp, LOCK_UN);
+        fclose($fp);
     }
 
     /**
      * Propagar caption dentro de un álbum.
-     * Se llama desde processMessage() justo después de fromWebhook().
+     * Operación atómica read-modify-write con LOCK_EX sostenido.
      */
     private function propagateMediaGroupCaption(NormalizedMessage $msg, array $message): void
     {
@@ -802,20 +863,23 @@ class WebhookHandler
         $currentCaption = $message['caption'] ?? '';
 
         if ($currentCaption !== '') {
-            // Primer mensaje del álbum — guardar caption
-            $captions = $this->loadMediaGroupCaptions();
-            $captions[$key] = ['caption' => $currentCaption, 'time' => time()];
-            $this->saveMediaGroupCaptions($captions);
+            // Primer mensaje del álbum — guardar caption atómicamente
+            $this->withMediaGroupCaptionsLock(function(array $captions) use ($key, $currentCaption): array {
+                $captions[$key] = ['caption' => $currentCaption, 'time' => time()];
+                return $captions;
+            });
         } else {
             // Mensaje subsiguiente — propagar caption guardado
             if ($msg->mediaCaption !== '') return; // ya tiene caption
-            $captions = $this->loadMediaGroupCaptions();
-            $saved = $captions[$key]['caption'] ?? '';
-            if ($saved !== '') {
-                $msg->mediaCaption = $saved;
-                // Actualizar text si es tipo "Foto:" sin caption
-                if ($msg->text !== '' && strpos($msg->text, ':') !== false && strpos($msg->text, $saved) === false) {
-                    $msg->text .= ' - ' . $saved;
+            $savedCaption = null;
+            $this->withMediaGroupCaptionsLock(function(array $captions) use ($key, &$savedCaption): array {
+                $savedCaption = $captions[$key]['caption'] ?? '';
+                return $captions; // solo lectura, no mutamos
+            });
+            if ($savedCaption !== null && $savedCaption !== '') {
+                $msg->mediaCaption = $savedCaption;
+                if ($msg->text !== '' && strpos($msg->text, ':') !== false && strpos($msg->text, $savedCaption) === false) {
+                    $msg->text .= ' - ' . $savedCaption;
                 }
             }
         }

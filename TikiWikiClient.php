@@ -24,13 +24,30 @@ class TikiWikiClient
      * null = no se pudo resolver (se procede sin pin, fail open).
      */
     private ?array $curlResolveEntries = null;
+    /** Si el prefix ya fue verificado (evita N+1 calls a GET /fields) */
+    private bool $prefixVerified = false;
 
     /**
-     * Setear field prefix para todos los permNames (ej: 'qpch', 'soporte')
+     * Setear field prefix para todos los permNames (ej: 'qpch', 'soporte').
+     * Marca prefixVerified=true para que resolveFieldPrefix() evite
+     * la llamada API, pero SOLO si el prefix no es el default (telegrammessage),
+     * para no impedir la auto-detección en el primer webhook.
      */
     public function setFieldPrefix(string $prefix): void
     {
         $this->fieldPrefix = $prefix;
+        if ($prefix !== 'telegrammessage') {
+            $this->prefixVerified = true;
+        }
+    }
+
+    /**
+     * Marcar flag prefixVerified manualmente (usado por api.php/admin.php
+     * cuando field_prefix_checked=true en setup.json y el prefix es telegrammessage).
+     */
+    public function setPrefixVerified(bool $verified): void
+    {
+        $this->prefixVerified = $verified;
     }
 
     /**
@@ -46,11 +63,14 @@ class TikiWikiClient
             return $this->resolvedPrefixCache[$trackerId];
         }
 
-        // Si ya tenemos un prefix custom (no el default), confiarlo
-        if ($this->fieldPrefix !== 'telegrammessage') {
+        // Si el prefix ya fue verificado (por setFieldPrefix o externamente),
+        // evitar la llamada API completamente.
+        if ($this->prefixVerified) {
             $this->resolvedPrefixCache[$trackerId] = $this->fieldPrefix;
             return $this->fieldPrefix;
         }
+
+        // Si ya tenemos un prefix custom (no el default), confiarlo
 
         // Cargar fields del tracker (también detecta el prefix)
         $fields = $this->loadTrackerFields($trackerId);
@@ -182,10 +202,12 @@ class TikiWikiClient
             return;
         }
 
-        // Validar que no sea IP privada/reservada
+        // Validar que no sea IP privada/reservada (fail-closed)
         $isPrivate = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
         if ($isPrivate) {
-            log_message("TikiWikiClient: Host '{$host}' resuelve a IP privada/reservada '{$ip}' — CURLOPT_RESOLVE aplicado igual para prevenir DNS rebinding", true);
+            $msg = "TikiWikiClient: SSRF BLOQUEADO — Host '{$host}' resuelve a IP privada/reservada '{$ip}'";
+            log_message($msg, true);
+            throw new \RuntimeException($msg);
         }
 
         // Puerto por defecto según scheme

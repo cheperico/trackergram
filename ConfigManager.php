@@ -29,12 +29,12 @@ class ConfigManager
         }
 
         // Leer con flock(LOCK_SH) para evitar leer JSON truncado si otro proceso escribe concurrentemente
-        $fp = @fopen($this->configPath, 'r');
+        $fp = fopen($this->configPath, 'r');
         if (!$fp) {
             return false;
         }
         flock($fp, LOCK_SH);
-        $content = @stream_get_contents($fp);
+        $content = stream_get_contents($fp);
         flock($fp, LOCK_UN);
         fclose($fp);
 

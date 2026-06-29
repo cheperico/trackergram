@@ -64,7 +64,7 @@ function validateCSRFToken($token) {
 function readWriteRateData(string $ip, callable $mutate): void
 {
     $rateFile = TEMP_DIR . '/tg_admin_rate_' . md5($ip);
-    $fp = @fopen($rateFile, 'c+');
+    $fp = fopen($rateFile, 'c+');
     if (!$fp) {
         return;
     }
@@ -75,7 +75,7 @@ function readWriteRateData(string $ip, callable $mutate): void
 
     // Leer data actual
     $data = ['attempts' => 0, 'first_attempt' => time()];
-    $content = @stream_get_contents($fp);
+    $content = stream_get_contents($fp);
     if ($content !== false && $content !== '') {
         $decoded = json_decode($content, true);
         if (is_array($decoded)) {
@@ -88,7 +88,7 @@ function readWriteRateData(string $ip, callable $mutate): void
 
     // Escribir de vuelta (truncar primero)
     rewind($fp);
-    $written = @fwrite($fp, json_encode($data));
+    $written = fwrite($fp, json_encode($data));
     if ($written !== false) {
         ftruncate($fp, ftell($fp));
     }
@@ -103,7 +103,7 @@ function checkRateLimit() {
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
     $rateFile = TEMP_DIR . '/tg_admin_rate_' . md5($ip);
-    $fp = @fopen($rateFile, 'c+');
+    $fp = fopen($rateFile, 'c+');
     if (!$fp) {
         return;
     }
@@ -113,7 +113,7 @@ function checkRateLimit() {
     }
 
     $data = ['attempts' => 0, 'first_attempt' => time()];
-    $content = @stream_get_contents($fp);
+    $content = stream_get_contents($fp);
     if ($content !== false && $content !== '') {
         $decoded = json_decode($content, true);
         if (is_array($decoded)) {
@@ -126,7 +126,7 @@ function checkRateLimit() {
         $data['attempts'] = 0;
         $data['first_attempt'] = time();
         rewind($fp);
-        @fwrite($fp, json_encode($data));
+        fwrite($fp, json_encode($data));
         ftruncate($fp, ftell($fp));
     }
 

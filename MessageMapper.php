@@ -29,24 +29,27 @@ class MessageMapper
      * Sin efectos secundarios (no upload, no cache)
      */
     /**
-     * Extraer hashtags de entities de Telegram
-     * Busca en 'entities' y 'caption_entities', devuelve tags espacio-separados sin #
+     * Extraer hashtags del texto usando regex.
+     * Telegram usa offsets en UTF-16 code units, PHP substr() usa bytes.
+     * Usar los offsets del entity causa corrupción si hay emojis antes del #tag.
+     * preg_match_all() con /u flag maneja UTF-8 correctamente.
+     * Busca en 'text' y 'caption', devuelve tags espacio-separados sin #.
      */
     private function extractHashtags(array $message): string
     {
         $parts = [];
-        // entities -> text, caption_entities -> caption
-        foreach (['entities' => 'text', 'caption_entities' => 'caption'] as $entitiesKey => $textKey) {
-            if (isset($message[$entitiesKey]) && isset($message[$textKey]) && is_string($message[$textKey])) {
-                foreach ($message[$entitiesKey] as $entity) {
-                    if (($entity['type'] ?? '') === 'hashtag') {
-                        $tag = substr($message[$textKey], $entity['offset'], $entity['length']);
-                        $parts[] = ltrim($tag, '#');
+        foreach (['text', 'caption'] as $textKey) {
+            if (isset($message[$textKey]) && is_string($message[$textKey]) && $message[$textKey] !== '') {
+                if (preg_match_all('/#(\w+)/u', $message[$textKey], $matches)) {
+                    foreach ($matches[1] as $tag) {
+                        if ($tag !== '') {
+                            $parts[] = $tag;
+                        }
                     }
                 }
             }
         }
-        return implode(' ', $parts);
+        return implode(' ', array_unique($parts));
     }
 
     public function fromWebhook(array $message): NormalizedMessage
