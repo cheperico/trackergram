@@ -9,6 +9,8 @@
 > - `reports/template-wiki-feed.md`
 > - `CAMBIOS.md`
 > - `reports/2024-06-28-code-review-exhaustivo.md`
+> - Code Review Arq & Seg Julio 2026 (CodeRabbit)
+> - Code Review Data Flow Julio 2026 (CodeRabbit)
 
 ---
 
@@ -16,7 +18,7 @@
 
 | | |
 |---|---|
-| **Versión actual** | v0.5.12 |
+| **Versión actual** | v0.5.14 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Instancias activas** | Dev (tracker 26) · Prod (tracker 22) |
 | **Filosofía** | Sin DB con servidor · JSON files para estado local (no SQLite) · PHP puro sin framework · MVP pragmático |
@@ -83,6 +85,13 @@
 - ✅ **Escritura atómica de buffer async**: `api.php` escribe a `.json.tmp` + `rename()` atómico. Si el proceso crashea, no queda `.json` truncado en la cola.
 - ✅ **Lock directo sobre .json en worker**: reemplazado lock separado (`fopen('x')`) por `flock(LOCK_EX | LOCK_NB)` sobre el archivo `.json` mismo. Si el worker crashea, el SO libera el lock y otro worker puede retomar el evento.
 - ✅ **GC de buffer**: `cleanupDoneFiles()` barre `.failed*`, `.lock` y `.tmp` viejos además de `.done`.
+- ✅ **resolveHostToIp() helper**: nueva función que resuelve hostname a IP con fallback IPv6 (dns_get_record DNS_AAAA).
+- ✅ **Admin rate limit con flock(LOCK_EX)**: checkRateLimit/incrementFailedLogin/resetFailedLogin refactorizadas con fopen('c+') + flock, helper readWriteRateData().
+- ✅ **generateWebhookUrl() sanitizada**: host header validado con regex, warning si difiere de SERVER_NAME.
+- ✅ **Dedup lock files se eliminan post-uso**: @unlink después de fclose en ambos puntos de salida de processMessage().
+- ✅ **TelegramClient::setWebhook()**: nuevo método, admin.php lo usa en vez de curl directo.
+- ✅ **Cache-Control: no-store en get_connection**: evita que tokens queden en cachés intermedias.
+- ✅ **createCurlHandle() fix**: reparada recursión infinita (llamaba a $this->createCurlHandle() en vez de curl_init()).
 
 ---
 
@@ -96,7 +105,7 @@
 
 *(Todos los items de Fase 2 completados ✅)*
 
-### 🟢 Fase 3: Features grandes / robustez (mediano plazo)
+### 🟢 Fase 3: Bugs + Robustez (mediano plazo)
 
 | # | Item | Esfuerzo | Dependencias |
 |---|------|----------|--------------|
@@ -107,8 +116,17 @@
 | 9 | **Import CLI asíncrono** | 2 sesiones | Script CLI para exports grandes sin timeout HTTP. |
 | 10 | **Álbumes/grupos de medios en un solo item** | 2-3 sesiones | Agrupar fotos del mismo `media_group_id` en UN item del tracker con múltiples archivos en el campo FG. Actualmente cada foto crea su propio item. Requiere: (1) método para actualizar items existentes en TikiWikiClient, (2) lógica de detección de grupo y update vs create, (3) concurrencia (fotos llegan casi simultáneas). |
 | 12 | **Backoff exponencial en GET requests de TikiWikiClient** | 1 sesión | Las requests GET (`messageExists`, `findItemByMessageId`, `getTrackerItem`) no tienen retry. Si TikiWiki está sobrecargado, el webhook falla sin reintentar. Añadir backoff como ya existe para uploads. |
+| **F3-1** | **Hashtags con regex en vez de substr()** | 1 sesión | `extractHashtags()` usa `substr()` con offset UTF-16 de Telegram, que se desalinea si hay emojis antes del hashtag. Reemplazar con `preg_match_all('/#(\w+)/u', $text)`. Código: MessageMapper.php:43. Code Review: Data Flow #1. |
+| **F3-2** | **SSRF fail-closed en initCurlResolve()** | 30 min | Si el hostname resuelve a IP privada, la función solo loguea y sigue. Debe lanzar `RuntimeException`. Código: TikiWikiClient.php:186-189. Code Review: Arq&Seg #1. |
+| **F3-3** | **Race condition álbumes: lock atómico captions** | 1 sesión | `loadMediaGroupCaptions()` suelta `LOCK_SH` antes de que `saveMediaGroupCaptions()` adquiera `LOCK_EX`. Álbumes de 5+ fotos concurrenes pierden captions. Fix: `fopen('c+')` + `flock(LOCK_EX)` sostenido para todo el ciclo read-modify-write. Código: WebhookHandler.php:769-788. Code Review: Data Flow #3. |
+| **F3-4** | **Race condition topics: mismo fix que F3-3** | 1 sesión | `getTopicName()` y escrituras de `topic_names.json` sin locks atómicos. Mismo patrón que álbumes. Código: WebhookHandler.php:47-53,253,305,311. Code Review: Data Flow #4. |
+| **F3-5** | **Rate limiting key por secret_token en vez de IP** | 30 min | Todos los webhooks vienen de IPs de Telegram → rate limit compartido entre conexiones. Cambiar key de `md5($ip)` a `md5($secretToken)`. Código: api.php:27. Code Review: Arq&Seg #2. |
+| **F3-6** | **N+1 calls field prefix con flag prefixVerified** | 1 sesión | `resolveFieldPrefix()` hace GET /fields aunque prefix ya esté verificado, en cada mensaje con media. Fix: flag `prefixVerified` que `setFieldPrefix()` marque como true. Código: TikiWikiClient.php:50-56. Code Review: Data Flow #2. |
+| **F3-7** | **Archivos temporales a TEMP_DIR** | 30 min | `topic_names.json` y `media_group_captions.json` en `__DIR__` en vez de `TEMP_DIR`. Código: WebhookHandler.php:47,762. Code Review: Arq&Seg #7. |
+| **F3-8** | **Eliminar operador @ en puntos críticos** | 1 sesión | `@rename`, `@fopen`, `@unlink` silencian errores de disco/permisos. Worker puede reprocesar infinitamente si `@rename` falla. Fix: sacar `@` y loguear con `error_get_last()`. Archivos: worker.php, api.php, varios. Code Review: Arq&Seg #8. |
+| **F3-9** | **Reply-To cache local (chat_id,message_id)→itemId** | 1-2 sesiones | Si el mensaje original se creó hace ms, el índice de TikiWiki puede no tenerlo. Cache local en JSON elimina la llamada API y evita el miss. Código: WebhookHandler.php:346, TikiWikiClient.php:592. Code Review: Data Flow #4. |
 
-### 🔵 Fase 4: Visión (largo plazo)
+### 🔵 Fase 4: Refactor + Deuda Técnica (largo plazo)
 
 | # | Item | Esfuerzo | Notas |
 |---|------|----------|-------|
@@ -117,11 +135,14 @@
 | 13 | **Tests unitarios** | Continuo | MessageMapper, WebhookHandler, clientes. |
 | 14 | **PSR-4 autoloading** | 1 sesión | Mover clases a `src/`, autoloader. |
 | 15 | **Transcripción de voz / OCR** | 3-4 sesiones | Whisper + OCR. Dependencias externas. |
-| 16 | **SQLite para cola async y rate limiting** (evaluación) | 1 sesión | **Opcional.** Evaluar si vale la pena migrar tmp/buffer/ y rate limiting de archivos JSON a SQLite. Prioridad mínima — los archivos actuales funcionan para el volumen esperado. No aplica a setup.json ni topic cache. |
+| 16 | **SQLite para cola async y rate limiting** (evaluación) | 1 sesión | **Opcional.** Evaluar si vale la pena migrar tmp/buffer/ y rate limiting de archivos JSON a SQLite. Prioridad mínima — los archivos actuales funcionan para el volumen esperado. No aplica a setup.json ni topic cache. Code Review: Arq&Seg #9. Postergado. |
 | 17 | **Rotación de logs por fecha** | 1 sesión | Además de por tamaño. |
 | 18 | **Expulsar bot desde admin panel** | 1 sesión | Botón para sacar el bot de un grupo directamente desde la interface, sin tener que hacerlo desde Telegram. |
-| 19 | **JsonFileStorage utility class** | 1-2 sesiones | Centralizar acceso a archivos JSON con `flock()` (LOCK_EX/LOCK_SH). Resolvería race conditions en rate limiting, ConfigManager, topics cache y media group captions de un solo golpe. |
-| 20 | **Refactor admin.php (~2467 líneas)** | 2-3 sesiones | Separar JS inline a `admin.js` (~500 líneas), CSS a `admin.css`, y handlers de acciones a archivos separados. Mejora mantenibilidad y legibilidad. Prioridad media-baja — el archivo funciona, pero es difícil de navegar. |
+| 19 | **JsonFileStorage utility class** | 1-2 sesiones | Centralizar acceso a archivos JSON con `flock()` (LOCK_EX/LOCK_SH). Resolvería race conditions en rate limiting, ConfigManager, topics cache y media group captions (F3-3, F3-4) de un solo golpe. |
+| 20 | **Desarme de admin.php (~2527 líneas)** | 2-3 sesiones | **Refactor mayor.** admin.php mezcla PHP lógica + HTML + CSS + JS. Separar en: `admin.php` (entry point + routing), `admin_handlers.php` (POST actions), `admin_view.php` (HTML templates), `admin.css` (estilos cacheables), `admin.js` y `admin_import.js` (JS cacheable). Code Review: God Object consecuencia directa. |
+| **F4-1** | **WebhookHandler refactor (God Object, 823 líneas)** | 2-3 sesiones | Extraer `CommandRouter` (comandos /ayuda /estado), `MediaProcessor` (download + upload + álbumes), `DeduplicationService` (locks TOCTOU). WebhookHandler queda como fachada. Code Review: Arq&Seg #6. |
+| **F4-2** | **HTTP Keep-Alive con curl_reset()** | 1 sesión | Reutilizar handle curl en TikiWikiClient y TelegramClient con `curl_reset()` para habilitar HTTP Keep-Alive y evitar handshake TLS en cada llamada. Code Review: Arq&Seg #4. |
+| **F4-3** | **Head-of-Line blocking en worker.php** | 2-3 sesiones | Worker single-thread: si TikiWiki tarda 30s en upload, la cola se bloquea. Evaluar `curl_multi_exec()` para push concurrente o múltiples workers con lock granular. Code Review: Arq&Seg #5. |
 
 ### ⚪ Fase 5: Pendientes de reevaluación (muy baja prioridad)
 
@@ -164,6 +185,9 @@ Items que no justifican implementación hoy pero se documentan por si el context
 | BUG-001 | `findByWebhookSecret()` devolvía primera conexión en vez de la pendiente | ✅ **Arreglado** en v0.5.8 |
 | BUG-002 | `pending_update_count` incluye el update actual durante `/estado` | ⚠️ Workaround (ocultar pending <10). Fix posta: restar 1 al pending o health check externo. |
 | BUG-003 | **debug.log no se escribe en producción** — Cuando `DEBUG_MODE=false`, `log_message()` solo escribe si `$force=true`. Pero `$force` solo se usa en errores críticos. Eventos importantes (mensajes procesados, errores de API, detecciones) no quedan registrados, haciendo imposible troubleshootear sin activar debug mode. | Pendiente de diagnóstico. Posible fix: log levels (INFO/WARN/ERROR) o rotación agresiva y siempre-escribir con límite de tamaño. |
+| BUG-004 | **Hashtags corruptos con emojis** — `extractHashtags()` usa `substr()` con offset UTF-16 de Telegram. Si hay emojis antes del hashtag, el offset se desalinea y extrae texto corrupto. Código: MessageMapper.php:43. Code Review: Data Flow #1. | ✅ Fix listo para implementar (F3-1). |
+| BUG-005 | **Race condition en álbumes** — `loadMediaGroupCaptions()` suelta `LOCK_SH` antes de que `saveMediaGroupCaptions()` adquiera `LOCK_EX`. Álbumes de 5+ fotos pierden captions. Código: WebhookHandler.php:769-788. Code Review: Data Flow #3. | Pendiente de implementar (F3-3). |
+| BUG-006 | **Race condition en topics** — `getTopicName()` sin lock de lectura; escrituras con TOCTOU. Mismo bug que BUG-005. Código: WebhookHandler.php:47-53,253,305,311. Code Review: Data Flow #4. | Pendiente de implementar (F3-4). |
 
 ## Cosas que NO vamos a hacer (por ahora)
 
@@ -174,6 +198,7 @@ Items que no justifican implementación hoy pero se documentan por si el context
 | Soporte multi-idioma | No agrega valor al caso de uso actual. |
 | Modo espejo (vs archivo) | Decidido: trackerGram es **archivo inmutable con eventos**. Los editados/borrados se guardan como eventos adicionales, no modifican el original. |
 | Reproducción de mensajes previos a nuevo tracker | El flujo real (export ZIP manual) ya cubre este caso. No agrega valor tenerlo integrado. |
+| Long Polling (getUpdates) en vez de Webhook | Webhook + async worker es la arquitectura correcta para hosting compartido (sin proceso persistente). Long Polling requeriría proceso CLI long-running con supervisor/systemd. Descartado en code review Arq&Seg #10. |
 
 ---
 
@@ -189,4 +214,4 @@ Los documentos en `design/` contienen exploraciones detalladas de features que e
 
 Los reportes históricos en `reports/` se conservan como referencia de investigaciones pasadas. Los items accionables ya están consolidados en este documento.
 
-> **Última actualización**: 28/06/2026
+> **Última actualización**: 06/07/2026
