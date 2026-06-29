@@ -203,7 +203,7 @@ class TikiWikiClient
      */
     private function createCurlHandle(): \CurlHandle
     {
-        $ch = $this->createCurlHandle();
+        $ch = curl_init();
         // Prevenir DNS rebinding: fuerza conexión a la IP resuelta y validada
         if ($this->curlResolveEntries !== null) {
             curl_setopt($ch, CURLOPT_RESOLVE, $this->curlResolveEntries);
