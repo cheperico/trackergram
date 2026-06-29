@@ -175,9 +175,9 @@ class TikiWikiClient
             return;
         }
 
-        // Resolver hostname a IP
-        $ip = @gethostbyname($host);
-        if ($ip === $host) {
+        // Resolver hostname a IP (IPv4 o IPv6)
+        $ip = resolveHostToIp($host);
+        if ($ip === null) {
             log_message("TikiWikiClient: No se pudo resolver host '{$host}' para CURLOPT_RESOLVE — se procede sin pin", true);
             return;
         }

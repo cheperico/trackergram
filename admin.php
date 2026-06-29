@@ -57,25 +57,82 @@ function validateCSRFToken($token) {
     }
 }
 
+/**
+ * Leer/escribir datos de rate limit con flock(LOCK_EX) para evitar race conditions.
+ * Reutiliza el archivo sin cerrar entre read/write dentro del mismo llamado.
+ */
+function readWriteRateData(string $ip, callable $mutate): void
+{
+    $rateFile = TEMP_DIR . '/tg_admin_rate_' . md5($ip);
+    $fp = @fopen($rateFile, 'c+');
+    if (!$fp) {
+        return;
+    }
+    if (!flock($fp, LOCK_EX)) {
+        fclose($fp);
+        return;
+    }
+
+    // Leer data actual
+    $data = ['attempts' => 0, 'first_attempt' => time()];
+    $content = @stream_get_contents($fp);
+    if ($content !== false && $content !== '') {
+        $decoded = json_decode($content, true);
+        if (is_array($decoded)) {
+            $data = $decoded;
+        }
+    }
+
+    // Aplicar mutación
+    $mutate($data);
+
+    // Escribir de vuelta (truncar primero)
+    rewind($fp);
+    $written = @fwrite($fp, json_encode($data));
+    if ($written !== false) {
+        ftruncate($fp, ftell($fp));
+    }
+
+    flock($fp, LOCK_UN);
+    fclose($fp);
+}
+
 function checkRateLimit() {
     $maxAttempts = 5;
     $lockoutTime = 15 * 60;
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+
     $rateFile = TEMP_DIR . '/tg_admin_rate_' . md5($ip);
-    
+    $fp = @fopen($rateFile, 'c+');
+    if (!$fp) {
+        return;
+    }
+    if (!flock($fp, LOCK_EX)) {
+        fclose($fp);
+        return;
+    }
+
     $data = ['attempts' => 0, 'first_attempt' => time()];
-    if (file_exists($rateFile)) {
-        $content = @file_get_contents($rateFile);
-        if ($content) {
-            $data = json_decode($content, true) ?? $data;
+    $content = @stream_get_contents($fp);
+    if ($content !== false && $content !== '') {
+        $decoded = json_decode($content, true);
+        if (is_array($decoded)) {
+            $data = $decoded;
         }
     }
-    
+
+    // Resetear si pasó la ventana
     if (time() - $data['first_attempt'] > $lockoutTime) {
         $data['attempts'] = 0;
         $data['first_attempt'] = time();
+        rewind($fp);
+        @fwrite($fp, json_encode($data));
+        ftruncate($fp, ftell($fp));
     }
-    
+
+    flock($fp, LOCK_UN);
+    fclose($fp);
+
     if ($data['attempts'] >= $maxAttempts) {
         $remainingTime = $lockoutTime - (time() - $data['first_attempt']);
         die("Demasiados intentos de login. Por favor espere " . ceil($remainingTime / 60) . " minutos antes de intentar nuevamente.");
@@ -84,31 +141,39 @@ function checkRateLimit() {
 
 function incrementFailedLogin() {
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-    $rateFile = TEMP_DIR . '/tg_admin_rate_' . md5($ip);
-    $data = ['attempts' => 0, 'first_attempt' => time()];
-    if (file_exists($rateFile)) {
-        $content = @file_get_contents($rateFile);
-        if ($content) {
-            $data = json_decode($content, true) ?? $data;
-        }
-    }
-    $data['attempts']++;
-    @file_put_contents($rateFile, json_encode($data));
+    readWriteRateData($ip, function(array &$data) {
+        $data['attempts'] = ($data['attempts'] ?? 0) + 1;
+    });
 }
 
 function resetFailedLogin() {
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-    $rateFile = TEMP_DIR . '/tg_admin_rate_' . md5($ip);
-    $data = ['attempts' => 0, 'first_attempt' => time()];
-    @file_put_contents($rateFile, json_encode($data));
+    readWriteRateData($ip, function(array &$data) {
+        $data['attempts'] = 0;
+        $data['first_attempt'] = time();
+    });
 }
 
-function generateWebhookUrl() {
+function generateWebhookUrl(): string {
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     if ($protocol === 'http' && !empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
         $protocol = 'https';
     }
     $host = $_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
+
+    // Sanitizar host: solo caracteres válidos (alphanumérico, guión, punto, :port)
+    // Si contiene algo extraño (inyección), forzar a SERVER_NAME como fallback seguro
+    if (preg_match('/[^a-zA-Z0-9.\-:\[\]]/', $host)) {
+        log_message("admin/generateWebhookUrl: Host header sospechoso '{$host}' — usando SERVER_NAME como fallback");
+        $host = $_SERVER['SERVER_NAME'] ?? 'localhost';
+    }
+
+    // Si el host difiere de SERVER_NAME, loguear advertencia (posible proxy o inyección)
+    $serverName = $_SERVER['SERVER_NAME'] ?? '';
+    if ($serverName !== '' && $host !== $serverName) {
+        log_message("admin/generateWebhookUrl: Host '{$host}' difiere de SERVER_NAME '{$serverName}' — verificar si hay proxy inverso");
+    }
+
     $scriptPath = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
     $prefix = rtrim($_SERVER['HTTP_X_FORWARDED_PREFIX'] ?? '', '/');
     $url = $protocol . '://' . $host . $prefix . $scriptPath;
@@ -370,14 +435,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     validateCSRFToken($csrfToken);
     
     // ── Obtener datos de conexión (AJAX, sin exponer tokens en HTML) ──
+    // ⚠️ SEGURIDAD: Este endpoint devuelve tokens COMPLETOS (bot_token, tiki_api_token,
+    // webhook_secret) vía AJAX. Es necesario para que el modal de edición pueda
+    // poblar los campos. El acceso está protegido por: (a) sesión admin autenticada,
+    // (b) token CSRF. Sin embargo, si un atacante obtiene acceso a la sesión admin
+    // (XSS, cookie theft), podría extraer todos los tokens via este endpoint.
+    // No cachear la respuesta para evitar que tokens queden en cachés intermedias.
     if ($_POST['action'] === 'get_connection') {
         $slug = $_POST['slug'] ?? '';
         $conn = $configManager->getConnection($slug);
         if ($conn) {
             header('Content-Type: application/json');
+            header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+            header('Pragma: no-cache');
             echo json_encode($conn);
         } else {
             http_response_code(404);
+            header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+            header('Pragma: no-cache');
             echo json_encode(['error' => 'Conexión no encontrada']);
         }
         exit;
@@ -579,29 +654,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 break;
             }
             
-            $apiUrl = "https://api.telegram.org/bot{$botToken}/setWebhook";
-            $params = [
-                'url' => $webhookUrl,
-                'secret_token' => $webhookSecret,
-            ];
+            $tgClient = new TelegramClient($botToken);
+            $result = $tgClient->setWebhook($webhookUrl, $webhookSecret);
             
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $apiUrl);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-            
-            $result = json_decode($response, true);
-            if ($result && $result['ok']) {
+            if ($result['ok']) {
                 $successMessage = 'Webhook configurado para "' . escapeHtml($conn['name']) . '": ' . $webhookUrl;
                 // Refrescar estado del webhook en los cards
                 try {
-                    $whClient = new TelegramClient($botToken);
-                    $wh = $whClient->getWebhookInfo();
+                    $wh = $tgClient->getWebhookInfo();
                     $status = ['ok' => !empty($wh['url']), 'label' => '✅', 'pending' => (int) ($wh['pending_update_count'] ?? 0)];
                     if (!empty($wh['last_error_message'])) {
                         $lastErrorDate = (int) ($wh['last_error_date'] ?? 0);

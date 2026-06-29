@@ -506,6 +506,15 @@ class MessageMapper
 
                 $msg->text = implode("\n", $lines);
                 // No seguir a photo/file checks — ya se determinó que es poll
+            } elseif (!empty($message['location'])) {
+                // Location: coordenadas GPS del export
+                $loc = $message['location'];
+                $lat = $loc['latitude'] ?? 0;
+                $lon = $loc['longitude'] ?? 0;
+                $zoom = $loc['zoom'] ?? 15;
+                $msg->messageType = 'location';
+                $msg->location = $lon . ',' . $lat . ',' . $zoom;
+                $msg->text = (string) ($message['text'] ?? '');
             } elseif (!empty($message['photo']) && !$this->isMediaExcluded($message['photo'])) {
                 $msg->messageType = 'photo';
                 $msg->mediaCaption = $message['photo_caption'] ?? '';

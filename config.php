@@ -57,7 +57,7 @@ loadEnv();
 
 // Configuración de la aplicación
 define('APP_NAME', 'trackerGram');
-define('TRACKERGRAM_VERSION', 'v0.5.13');
+define('TRACKERGRAM_VERSION', 'v0.5.14');
 define('TIMEZONE', 'America/Argentina/Buenos_Aires');
 
 // Configuración de múltiples chats
@@ -180,5 +180,38 @@ function formatBytes(int $bytes): string {
         return round($bytes / 1024) . 'KB';
     }
     return $bytes . 'B';
+}
+
+/**
+ * Resolver un hostname a IP (IPv4 o IPv6).
+ *
+ * Primero intenta gethostbyname() (IPv4). Si no resuelve (el hostname puede
+ * ser IPv6-only o no existir), intenta dns_get_record() con DNS_AAAA.
+ *
+ * @param string $host Hostname a resolver (ej: wiki.example.org)
+ * @return string|null IP resuelta, o null si no se pudo resolver
+ */
+function resolveHostToIp(string $host): ?string
+{
+    // Caso 1: ya es una IP literal
+    if (filter_var($host, FILTER_VALIDATE_IP)) {
+        return $host;
+    }
+
+    // Caso 2: intentar resolución IPv4
+    $ip = @gethostbyname($host);
+    if ($ip !== $host && filter_var($ip, FILTER_VALIDATE_IP)) {
+        return $ip;
+    }
+
+    // Caso 3: fallback a IPv6 (AAAA)
+    if (function_exists('dns_get_record')) {
+        $records = @dns_get_record($host, DNS_AAAA);
+        if (!empty($records) && !empty($records[0]['ipv6'])) {
+            return $records[0]['ipv6'];
+        }
+    }
+
+    return null;
 }
 ?>

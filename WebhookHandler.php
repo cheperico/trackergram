@@ -321,6 +321,7 @@ class WebhookHandler
             if (isset($lockFp) && $lockFp) {
                 flock($lockFp, LOCK_UN);
                 fclose($lockFp);
+                @unlink($lockFile);
             }
             return;
         }
@@ -385,6 +386,7 @@ class WebhookHandler
         if (isset($lockFp) && $lockFp) {
             flock($lockFp, LOCK_UN);
             fclose($lockFp);
+            @unlink($lockFile);
         }
 
         log_message("Mensaje procesado: Topic $topicId, User {$message['from']['first_name']}");

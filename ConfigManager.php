@@ -513,12 +513,9 @@ class ConfigManager
             // Validación anti-SSRF: bloquear IPs privadas/reservadas
             $host = parse_url(trim($data['tiki_api_url']), PHP_URL_HOST);
             if ($host !== null) {
-                $ip = gethostbyname($host);
-                if ($ip === $host) {
-                    // Si el host NO es una IP literal, significa que la resolución DNS falló
-                    if (!filter_var($host, FILTER_VALIDATE_IP)) {
-                        $errors[] = 'tiki_api_url: no se pudo resolver el hostname (' . $host . ')';
-                    }
+                $ip = resolveHostToIp($host);
+                if ($ip === null) {
+                    $errors[] = 'tiki_api_url: no se pudo resolver el hostname (' . $host . ')';
                 } else {
                     $isPrivate = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
                     if ($isPrivate) {

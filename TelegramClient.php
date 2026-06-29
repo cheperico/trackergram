@@ -142,6 +142,52 @@ class TelegramClient
     }
 
     /**
+     * Configurar webhook en Telegram.
+     *
+     * @param string $url URL pública donde Telegram enviará los updates
+     * @param string $secretToken Secreto opcional para verificar origen
+     * @return array{ok: bool, description: string, result?: array}
+     */
+    public function setWebhook(string $url, string $secretToken = ''): array
+    {
+        $apiUrl = $this->baseUrl . '/bot' . $this->botToken . '/setWebhook';
+
+        $params = ['url' => $url];
+        if ($secretToken !== '') {
+            $params['secret_token'] = $secretToken;
+        }
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $apiUrl);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlError) {
+            return ['ok' => false, 'description' => "Error de red: {$curlError}"];
+        }
+
+        if ($httpCode !== 200) {
+            return ['ok' => false, 'description' => "HTTP {$httpCode}"];
+        }
+
+        $data = json_decode($response, true);
+        if (!$data || !isset($data['ok'])) {
+            return ['ok' => false, 'description' => 'Respuesta inválida de Telegram'];
+        }
+
+        return $data;
+    }
+
+    /**
      * Probar conexión con la API de Telegram (getMe)
      * @return array{ok: bool, message: string}
      */

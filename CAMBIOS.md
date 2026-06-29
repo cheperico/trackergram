@@ -1,5 +1,33 @@
 # Cambios - Changelog
 
+## v0.5.14
+
+### 🐛 Fixes de code review de julio 2026
+
+#### 🔴 Fix #1: IPv6-only hosts en validación y DNS pinning
+- **config.php**: Nueva función `resolveHostToIp()` que prueba `gethostbyname()` (IPv4) y fallback a `dns_get_record(DNS_AAAA)` para IPv6.
+- **ConfigManager::validateConnectionData()**: Usa `resolveHostToIp()` en vez de `gethostbyname()` directo.
+- **TikiWikiClient::initCurlResolve()**: Usa `resolveHostToIp()` en vez de `gethostbyname()` directo.
+
+#### 🔴 Fix #2: Location messages perdidos en exports
+- **MessageMapper::fromExport()**: Nueva detección de `message['location']` en exports — ahora las coordenadas GPS se mapean correctamente a `messageType='location'` y `location` field.
+
+#### 🟡 Fix #3: Admin rate limit sin flock (race condition)
+- **admin.php**: Las 3 funciones (`checkRateLimit()`, `incrementFailedLogin()`, `resetFailedLogin()`) refactorizadas a patrón `fopen('c+')` + `flock(LOCK_EX)` + `ftruncate()`. Nueva helper `readWriteRateData()` elimina código duplicado.
+
+#### 🟡 Fix #4: Host header injection en generateWebhookUrl
+- **admin.php**: `generateWebhookUrl()` ahora sanitiza el hostname (rechaza caracteres inválidos con regex). Si el host difiere de `SERVER_NAME`, loguea advertencia. Fallback seguro a `SERVER_NAME` en caso de host sospechoso.
+
+#### 🟢 Fix #5: Dedup lock files sin GC
+- **WebhookHandler::processMessage()`: Los lock files en `TEMP_DIR/dedup_locks/` ahora se eliminan con `@unlink()` después de `fclose()` en ambos puntos de salida (duplicado y post-procesamiento).
+
+#### 🟢 Fix #6: configure_webhook usaba curl directo
+- **TelegramClient**: Nuevo método `setWebhook(string $url, string $secretToken)` siguiendo el mismo patrón que `sendMessage()`.
+- **admin.php**: El case `configure_webhook` ahora usa `TelegramClient::setWebhook()` en vez de `curl_init()` directo.
+
+#### 🟢 Fix #7: get_connection devuelve tokens completos vía AJAX
+- **admin.php**: Endpoint `get_connection` ahora agrega headers `Cache-Control: no-store` y `Pragma: no-cache` para evitar que tokens queden en cachés intermedias. Comentario de seguridad documentando el riesgo.
+
 ## v0.5.13
 
 ### 🔒 Fix: DNS Rebinding en SSRF (hallazgo #2 code review)
