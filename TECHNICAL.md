@@ -495,7 +495,7 @@ WebhookHandler::processMessage()
 7. sendToTikiWikiWithRetries() → crear item con reintentos
 ```
 
-### Cómo se relacionan los archivos (v0.4.0+)
+### Cómo se relacionan los archivos (v0.6.0+)
 
 ```
 bootstrap.php
@@ -506,15 +506,21 @@ bootstrap.php
     ├── MessageMapper.php   → transformación de datos
     └── WebhookHandler.php  → orquesta todo
 
-api.php → ConfigManager → clientes por conexión → WebhookHandler::processUpdate()
-admin.php → ConfigManager → clientes por conexión (test, create)
-import.php → clientes locales desde formulario → MessageMapper::toWikiFields()
-worker.php → ConfigManager → clientes por conexión → WebhookHandler
+api.php            → ConfigManager → clientes por conexión → WebhookHandler::processUpdate()
+admin.php          → ConfigManager → clientes por conexión (test, create)
+  └── admin_handlers.php  → 12 handlers POST + 3 AJAX (incluido ANTES de loops pesados)
+  └── admin.css           → 211 líneas cacheables de estilos
+  └── admin.js            → 558 líneas cacheables (modal, test, fetch, CSRF)
+  └── admin_import.js     → 166 líneas cacheables (chunked import + progress bar)
+import.php         → clientes locales desde formulario → MessageMapper::toWikiFields()
+worker.php         → ConfigManager → clientes por conexión → WebhookHandler
 ```
 
 **No hay un wiring central**. Cada entry point crea sus propios clientes desde las credenciales de la conexión en `setup.json`. Esto permite tener múltiples bots, wikis y trackers desde una misma instalación.
 
-### Deuda técnica (v0.5.11)
+**admin.php** pasó de 2529 líneas monolíticas a ~1114 (-56%). La lógica POST se movió a `admin_handlers.php`, los estilos a `admin.css`, y el JS a `admin.js`/`admin_import.js`. Los handlers se incluyen **antes** de los loops pesados a APIs externas (Telegram/TikiWiki), por lo que los AJAX responden en milisegundos. `$connectionsSafe` se construye al final de todo el procesamiento, reflejando el estado final de `$connections` sin actualizaciones manuales intermedias.
+
+### Deuda técnica (v0.6.0)
 
 Items **ya resueltos**:
 - ✅ **Inyección de dependencias**: Clases instanciables con dependencias inyectadas por constructor, sin wiring central en bootstrap.
@@ -541,17 +547,31 @@ Items **ya resueltos**:
 - ✅ **BUG-001 fix**: `findByWebhookSecret()` prioriza conexiones pendientes; `assignDetection()` no sobrescribe `chat_id`.
 - ✅ **Media upload timeout separado**: 60s para upload vs 30s para API general.
 - ✅ **Accesibilidad ARIA completa**: Roles, landmarks, focus trap, aria-live en admin.php.
+- ✅ **Rate limiting con flock(LOCK_EX)**: `fopen('c+')` + `flock()` reemplaza `file_get_contents()`/`file_put_contents()` sin lock. Elimina race condition entre requests concurrentes (v0.5.12).
+- ✅ **ConfigManager::load() con flock(LOCK_SH)**: Lectura de `setup.json` con lock compartido, previniendo JSON truncado por escritura concurrente (v0.5.12).
+- ✅ **TOCTOU en dedup eliminado**: Lock exclusivo por `(chatId:messageId)` serializa creación de items. Dedup lock files se eliminan post-uso con `@unlink` (v0.5.12 + v0.5.14).
+- ✅ **GC de archivos rate limit**: Limpieza probabilística (1% por request) de archivos `tmp/tg_rate_*` con más de 1 hora sin actividad (v0.5.12).
+- ✅ **SSRF DNS Rebinding prevenido**: `TikiWikiClient` resuelve hostname a IP en construcción y fuerza cURL a usar esa IP mediante `CURLOPT_RESOLVE` en todos los 23 calls curl. `createCurlHandle()` centralizado (v0.5.13).
+- ✅ **Host header poisoning prevenido**: `CURLOPT_RESOLVE` + `CURLOPT_SSL_VERIFYPEER` garantizan integridad del Host header (v0.5.13).
+- ✅ **Escritura atómica de buffer async**: `.json.tmp` + `rename()` evita JSON truncado si el proceso crashea (v0.5.13).
+- ✅ **Lock directo sobre .json en worker**: `flock(LOCK_EX | LOCK_NB)` sobre el `.json` mismo en vez de lock separado (v0.5.13).
+- ✅ **IPv6 support**: `resolveHostToIp()` con fallback a `dns_get_record(DNS_AAAA)` (v0.5.14).
+- ✅ **Location messages en exports**: `fromExport()` parsea `message['location']` correctamente (v0.5.14).
+- ✅ **Host header sanitizado en generateWebhookUrl()**: Validación con regex, warning si difiere de `SERVER_NAME` (v0.5.14).
+- ✅ **TelegramClient::setWebhook()**: Método estandarizado, admin.php ya no usa `curl_init()` directo (v0.5.14).
+- ✅ **Cache-Control: no-store en get_connection**: Evita que tokens queden en cachés intermedias (v0.5.14).
+- ✅ **Admin.php refactorizado (Fase A)**: CSS/JS extraídos a archivos externos cacheables (`admin.css`, `admin.js`, `admin_import.js`). admin.php reducido de 2529 a ~1597 líneas (v0.5.14/0.6.0).
+- ✅ **Admin.php refactorizado (Fase B)**: Handlers POST extraídos a `admin_handlers.php` (508 líneas). admin.php reducido a 1114 líneas (-56% del original). Handlers ejecutados ANTES de loops pesados (AJAX en ms). `$connectionsSafe` construido al final del procesamiento (datos frescos). `validateCSRFToken()` responde JSON+403 para AJAX. Sin doble escape en handlers.
 
 Items aún pendientes:
-- ⬜ **Race condition en rate limiting**: `api.php` escribe archivos rate limit sin `LOCK_EX`. Potencial corrupción bajo alta concurrencia.
-- ⬜ **Race condition en ConfigManager::load()**: Sin flock, puede leer datos inconsistentes si dos procesos escriben simultáneamente.
-- ⬜ **TOCTOU en dedup webhook**: Entre `messageExists()` y `createTrackerItem()` hay una ventana donde otro webhook puede insertar el mismo mensaje.
-- ⬜ **DNS Rebinding SSRF**: `TikiWikiClient` valida URL pero no resuelve contra IPs internas. Proteger con `CURLOPT_RESOLVE`.
-- ⬜ **GC de archivos rate limit**: Los archivos de rate limiting se acumulan. No hay cleanup automático.
-- ⬜ **Manejo de errores inconsistente**: Algunas funciones retornan `null`, otras `false`, otras usan `die()`.
 - ⬜ **Backoff exponencial en GET**: `messageExists()` y `getTrackerItem()` hacen GET sin backoff. Bajo error 429/503, saturan la API.
+- ⬜ **Manejo de errores inconsistente**: Algunas funciones aún retornan `null`, otras `false`, otras excepciones. Faltan excepciones de dominio tipadas.
 - ⬜ **Tests unitarios**: Las clases son instanciables y testeables, pero faltan los tests. JsonFileStorage utility como primer candidato.
 - ⬜ **PSR-4 autoloading**: Sin autoloader, todo se incluye con `require_once`.
+- ⬜ **Reply-To cache local (chat_id,message_id)→itemId**: Evitar miss de índice TikiWiki mensajes creados hace ms (F3-9).
+- ⬜ **WebhookHandler refactor**: Extraer CommandRouter, MediaProcessor, DeduplicationService (F4-1).
+- ⬜ **HTTP Keep-Alive con curl_reset()**: Reutilizar handle curl entre llamadas (F4-2).
+- ⬜ **Head-of-Line blocking en worker**: Si TikiWiki tarda 30s en upload, la cola se bloquea (F4-3).
 
 ---
 
@@ -603,6 +623,9 @@ Tanto el webhook como el login del admin tienen rate limiting por IP. Sin esto, 
 | Race conditions en duplicados | Dos webhooks simultáneos | Verificación post-insert |
 | `sleep(1)` bloqueaba mucho | Reintentos con sleep de 1 segundo | Cambiar a `usleep(100000)` |
 | Doble `/api.php` en URL | Bug en `generateWebhookUrl()` | Corregir lógica de construcción |
+| Admin lento en AJAX | `include admin_handlers.php` después de loops a APIs externas | Mover handlers ANTES de loops pesados. AJAX pasa de segundos a milisegundos. |
+| Datos stale en vista admin | `$connectionsSafe` construido antes de handlers POST | Construir `$connectionsSafe` al FINAL de todo el procesamiento. |
+| CSRF error silencioso en JS | `validateCSRFToken()` con `die()` plano para AJAX | Responder HTTP 403 + JSON estructurado para acciones AJAX. |
 
 ### Lo que haríamos diferente
 

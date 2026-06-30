@@ -136,13 +136,21 @@ class MessageMapper
             $doc = $message['document'];
             $msg->messageType = 'document';
             $msg->fileId = $doc['file_id'];
-            $msg->mimeType = $doc['mime_type'] ?? 'application/octet-stream';
-            $msg->mediaType = $doc['mime_type'] ?? 'application/octet-stream';
+            $mime = $doc['mime_type'] ?? 'application/octet-stream';
+            $msg->mimeType = $mime;
+            $msg->mediaType = $mime;
             $msg->mediaSize = (string) ($doc['file_size'] ?? '');
             $msg->mediaCaption = $message['caption'] ?? '';
             $fn = $doc['file_name'] ?? 'Documento';
+            // Si el filename no tiene extensión, derivarla del MIME type
+            if (pathinfo($fn, PATHINFO_EXTENSION) === '') {
+                $ext = self::mimeToExtension($mime);
+                if ($ext) {
+                    $fn .= '.' . $ext;
+                }
+            }
             $msg->fileName = $fn;
-            $msg->text = 'Documento: ' . $msg->mediaType . ' - ' . $fn;
+            $msg->text = 'Documento: ' . $mime . ' - ' . $fn;
             return $msg;
         }
 
@@ -264,13 +272,23 @@ class MessageMapper
         if (isset($message['animation'])) {
             $anim = $message['animation'];
             $msg->messageType = 'animation';
-            $msg->mediaType = $anim['mime_type'] ?? 'animation/gif';
+            $mime = $anim['mime_type'] ?? 'image/gif';
+            $msg->mimeType = $mime;
+            $msg->mediaType = $mime;
             $msg->fileId = $anim['file_id'] ?? '';
             $msg->mediaSize = (string) ($anim['file_size'] ?? '');
             $msg->width = (string) ($anim['width'] ?? '');
             $msg->height = (string) ($anim['height'] ?? '');
             $msg->duration = (string) ($anim['duration'] ?? '');
-            $msg->text = '🎬 Animation: ' . $msg->mediaType;
+            $fn = $anim['file_name'] ?? 'animation';
+            if (pathinfo($fn, PATHINFO_EXTENSION) === '') {
+                $ext = self::mimeToExtension($mime);
+                if ($ext) {
+                    $fn .= '.' . $ext;
+                }
+            }
+            $msg->fileName = $fn;
+            $msg->text = '🎬 Animation: ' . $mime . ' - ' . $fn;
             return $msg;
         }
 
@@ -815,5 +833,65 @@ class MessageMapper
             'lon' => $message['location']['longitude'] ?? 0,
             'zoom' => 15
         ];
+    }
+
+    /**
+     * Convertir MIME type a extensión de archivo.
+     * Usado cuando Telegram no envía file_name en un documento.
+     */
+    public static function mimeToExtension(string $mime): string
+    {
+        $map = [
+            'video/mp4' => 'mp4',
+            'video/webm' => 'webm',
+            'video/quicktime' => 'mov',
+            'video/x-msvideo' => 'avi',
+            'video/x-matroska' => 'mkv',
+            'video/3gpp' => '3gp',
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/gif' => 'gif',
+            'image/webp' => 'webp',
+            'image/svg+xml' => 'svg',
+            'image/bmp' => 'bmp',
+            'image/tiff' => 'tiff',
+            'audio/mpeg' => 'mp3',
+            'audio/ogg' => 'ogg',
+            'audio/wav' => 'wav',
+            'audio/webm' => 'webm',
+            'audio/flac' => 'flac',
+            'audio/aac' => 'aac',
+            'application/pdf' => 'pdf',
+            'application/zip' => 'zip',
+            'application/gzip' => 'gz',
+            'application/x-rar-compressed' => 'rar',
+            'application/x-7z-compressed' => '7z',
+            'application/x-tar' => 'tar',
+            'text/plain' => 'txt',
+            'text/html' => 'html',
+            'application/json' => 'json',
+            'application/xml' => 'xml',
+            'application/msword' => 'doc',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+            'application/vnd.ms-excel' => 'xls',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+            'application/vnd.ms-powerpoint' => 'ppt',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation' => 'pptx',
+        ];
+
+        // Fallback: extraer del subtype (ej: "video/mp4" → "mp4")
+        $parts = explode('/', $mime, 2);
+        if (count($parts) === 2) {
+            $subtype = $parts[1];
+            // Si el subtype tiene + (ej: "svg+xml"), tomar la primera parte
+            $subtype = explode('+', $subtype)[0];
+            // Sanitizar: solo caracteres alfanuméricos
+            $subtype = preg_replace('/[^a-zA-Z0-9]/', '', $subtype);
+            if ($subtype !== '') {
+                return $subtype;
+            }
+        }
+
+        return '';
     }
 }

@@ -128,6 +128,7 @@ class WebhookHandler
             log_message("trackerGram: Cannot get download URL for file: {$msg->fileId}");
             return null;
         }
+        $msg->fileUrl = $fileUrl; // Guardar URL original de Telegram para el tracker
 
         // HEAD request previa para rechazar rápido archivos grandes conocidos
         $ch = curl_init();
