@@ -1385,8 +1385,6 @@ foreach ($detections as $det) {
     </div>
 </div>
 
-<script src="admin.js"></script>
-
 <?php elseif ($activeTab === 'import'): ?>
 
 <!-- ===== TAB: IMPORTAR ===== -->
@@ -1593,5 +1591,6 @@ foreach ($detections as $det) {
 
 </div><!-- /container -->
 
+<script src="admin.js"></script>
 </body>
 </html>
