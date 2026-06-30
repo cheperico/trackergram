@@ -126,8 +126,10 @@ function checkRateLimit() {
         $data['attempts'] = 0;
         $data['first_attempt'] = time();
         rewind($fp);
-        fwrite($fp, json_encode($data));
-        ftruncate($fp, ftell($fp));
+        $written = fwrite($fp, json_encode($data));
+        if ($written !== false) {
+            ftruncate($fp, ftell($fp));
+        }
     }
 
     flock($fp, LOCK_UN);

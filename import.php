@@ -295,7 +295,7 @@ function handleExtract(): void
     $activeTikiClient = $localTikiClient;
 
     // Guardar metadata (sin credenciales Tiki — van a session)
-    file_put_contents($tempDir . '/metadata.json', json_encode([
+    $metaWritten = @file_put_contents($tempDir . '/metadata.json', json_encode([
         'chat_id' => $chatId,
         'chat_title' => $chatTitle,
         'topics' => $topics,
@@ -304,6 +304,10 @@ function handleExtract(): void
         'created' => time(),
         'field_prefix' => $fieldPrefix,
     ]));
+    if ($metaWritten === false) {
+        rrmdir($tempDir);
+        jsonError('No se pudo escribir metadata.json en directorio temporal');
+    }
     
     // Guardar credenciales Tiki en session (no en disco)
     $importSessionKey = 'import_creds_' . basename($tempDir);
@@ -322,14 +326,20 @@ function handleExtract(): void
             $fileIndex[$fn] = $f->getPathname();
         }
     }
-    file_put_contents($tempDir . '/fileindex.json', json_encode($fileIndex));
+    $idxWritten = @file_put_contents($tempDir . '/fileindex.json', json_encode($fileIndex));
+    if ($idxWritten === false) {
+        log_message("import.php: ERROR — No se pudo escribir fileindex.json", true);
+    }
 
     // Resolver gallery ID y persistirlo en metadata para que handleProcess lo re-use
     $galleryId = $activeTikiClient->getMediaGalleryId((int) $trackerId);
     if ($galleryId !== null) {
         $metadata = json_decode(file_get_contents($tempDir . '/metadata.json'), true);
         $metadata['gallery_id'] = $galleryId;
-        file_put_contents($tempDir . '/metadata.json', json_encode($metadata));
+        $metaWritten2 = @file_put_contents($tempDir . '/metadata.json', json_encode($metadata));
+        if ($metaWritten2 === false) {
+            log_message("import.php: ERROR — No se pudo actualizar metadata.json con gallery_id", true);
+        }
         log_message("trackerGram import: Gallery ID {$galleryId} persistido para tracker {$trackerId}");
     } else {
         log_message("trackerGram import: WARNING — No se pudo resolver galleryId para tracker {$trackerId}", true);
@@ -408,7 +418,10 @@ function handleProcess(): void
             $localTikiClient->setFieldPrefix($resolvedPrefix);
             // Actualizar metadata en disco para chunks subsiguientes
             $metadata['field_prefix'] = $resolvedPrefix;
-            file_put_contents($metadataPath, json_encode($metadata));
+            $metaWritten3 = @file_put_contents($metadataPath, json_encode($metadata));
+            if ($metaWritten3 === false) {
+                log_message("import.php process: ERROR — No se pudo actualizar metadata.json con field_prefix", true);
+            }
             // Actualizar session
             if (isset($creds)) {
                 $creds['field_prefix'] = $resolvedPrefix;

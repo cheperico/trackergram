@@ -242,15 +242,15 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
                 if ($written === false) {
                     @unlink($tmpFile);
                     log_message("trackerGram: No se pudo escribir buffer async — procesando sincrónicamente", true);
-                    processUpdate($update, $connection, $connectionSlug, $messageMapper);
+                    processUpdate($update, $connection, $connectionSlug, $messageMapper, $configManager);
                 } elseif (!@rename($tmpFile, $bufferFile)) {
                     @unlink($tmpFile);
                     log_message("trackerGram: No se pudo renombrar buffer async — procesando sincrónicamente", true);
-                    processUpdate($update, $connection, $connectionSlug, $messageMapper);
+                    processUpdate($update, $connection, $connectionSlug, $messageMapper, $configManager);
                 }
             } else {
                 // Modo sync: procesar inmediatamente
-                processUpdate($update, $connection, $connectionSlug, $messageMapper);
+                processUpdate($update, $connection, $connectionSlug, $messageMapper, $configManager);
             }
             $fanOutResults[$connectionSlug] = 'ok';
         } catch (Throwable $e) {
@@ -283,7 +283,7 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
 /**
  * Procesar un update de Telegram usando la conexión encontrada
  */
-function processUpdate(array $update, array $connection, string $connectionSlug, MessageMapper $messageMapper): void
+function processUpdate(array $update, array $connection, string $connectionSlug, MessageMapper $messageMapper, ConfigManager $configManager): void
 {
     // Extraer solo los campos de la conexión (por si pasan con _slug)
     if (isset($connection['_slug'])) {
@@ -311,8 +311,7 @@ function processUpdate(array $update, array $connection, string $connectionSlug,
             $tikiClient->setFieldPrefix($resolvedPrefix);
             $updateFields['field_prefix'] = $resolvedPrefix;
         }
-        $cm = new ConfigManager();
-        $cm->updateConnectionFields($connectionSlug, $updateFields);
+        $configManager->updateConnectionFields($connectionSlug, $updateFields);
     } elseif ($trackerId > 0 && $prefixChecked && ($connection['field_prefix'] ?? 'telegrammessage') === 'telegrammessage') {
         // Prefix ya verificado y es el default — marcar verified para evitar
         // que getMediaGalleryId() haga otra llamada API.
