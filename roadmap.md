@@ -18,7 +18,7 @@
 
 | | |
 |---|---|
-| **Versión actual** | v0.5.14 |
+| **Versión actual** | v0.6.0 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Instancias activas** | Dev (tracker 26) · Prod (tracker 22) |
 | **Filosofía** | Sin DB con servidor · JSON files para estado local (no SQLite) · PHP puro sin framework · MVP pragmático |
@@ -92,6 +92,8 @@
 - ✅ **TelegramClient::setWebhook()**: nuevo método, admin.php lo usa en vez de curl directo.
 - ✅ **Cache-Control: no-store en get_connection**: evita que tokens queden en cachés intermedias.
 - ✅ **createCurlHandle() fix**: reparada recursión infinita (llamaba a $this->createCurlHandle() en vez de curl_init()).
+- ✅ **#20 Desarme admin.php — Fase A**: CSS/JS extraídos a `admin.css` (211 líneas), `admin.js` (558 líneas), `admin_import.js` (166 líneas). admin.php reducido de 2529 a ~1597 líneas.
+- ✅ **#20 Desarme admin.php — Fase B**: Handlers POST extraídos a `admin_handlers.php` (508 líneas). admin.php reducido a ~1114 líneas (-56% del original). Handlers ejecutados ANTES de loops pesados (AJAX en ms). `$connectionsSafe` construido al final. ValidateCSRF con JSON+403. Sin doble escape.
 
 ---
 
@@ -139,7 +141,6 @@
 | 17 | **Rotación de logs por fecha** | 1 sesión | Además de por tamaño. |
 | 18 | **Expulsar bot desde admin panel** | 1 sesión | Botón para sacar el bot de un grupo directamente desde la interface, sin tener que hacerlo desde Telegram. |
 | 19 | **JsonFileStorage utility class** | 1-2 sesiones | Centralizar acceso a archivos JSON con `flock()` (LOCK_EX/LOCK_SH). Resolvería race conditions en rate limiting, ConfigManager, topics cache y media group captions (F3-3, F3-4) de un solo golpe. |
-| 20 | **Desarme de admin.php (~2527 líneas)** | 2-3 sesiones | **Refactor mayor.** admin.php mezcla PHP lógica + HTML + CSS + JS. Separar en: `admin.php` (entry point + routing), `admin_handlers.php` (POST actions), `admin_view.php` (HTML templates), `admin.css` (estilos cacheables), `admin.js` y `admin_import.js` (JS cacheable). Code Review: God Object consecuencia directa. |
 | **F4-1** | **WebhookHandler refactor (God Object, 823 líneas)** | 2-3 sesiones | Extraer `CommandRouter` (comandos /ayuda /estado), `MediaProcessor` (download + upload + álbumes), `DeduplicationService` (locks TOCTOU). WebhookHandler queda como fachada. Code Review: Arq&Seg #6. |
 | **F4-2** | **HTTP Keep-Alive con curl_reset()** | 1 sesión | Reutilizar handle curl en TikiWikiClient y TelegramClient con `curl_reset()` para habilitar HTTP Keep-Alive y evitar handshake TLS en cada llamada. Code Review: Arq&Seg #4. |
 | **F4-3** | **Head-of-Line blocking en worker.php** | 2-3 sesiones | Worker single-thread: si TikiWiki tarda 30s en upload, la cola se bloquea. Evaluar `curl_multi_exec()` para push concurrente o múltiples workers con lock granular. Code Review: Arq&Seg #5. |

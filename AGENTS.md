@@ -41,7 +41,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 | | |
 |---|---|
-| **Versión** | v0.5.12 |
+| **Versión** | v0.6.0 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
 | **Repositorio** | https://github.com/cheperico/trackergram |
@@ -114,6 +114,9 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 - ✅ **Escritura atómica de buffer async**: `api.php` escribe a `.tmp` + `rename()`. Si el proceso crashea a mitad de escritura, no queda JSON truncado.
 - ✅ **Lock directo sobre .json en worker**: `flock(LOCK_EX | LOCK_NB)` sobre el `.json` en vez de lock separado. Si el worker crashea, el SO limpia el lock y otro worker retoma el evento.
 - ✅ **GC de buffer**: `cleanupDoneFiles()` barre `.failed*`, `.lock` y `.tmp` viejos además de `.done`.
+- ✅ **Admin.php refactorizado**: CSS/JS extraídos a archivos externos cacheables (`admin.css`, `admin.js`, `admin_import.js`). Handlers POST extraídos a `admin_handlers.php` (508 líneas). admin.php reducido de 2529 a 1114 líneas (-56%).
+- ✅ **Handlers antes de loops pesados**: `include admin_handlers.php` ejecutado ANTES de llamadas a APIs externas (Telegram/TikiWiki). Los handlers AJAX responden en milisegundos.
+- ✅ **$connectionsSafe sincronizado siempre**: construido al final de todo el procesamiento (handlers + loops + health check), refleja el estado final de `$connections` sin actualizaciones manuales intermedias.
 
 ---
 ## 2. Decisiones Arquitectónicas
@@ -198,7 +201,8 @@ La mayoría de los archivos están en la raíz. Subdirectorios:
 |---|---|---|
 | `bootstrap.php` | Carga config + clases PHP (sin DI wiring central) | Siempre, primer include |
 | `api.php` | Recibe webhooks de Telegram | Cuando Telegram envía un mensaje |
-| `admin.php` | Panel de administración web | Cuando un humano abre la URL |
+| `admin.php` | Panel de administración web (~1114 líneas, entry point + helpers + HTML) | Cuando un humano abre la URL |
+| `admin_handlers.php` | 12 handlers POST + 1 AJAX (incluido desde admin.php) | En cada request POST a admin.php |
 | `import.php` | Procesa exports ZIP de Telegram | Cuando un humano sube un ZIP |
 
 #### Clientes y Lógica
@@ -212,6 +216,14 @@ La mayoría de los archivos están en la raíz. Subdirectorios:
 | `MessageMapper.php` | Transforma mensajes → NormalizedMessage → campos TikiWiki |
 | `WebhookHandler.php` | Orquesta: valida, resuelve topics, descarga media, envía a TikiWiki |
 | `ConfigManager.php` | CRUD de conexiones multi-bot/wiki/tracker en `setup.json` |
+
+#### Frontend Admin
+
+| Archivo | Responsabilidad |
+|---|---|
+| `admin.css` | Estilos del panel de administración (211 líneas cacheables) |
+| `admin.js` | JS del panel de administración (558 líneas): funciones de modal, test, fetch, CSRF. Carga en todos los tabs. |
+| `admin_import.js` | JS del flujo de importación (166 líneas): chunked processing con barra de progreso |
 
 #### Soporte
 
@@ -547,6 +559,10 @@ Ver [CAMBIOS.md](CAMBIOS.md) para el detalle completo por versión.
 | Versión | Cambio principal |
 |---|---|---|
 | **v0.5.12** | **Fixes de code review externo**: edited_message ruteado por webhook (bug funcional), configure_webhook usa POST (token fuera de URLs), safeRender() elimina innerHTML residual (XSS fix), htmlspecialchars eliminado de fromWebhook() (caption data fix), tmp/test_create.php eliminado (token hardcodeado). Docs sincronizados. |
+| **v0.6.0** | **Desarme admin.php Fase B + fixes post-revision**: Handlers extraídos a `admin_handlers.php` (508 líneas). admin.php: 2529→1114 líneas (-56%). `include` handlers movido ANTES de loops pesados (AJAX responde en ms). `$connectionsSafe` construido al final del procesamiento (datos frescos). `validateCSRFToken()` responde JSON+403 para AJAX. Eliminado `escapeHtml()` en handlers (doble escape). Vista itera `$connectionsSafe` (tokens sanitizados). Eliminado `$webhookStatuses = [];` redundante. |
+| **v0.5.14** | **Code review fixes Julio 2026 (7 hallazgos)**: IPv6 `resolveHostToIp()`, Location en exports, rate limit con flock, Host header sanitizado, dedup lock GC, `TelegramClient::setWebhook()`, Cache-Control en get_connection. |
+| **v0.5.13** | **SSRF DNS Rebinding + Host header poisoning + async buffer fixes**: `CURLOPT_RESOLVE` en TikiWikiClient, `createCurlHandle()`, ConfigManager DNS validation, escritura atómica de buffer async, lock directo sobre .json en worker + GC extendido. |
+| **v0.5.12** | **Code review externo fixes**: edited_message ruteado por webhook (bug funcional), configure_webhook usa POST, safeRender() elimina innerHTML residual, htmlspecialchars eliminado de fromWebhook(), tmp/test_create.php eliminado. Rate limiting con flock, migración grupo→supergrupo, ConfigManager::load() con flock(LOCK_SH), fan-out 502, messageExists() null. |
 | **v0.5.11** | **Dedup con edit detection + polls enriquecidos**: `updateTrackerItem()` para reflejar edits; `toWikiFieldsEdit()` seguro (solo Text+EditedDate+Reactions); polls del export parsean `answers[]` con voters reales; import.php dedup pre-create con field access en ambos formatos API; `$updated`/`$failed` counters. WebhookHandler: /ayuda con links a sintaxis wiki, XSS fix. |
 | v0.5.9 | **Hashtags como etiquetas (Freetags)**: Extracción de `#tags` de mensajes Telegram (webhook + import) a campo tipo `F` en TikiWiki. Se integran al ecosistema de etiquetas (tag cloud, búsqueda). Nuevo campo `{prefix}Hashtags` en getTrackerFieldDefinitions(). |
 | v0.5.8 | **BUG-001 fix + Privacy Mode doc + htmlspecialchars fix**: findByWebhookSecret() prioriza conexiones pendientes. assignDetection() no sobrescribe chat_id existente. Documentado requisito de bot admin (Privacy Mode de Telegram). Eliminado htmlspecialchars() de toWikiFields() que corrompía comillas y otros caracteres. |

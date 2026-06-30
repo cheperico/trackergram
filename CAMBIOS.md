@@ -28,6 +28,40 @@
 #### 🟢 Fix #7: get_connection devuelve tokens completos vía AJAX
 - **admin.php**: Endpoint `get_connection` ahora agrega headers `Cache-Control: no-store` y `Pragma: no-cache` para evitar que tokens queden en cachés intermedias. Comentario de seguridad documentando el riesgo.
 
+## v0.6.0
+
+### 🏗️ Desarme de admin.php — Fase B: Handlers externos + fixes post-revision
+
+#### Fase B: handlers POST extraídos a admin_handlers.php
+- **admin.php**: Los 12 handlers POST (`change_password`, `save_connection`, `delete_connection`, `duplicate_connection`, `toggle_connection`, `sync_tracker`, `configure_webhook`, `test_connection`, `check_privacy`, `assign_chat`, `ignore_chat`, `create_tracker`) + 1 AJAX (`get_connection`) extraídos a nuevo archivo `admin_handlers.php` (508 líneas).
+- admin.php reducido de 2529 → 1114 líneas (-56% del original).
+- admin.php ahora es solo: entry point, 8 helpers (CSRF, rate limit, webhook URL, escape), auth, setup de conexiones, include de handlers, loops pesados, construcción de `$connectionsSafe`, determinación de tab, y HTML skeleton.
+
+#### 🏗️ Orden de ejecución optimizado: handlers antes de loops pesados
+- `include 'admin_handlers.php'` movido **ANTES** de los loops que llaman APIs externas de Telegram/TikiWiki (auto-fetch bot_name/chat_title/field_prefix + health check).
+- Los 3 handlers AJAX (`get_connection`, `test_connection`, `check_privacy`) hacen `exit` inmediato sin tocar APIs externas. Corte de latencia drástico: de segundos a milisegundos.
+- Los handlers POST mutantes (`save_connection`, `delete_connection`, etc.) ya no tienen que esperar a que se ejecuten los loops pesados.
+
+#### 🔴 Fix #1: $connectionsSafe construido al final, sincronizado con $connections
+- `$connectionsSafe` movido de antes del include (línea 295) a **después de los handlers + heavy loops + health check** (línea 425).
+- Eliminadas 3 actualizaciones manuales de `$connectionsSafe` dentro de los loops (bot_name, chat_title, field_prefix) que se desincronizaban si otro handler modificaba `$connections`.
+- `$connectionsSafe` ahora siempre refleja el estado final de `$connections`.
+
+#### 🟡 Fix #2: $webhookStatuses sin inicialización redundante
+- Eliminado `$webhookStatuses = [];` al inicio del health check que pisaba lo que `configure_webhook` handler hubiera seteado.
+- Inicializado una sola vez antes del include. El health check loop sobreescribe slugs con datos frescos de Telegram.
+
+#### 🟡 Fix #3: Vista HTML itera $connectionsSafe (tokens sanitizados)
+- Las 3 vistas (clásica, agrupada por bot_token, selects de importación/creación) ahora iteran `$connectionsSafe` en vez de `$connections`.
+- En la vista clásica, el fallback de bot_display ya no muestra `substr($token, 0, 20)` — ahora muestra el token sanitizado de `$connectionsSafe` o "Sin token".
+- En la vista agrupada, `bot_token` ya no se sanitiza manualmente — se usa el valor ya sanitizado de `$connectionsSafe`.
+
+#### 🟢 Fix #4: validateCSRFToken() con respuesta JSON+403 para AJAX
+- `validateCSRFToken()` detecta acciones AJAX (`get_connection`, `test_connection`, `check_privacy`) y responde `HTTP 403` + `Content-Type: application/json` con mensaje estructurado, en vez de `die()` plano que causaba SyntaxError silencioso en el JS.
+
+#### 🟢 Fix #5: Handlers sin escapeHtml() (double escape)
+- Los handlers en `admin_handlers.php` ya no aplican `escapeHtml()` sobre `$successMessage`/`$errorMessage`. La vista (admin.php) es la única responsable de escapar al renderizar.
+
 ## v0.5.13
 
 ### 🔒 Fix: DNS Rebinding en SSRF (hallazgo #2 code review)
