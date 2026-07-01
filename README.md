@@ -149,26 +149,16 @@ El tracker usa **28 campos** con permNames que siguen el patrón `{prefix}Telegr
 >
 > Si necesitás la configuración INI completa para importar campos manualmente en TikiWiki, consultá el [Apéndice en TECHNICAL.md](TECHNICAL.md#apéndice-schema-completo-del-tracker-para-trackergram).
 
-## Visualización del Chat
+## Visualizaciones Personalizadas
 
-Una vez que los mensajes están en el tracker, podés crear un **feed tipo chat** en cualquier página wiki de TikiWiki usando `{TRACKERLIST}` con un template Smarty personalizado (`tplwiki`). Esto te permite mostrar los mensajes como burbujas de chat, con colores por tipo, multimedia embebida, reacciones, enlaces a respuestas, etc.
+Los datos guardados en el tracker se pueden mostrar en TikiWiki de muchas formas. Como cualquier tracker de TikiWiki, podés usar `{TRACKERLIST}` con templates Smarty (`tplwiki`) para crear visualizaciones a medida: feeds tipo chat, timelines, tablas, dashboards, etc.
 
-Ejemplo básico de página wiki:
+Además, al ser un tracker estándar de TikiWiki, los mensajes son:
+- **Buscables** por cualquier campo
+- **Filtrables** por fecha, usuario, tipo de mensaje, hashtags
+- **Integrables** con otros plugins y funcionalidades de TikiWiki
 
-```
-{TRACKERLIST(
-    trackerId="X",
-    fields="15:24:25:26:31:33",
-    sort_mode="f_ID_desc",
-    max="50",
-    tplwiki="MiTemplate"
-) /}
-```
-
-El template Smarty (creado como otra página wiki) recibe cada item como variables `{$f_fieldId}` y puede usar HTML, CSS y plugins de TikiWiki para darle formato. Ver ejemplos funcionales y templates completos en:
-
-- `opt/visualizacion-tiki.md` — template original para tracker con prefix `telegrammessage`
-- `opt/visualizacion-lcc2026.md` — template adaptado para tracker con prefix `lcc2026t`, bordes redondeados
+Las visualizaciones se crean en páginas wiki usando el plugin `{TRACKERLIST}` con un template Smarty que define el HTML de cada mensaje, y se estiliza con CSS inline o plugins de TikiWiki.
 
 ## Problemas Comunes
 
@@ -208,8 +198,6 @@ Si tu servidor tiene ModSecurity activado, puede bloquear las peticiones a TikiW
 | [roadmap.md](roadmap.md) | Qué falta por hacer, prioridades |
 | [CAMBIOS.md](CAMBIOS.md) | Historial de cambios por versión |
 | `design/*` | Documentos de diseño exploratorio (features en discusión) |
-| `opt/visualizacion-tiki.md` | Template Smarty para feed tipo chat (tracker original) |
-| `opt/visualizacion-lcc2026.md` | Template Smarty para feed tipo chat (tracker lcc2026, bordes redondeados) |
 
 ## Licencia
 
