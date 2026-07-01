@@ -679,9 +679,10 @@ Este apéndice describe **qué campos debe tener un tracker de TikiWiki** para s
 | 22 | `MediaDuration` | `DUR` (duration) | Duración en segundos (hh:mm:ss) | | | | |
 | 23 | `Location` | `G` (geolocation) | Coordenadas GPS (lon, lat, zoom) | | | | ✅ |
 | 24 | `EditedDate` | `t` (text) | Timestamp UNIX de última edición | | | | |
-| 25 | `ReplyToId` | `t` (text) | ID del mensaje al que responde | | | | |
-| 26 | `Reactions` | `a` (textarea) | Reacciones formateadas (👍 3 · ❤️ 1) | | | | ✅ |
-| 27 | `Hashtags` | `F` (freetags) | Hashtags como etiquetas (sin #) | | | ✅ | ✅ |
+| 25 | `MediaGroupId` | `t` (text) | ID del grupo de medios (media_group_id) | | | | |
+| 26 | `ReplyToId` | `t` (text) | ID del mensaje al que responde | | | | |
+| 27 | `Reactions` | `a` (textarea) | Reacciones formateadas (👍 3 · ❤️ 1) | | | | ✅ |
+| 28 | `Hashtags` | `F` (freetags) | Hashtags como etiquetas (sin #) | | | ✅ | ✅ |
 
 ### INI para importar campos manualmente en TikiWiki
 
@@ -1123,6 +1124,24 @@ visibleInEditMode = y
 visibleInHistoryMode = y
 
 [FIELD25]
+name = media_group_id
+permName = telegrammessageMediaGroupId
+type = t
+description = ID del grupo de medios (media_group_id) para álbumes de fotos/videos
+isMain = n
+isSearchable = y
+isTblVisible = n
+isPublic = y
+isHidden = n
+isMandatory = n
+isMultilingual = n
+descriptionIsParsed = n
+excludeFromNotification = n
+visibleInViewMode = y
+visibleInEditMode = y
+visibleInHistoryMode = y
+
+[FIELD26]
 name = reply_to_id
 permName = telegrammessageReplyToId
 type = t
@@ -1140,7 +1159,7 @@ visibleInViewMode = y
 visibleInEditMode = y
 visibleInHistoryMode = y
 
-[FIELD26]
+[FIELD27]
 name = reactions
 permName = telegrammessageReactions
 type = a
@@ -1158,7 +1177,7 @@ visibleInViewMode = y
 visibleInEditMode = y
 visibleInHistoryMode = y
 
-[FIELD27]
+[FIELD28]
 name = hashtags
 permName = telegrammessageHashtags
 type = F

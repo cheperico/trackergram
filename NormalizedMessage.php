@@ -34,6 +34,8 @@ class NormalizedMessage
     public string $height = '';
     public string $duration = '';
     public string $editedDate = '';
+    /** ID del grupo de medios al que pertenece (media_group_id en webhook, grouped_id en export) */
+    public string $mediaGroupId = '';
     public string $replyToId = '';
     public string $reactions = '';
     /** Hashtags extraídos del mensaje (espacio-separados, sin #) */

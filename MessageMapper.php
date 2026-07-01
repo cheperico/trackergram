@@ -59,6 +59,7 @@ class MessageMapper
         $msg->messageId = (string) ($message['message_id'] ?? '');
         $msg->text = $message['text'] ?? '';
         $msg->editedDate = (string) ($message['edit_date'] ?? '');
+        $msg->mediaGroupId = (string) ($message['media_group_id'] ?? '');
         // Ignorar reply_to si apunta a un mensaje de sistema de topics (forum_topic_*)
         $replyToMsg = $message['reply_to_message'] ?? null;
         if ($replyToMsg) {
@@ -602,6 +603,8 @@ class MessageMapper
 
         $msg->editedDate = (string) ($message['edited_unixtime'] ?? '');
         $msg->replyToId = (string) ($message['reply_to_message_id'] ?? '');
+        // En el export de Telegram, los álbumes usan 'grouped_id' (equivalente a media_group_id)
+        $msg->mediaGroupId = (string) ($message['grouped_id'] ?? '');
 
         return $msg;
     }
@@ -640,6 +643,7 @@ class MessageMapper
             "fields[{$p}MediaCaption]" => $msg->mediaCaption,
             "fields[{$p}MessageDate]" => $msg->date,
             "fields[{$p}EditedDate]" => $msg->editedDate,
+            "fields[{$p}MediaGroupId]" => $msg->mediaGroupId,
             "fields[{$p}ReplyToId]" => $msg->replyToId,
             "fields[{$p}Reactions]" => $msg->reactions,
             "fields[{$p}Hashtags]" => $msg->hashtags,

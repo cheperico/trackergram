@@ -337,6 +337,7 @@ El tracker por defecto tiene estos campos (permNames):
 | `telegrammessageMediaHeight` | n (number) | Alto del media en píxeles |
 | `telegrammessageMediaDuration` | DUR (duration) | Duración en segundos (audio/video/voice), se muestra como hh:mm:ss |
 | `telegrammessageEditedDate` | t (text) | Unix timestamp de última edición (vacío si no editado) |
+| `telegrammessageMediaGroupId` | t (text) | ID del grupo de medios (media_group_id) para álbumes |
 | `telegrammessageReplyToId` | t (text) | ID del mensaje al que responde |
 | `telegrammessageReactions` | t (text) | Reacciones formateadas como texto legible (👍 3 · ❤️ 1) |
 | `telegrammessageHashtags` | F (freetags) | Hashtags de Telegram como etiquetas (espacio-separados, sin #) |

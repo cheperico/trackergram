@@ -612,13 +612,22 @@ class WebhookHandler
                     . "/inicio: mensaje de bienvenida;\n"
                     . "/ayuda: mostrar esta ayuda;\n"
                     . "/tracker: enlace al tracker en TikiWiki;\n"
-                    . "/estado: estado de la conexión.\n\n"
+                    . "/estado: estado de la conexión;\n"
+                    . "/version: versión de trackerGram y enlace al repositorio.\n\n"
                     . "<b>Sintaxis TikiWiki:</b>\n"
                     . "El texto del mensaje soporta <a href=\"https://doc.tiki.org/Wiki-syntax\">sintaxis wiki</a>. "
                     . "Además podés incorporar etiquetas con #etiqueta para marcar contenido "
                     . "con <a href=\"https://doc.tiki.org/Tags\">freetags</a>.";
                 $this->telegramClient->sendMessage($chatId, $text);
                 log_message("trackerGram: /ayuda respondido en chat {$chatId}");
+                break;
+
+            case '/version':
+                $text = "📦 <b>trackerGram " . TRACKERGRAM_VERSION . "</b>\n\n"
+                    . "Código fuente: <a href=\"https://github.com/cheperico/trackergram\">github.com/cheperico/trackergram</a>\n\n"
+                    . "Reportá bugs o sugerí mejoras en el repositorio.";
+                $this->telegramClient->sendMessage($chatId, $text);
+                log_message("trackerGram: /version respondido en chat {$chatId}");
                 break;
 
             case '/tracker':

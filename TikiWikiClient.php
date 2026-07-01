@@ -1429,6 +1429,7 @@ class TikiWikiClient
             ['name' => $prefix . 'MediaWidth', 'type' => 'n', 'permName' => $prefix . 'MediaWidth', 'description' => 'Ancho de la imagen/video en píxeles'],
             ['name' => $prefix . 'MediaHeight', 'type' => 'n', 'permName' => $prefix . 'MediaHeight', 'description' => 'Alto de la imagen/video en píxeles'],
             ['name' => $prefix . 'MediaDuration', 'type' => 'DUR', 'permName' => $prefix . 'MediaDuration', 'description' => 'Duración del audio/video/voice en segundos (se muestra como hh:mm:ss)'],
+            ['name' => $prefix . 'MediaGroupId', 'type' => 't', 'permName' => $prefix . 'MediaGroupId', 'description' => 'ID del grupo de medios (media_group_id) para álbumes de fotos/videos'],
             ['name' => $prefix . 'EditedDate', 'type' => 't', 'permName' => $prefix . 'EditedDate', 'description' => 'Fecha de última edición (timestamp UNIX, vacío si no fue editado)'],
             ['name' => $prefix . 'ReplyToId', 'type' => 't', 'permName' => $prefix . 'ReplyToId', 'description' => 'ID del mensaje al que responde (para conversaciones en hilo)'],
             ['name' => $prefix . 'Reactions', 'type' => 'a', 'permName' => $prefix . 'Reactions', 'description' => 'Reacciones al mensaje formateadas como texto (ej: 👍 3 · ❤️ 1)'],
