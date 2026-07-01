@@ -506,6 +506,74 @@ function checkPrivacy(slug, btn) {
     });
 }
 
+/**
+ * Limpiar formulario del modal de conexión (para crear nueva, no editar)
+ */
+function resetConnectionForm() {
+    document.getElementById('modal-title').textContent = 'Nueva conexion';
+    document.getElementById('form-slug').value = '';
+    document.getElementById('form-name').value = '';
+    document.getElementById('form-bot_token').value = '';
+    document.getElementById('form-webhook_secret').value = '';
+    document.getElementById('form-chat_id').value = '0';
+    document.getElementById('form-tracker_id').value = '';
+    document.getElementById('form-tiki_api_url').value = '';
+    document.getElementById('form-tiki_api_token').value = '';
+    document.getElementById('form-enabled').checked = true;
+    document.getElementById('form-async_processing').checked = false;
+}
+
+/**
+ * Auto-llenar campos Tiki al seleccionar una conexión existente
+ * @param {HTMLSelectElement} selectEl - El elemento <select> del connection_slug
+ * @param {string} prefix - Prefijo de IDs: 'import-' o 'create-'
+ */
+function fillConnectionSlug(selectEl, prefix) {
+    var slug = selectEl.value;
+    if (!slug) {
+        // Limpiar campos si se volvió a "Ingresar manual"
+        var urlInput = document.getElementById(prefix + 'tiki_url');
+        var tokenInput = document.getElementById(prefix + 'tiki_token');
+        var trackerInput = document.getElementById(prefix + 'tracker_id');
+        if (urlInput) urlInput.value = '';
+        if (tokenInput) tokenInput.value = '';
+        if (trackerInput) trackerInput.value = '';
+        return;
+    }
+    
+    var data = new URLSearchParams();
+    data.append('action', 'get_connection');
+    data.append('slug', slug);
+    data.append('csrf_token', csrftoken());
+    
+    fetch('admin.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: data.toString()
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(conn) {
+        if (conn.error) { alert(conn.error); return; }
+        
+        var urlInput = document.getElementById(prefix + 'tiki_url');
+        var tokenInput = document.getElementById(prefix + 'tiki_token');
+        var trackerInput = document.getElementById(prefix + 'tracker_id');
+        
+        if (urlInput) urlInput.value = conn.tiki_api_url || '';
+        if (tokenInput) tokenInput.value = conn.tiki_api_token || '';
+        if (trackerInput) trackerInput.value = conn.tracker_id || '';
+        
+        // También el field_prefix si existe en el formulario
+        var prefixInput = document.getElementById(prefix + 'field_prefix') || document.getElementById(prefix + 'field-prefix');
+        if (prefixInput && conn.field_prefix) {
+            prefixInput.value = conn.field_prefix;
+        }
+    })
+    .catch(function() {
+        alert('Error al cargar datos de la conexion');
+    });
+}
+
 // Cerrar modal si se hace click fuera
 document.addEventListener('click', function(e) {
     if (e.target.classList.contains('modal-overlay')) {

@@ -509,11 +509,11 @@ if (isset($_GET['edit'])) {
         <?php if (empty($connections)): ?>
             <div class="empty-state">
                 <p>No hay conexiones configuradas.</p>
-                <button class="btn btn-primary" onclick="openModal('connection-modal')" title="Agregar una nueva conexión entre un bot de Telegram y un tracker de TikiWiki">+ Agregar conexion</button>
+                <button class="btn btn-primary" onclick="resetConnectionForm(); openModal('connection-modal')" title="Agregar una nueva conexión entre un bot de Telegram y un tracker de TikiWiki">+ Agregar conexion</button>
             </div>
         <?php else: ?>
             <div style="margin-bottom:16px;">
-                <button class="btn btn-primary" onclick="openModal('connection-modal')" title="Agregar una nueva conexión entre un bot de Telegram y un tracker de TikiWiki">+ Agregar conexion</button>
+                <button class="btn btn-primary" onclick="resetConnectionForm(); openModal('connection-modal')" title="Agregar una nueva conexión entre un bot de Telegram y un tracker de TikiWiki">+ Agregar conexion</button>
             </div>
             <div class="conn-list">
                 <?php foreach ($connectionsSafe as $slug => $conn): ?>
@@ -633,13 +633,13 @@ foreach ($connectionsSafe as $slug => $conn) {
         <div class="section-content">
             <div class="empty-state">
                 <p>No hay conexiones configuradas.</p>
-                <button class="btn btn-primary" onclick="openModal('connection-modal')" title="Agregar una nueva conexión">+ Agregar conexion</button>
+                <button class="btn btn-primary" onclick="resetConnectionForm(); openModal('connection-modal')" title="Agregar una nueva conexión">+ Agregar conexion</button>
             </div>
         </div>
     </div>
 <?php else: ?>
     <div style="margin-bottom:16px;">
-        <button class="btn btn-primary" onclick="openModal('connection-modal')" title="Agregar una nueva conexión">+ Agregar conexion</button>
+        <button class="btn btn-primary" onclick="resetConnectionForm(); openModal('connection-modal')" title="Agregar una nueva conexión">+ Agregar conexion</button>
     </div>
     <?php foreach ($grouped as $botToken => $bot): ?>
         <?php 
@@ -838,14 +838,14 @@ foreach ($detections as $det) {
                     <div class="form-group">
                         <label for="form-bot_token">Bot Token</label>
                         <div class="input-wrapper">
-                            <input type="password" name="bot_token" id="form-bot_token" required aria-required="true" placeholder="Token de @BotFather" title="Token del bot de Telegram obtenido de @BotFather">
+                            <input type="password" name="bot_token" id="form-bot_token" required aria-required="true" autocomplete="new-password" placeholder="Token de @BotFather" title="Token del bot de Telegram obtenido de @BotFather">
                             <button type="button" class="icon-btn" onclick="togglePassword(this)" title="Mostrar u ocultar el token" aria-label="Mostrar contraseña">Mostrar</button>
                         </div>
                     </div>
                     <div class="form-group">
                         <label for="form-webhook_secret">Webhook Secret</label>
                         <div class="input-wrapper">
-                            <input type="password" name="webhook_secret" id="form-webhook_secret" placeholder="Auto-generado si se deja vacio" aria-describedby="hint-webhook_secret" title="Secreto del webhook para verificar que los mensajes vienen de Telegram">
+                            <input type="password" name="webhook_secret" id="form-webhook_secret" autocomplete="new-password" placeholder="Auto-generado si se deja vacio" aria-describedby="hint-webhook_secret" title="Secreto del webhook para verificar que los mensajes vienen de Telegram">
                             <button type="button" class="icon-btn" onclick="togglePassword(this)" title="Mostrar u ocultar el secreto" aria-label="Mostrar contraseña">Mostrar</button>
                         </div>
                         <div class="hint" id="hint-webhook_secret">Dejar vacio para generar uno automaticamente</div>
@@ -872,7 +872,7 @@ foreach ($detections as $det) {
                 <div class="form-group">
                     <label for="form-tiki_api_token">Tiki API Token</label>
                     <div class="input-wrapper">
-                        <input type="password" name="tiki_api_token" id="form-tiki_api_token" required aria-required="true" placeholder="Token de TikiWiki" title="Token de autenticación de la API de TikiWiki">
+                        <input type="password" name="tiki_api_token" id="form-tiki_api_token" required aria-required="true" autocomplete="new-password" placeholder="Token de TikiWiki" title="Token de autenticación de la API de TikiWiki">
                         <button type="button" class="icon-btn" onclick="togglePassword(this)" title="Mostrar u ocultar el token" aria-label="Mostrar contraseña">Mostrar</button>
                     </div>
                 </div>
@@ -916,7 +916,7 @@ foreach ($detections as $det) {
             <?php if (!empty($connections)): ?>
             <div class="form-group">
                     <label for="import-connection-slug">Usar conexion existente (opcional)</label>
-                        <select name="connection_slug" id="import-connection-slug" title="Seleccionar una conexión existente">
+                        <select name="connection_slug" id="import-connection-slug" onchange="fillConnectionSlug(this, 'import-')" title="Seleccionar una conexión existente">
                             <option value="">— Ingresar manual —</option>
                         <?php foreach ($connectionsSafe as $slug => $conn): ?>
                         <option value="<?php echo escapeHtml($slug); ?>">
@@ -936,7 +936,7 @@ foreach ($detections as $det) {
                 <div class="form-group">
                     <label for="import-tiki_token">Tiki API Token</label>
                     <div class="input-wrapper">
-                        <input type="password" name="tiki_api_token" id="import-tiki_token" required aria-required="true" placeholder="Token de TikiWiki" title="Token de autenticación de la API de TikiWiki">
+                        <input type="password" name="tiki_api_token" id="import-tiki_token" required aria-required="true" autocomplete="new-password" placeholder="Token de TikiWiki" title="Token de autenticación de la API de TikiWiki">
                         <button type="button" class="icon-btn" onclick="togglePassword(this)" title="Mostrar u ocultar el token" aria-label="Mostrar contraseña">Mostrar</button>
                     </div>
                 </div>
@@ -984,7 +984,7 @@ foreach ($detections as $det) {
             
             <div class="form-group">
                 <label for="create-tracker-name">Nombre del tracker *</label>
-                <input type="text" name="tracker_name" id="create-tracker-name" required aria-required="true" placeholder="Ej: QPCH Produccion" value="<?php echo escapeHtml($_POST['tracker_name'] ?? ''); ?>" aria-describedby="hint-tracker-name" title="Nombre con el que se creará el tracker en TikiWiki">
+                <input type="text" name="tracker_name" id="create-tracker-name" required aria-required="true" placeholder="Ej: Conversaciones del grupo de Telegram" value="<?php echo escapeHtml($_POST['tracker_name'] ?? ''); ?>" aria-describedby="hint-tracker-name" title="Nombre con el que se creará el tracker en TikiWiki">
                 <div class="hint" id="hint-tracker-name">Este nombre se usará como nombre del tracker en TikiWiki</div>
             </div>
             
@@ -1005,7 +1005,7 @@ foreach ($detections as $det) {
                 </div>
                 <div class="form-group">
                     <label for="create-connection-slug">Asignar a conexión (opcional)</label>
-                    <select name="connection_slug" id="create-connection-slug" title="Seleccioná una conexión para ver sus datos abajo">
+                    <select name="connection_slug" id="create-connection-slug" onchange="fillConnectionSlug(this, 'create-')" title="Seleccioná una conexión para ver sus datos abajo">
                         <option value="">— Solo crear tracker —</option>
                         <?php foreach ($connectionsSafe as $slug => $conn): ?>
                         <option value="<?php echo escapeHtml($slug); ?>"
@@ -1026,7 +1026,7 @@ foreach ($detections as $det) {
                 <div class="form-group">
                     <label for="create-tiki-token">Tiki API Token <span id="create-token-required" style="color:var(--error);">*</span></label>
                     <div class="input-wrapper">
-                        <input type="password" name="tiki_api_token" id="create-tiki-token" required aria-required="true" placeholder="Token de TikiWiki" value="<?php echo escapeHtml($_POST['tiki_api_token'] ?? ''); ?>" title="Token de autenticación de la API de TikiWiki">
+                        <input type="password" name="tiki_api_token" id="create-tiki-token" required aria-required="true" autocomplete="new-password" placeholder="Token de TikiWiki" value="<?php echo escapeHtml($_POST['tiki_api_token'] ?? ''); ?>" title="Token de autenticación de la API de TikiWiki">
                         <button type="button" class="icon-btn" onclick="togglePassword(this)" title="Mostrar u ocultar el token" aria-label="Mostrar contraseña">Mostrar</button>
                     </div>
                 </div>
