@@ -62,6 +62,28 @@
 #### 🟢 Fix #5: Handlers sin escapeHtml() (double escape)
 - Los handlers en `admin_handlers.php` ya no aplican `escapeHtml()` sobre `$successMessage`/`$errorMessage`. La vista (admin.php) es la única responsable de escapar al renderizar.
 
+## v0.6.1
+
+### ✨ Nuevo campo MediaGroupId para álbumes de fotos/videos
+
+- **NormalizedMessage.php**: Nueva propiedad `$mediaGroupId` para transporte unificado del identificador de grupo de medios.
+- **MessageMapper::fromWebhook()**: Extrae `media_group_id` del update de Telegram (se ejecuta antes de todos los early returns, cubriendo 100% de tipos de mensaje).
+- **MessageMapper::fromExport()**: Extrae `grouped_id` del export ZIP de Telegram (Telegram Desktop usa `grouped_id` como equivalente a `media_group_id`).
+- **MessageMapper::toWikiFields()**: Mapea a `fields[{prefix}MediaGroupId]`.
+- **TikiWikiClient::getTrackerFieldDefinitions()**: Nuevo campo `{prefix}MediaGroupId` tipo `t` (text). Se crea automáticamente vía botón Sync o al crear tracker nuevo.
+- **Docs actualizados**: README.md (tabla de campos → 28 campos), TECHNICAL.md (schema + INI), AGENTS.md (tabla de campos).
+
+### 🔄 FileUrl eliminado, FileUniqueId agregado, Fill Empty Fields en import
+
+- **NormalizedMessage.php**: Propiedad `$fileUrl` eliminada. Nueva propiedad `$fileUniqueId` (identificador universal del archivo en Telegram, no expira entre bots).
+- **MessageMapper::fromWebhook()**: Extrae `file_unique_id` en los 8 tipos de media (photo, video, audio, document, sticker, voice, video_note, animation).
+- **MessageMapper::toWikiFields()**: Eliminado mapeo a `{prefix}FileUrl`. Nuevo mapeo a `{prefix}FileUniqueId`.
+- **WebhookHandler::attemptDownloadAndUpload()**: Eliminada asignación `$msg->fileUrl = $fileUrl` (la URL de descarga de Telegram ya no se persiste porque expira en 1h y expone el bot token).
+- **TikiWikiClient::getTrackerFieldDefinitions()**: Campo `{prefix}FileUrl` eliminado. Nuevo campo `{prefix}FileUniqueId` tipo `t` (text).
+- **MessageMapper**: Nuevo método `getFillEmptyFields(NormalizedMessage, array $existingItem)` que compara campos del import vs existentes y rellena solo si el valor actual está vacío (`''`/`null`/`'0'`). Nunca sobreescribe identity fields (MessageId, ChatId, TopicId, UserId, EditedDate).
+- **import.php**: Fill empty fields implementado en `handleProcess()` y `handleFull()`. Cuando un item existe y no requiere update por edit/poll, se verifica si hay campos vacíos para rellenar. Incrementa `$updated` y loggea qué campos se llenaron.
+- **Docs actualizados**: README.md, TECHNICAL.md, AGENTS.md, opt/visualizacion-tiki.md, opt/visualizacion-lcc2026.md.
+
 ## v0.5.13
 
 ### 🔒 Fix: DNS Rebinding en SSRF (hallazgo #2 code review)

@@ -1425,7 +1425,7 @@ class TikiWikiClient
             ['name' => $prefix . 'MessageDate', 'type' => 'f', 'permName' => $prefix . 'MessageDate', 'description' => 'Fecha/hora del mensaje (timestamp UNIX)'],
             ['name' => $prefix . 'Media', 'type' => 'FG', 'permName' => $prefix . 'Media', 'description' => 'Archivo multimedia adjunto (referencia a File Gallery de TikiWiki)'],
             ['name' => $prefix . 'MediaUrl', 'type' => 't', 'permName' => $prefix . 'MediaUrl', 'description' => 'URL pública del archivo multimedia en TikiWiki'],
-            ['name' => $prefix . 'FileUrl', 'type' => 't', 'permName' => $prefix . 'FileUrl', 'description' => 'URL original del archivo en los servidores de Telegram'],
+            ['name' => $prefix . 'FileUniqueId', 'type' => 't', 'permName' => $prefix . 'FileUniqueId', 'description' => 'Identificador universal del archivo en Telegram (file_unique_id, no expira entre bots)'],
             ['name' => $prefix . 'MediaWidth', 'type' => 'n', 'permName' => $prefix . 'MediaWidth', 'description' => 'Ancho de la imagen/video en píxeles'],
             ['name' => $prefix . 'MediaHeight', 'type' => 'n', 'permName' => $prefix . 'MediaHeight', 'description' => 'Alto de la imagen/video en píxeles'],
             ['name' => $prefix . 'MediaDuration', 'type' => 'DUR', 'permName' => $prefix . 'MediaDuration', 'description' => 'Duración del audio/video/voice en segundos (se muestra como hh:mm:ss)'],

@@ -81,6 +81,7 @@ class MessageMapper
             $photo = end($message['photo']);
             $msg->messageType = 'photo';
             $msg->fileId = $photo['file_id'];
+            $msg->fileUniqueId = $photo['file_unique_id'] ?? '';
             $msg->mimeType = 'image/jpeg';
             $msg->fileName = 'telegram_photo_' . $photo['file_id'] . '.jpg';
             $msg->mediaType = 'image/jpeg';
@@ -99,6 +100,7 @@ class MessageMapper
             $video = $message['video'];
             $msg->messageType = 'video';
             $msg->fileId = $video['file_id'];
+            $msg->fileUniqueId = $video['file_unique_id'] ?? '';
             $mime = $video['mime_type'] ?? 'video/mp4';
             $msg->mimeType = $mime;
             $msg->mediaType = $mime;
@@ -120,6 +122,7 @@ class MessageMapper
             $audio = $message['audio'];
             $msg->messageType = 'audio';
             $msg->fileId = $audio['file_id'];
+            $msg->fileUniqueId = $audio['file_unique_id'] ?? '';
             $mime = $audio['mime_type'] ?? 'audio/mpeg';
             $msg->mimeType = $mime;
             $msg->mediaType = $mime;
@@ -137,6 +140,7 @@ class MessageMapper
             $doc = $message['document'];
             $msg->messageType = 'document';
             $msg->fileId = $doc['file_id'];
+            $msg->fileUniqueId = $doc['file_unique_id'] ?? '';
             $mime = $doc['mime_type'] ?? 'application/octet-stream';
             $msg->mimeType = $mime;
             $msg->mediaType = $mime;
@@ -159,6 +163,7 @@ class MessageMapper
             $sticker = $message['sticker'];
             $msg->messageType = 'sticker';
             $msg->fileId = $sticker['file_id'];
+            $msg->fileUniqueId = $sticker['file_unique_id'] ?? '';
             $msg->mimeType = 'image/webp';
             $msg->mediaType = 'image/webp';
             $msg->fileName = 'telegram_sticker_' . $sticker['file_id'] . '.webp';
@@ -172,6 +177,7 @@ class MessageMapper
             $voice = $message['voice'];
             $msg->messageType = 'voice';
             $msg->fileId = $voice['file_id'];
+            $msg->fileUniqueId = $voice['file_unique_id'] ?? '';
             $mime = $voice['mime_type'] ?? 'audio/ogg';
             $msg->mimeType = $mime;
             $msg->mediaType = $mime;
@@ -190,6 +196,7 @@ class MessageMapper
             $vn = $message['video_note'];
             $msg->messageType = 'video_note';
             $msg->fileId = $vn['file_id'];
+            $msg->fileUniqueId = $vn['file_unique_id'] ?? '';
             $mime = $vn['mime_type'] ?? 'video/mp4';
             $msg->mimeType = $mime;
             $msg->mediaType = $mime;
@@ -277,6 +284,7 @@ class MessageMapper
             $msg->mimeType = $mime;
             $msg->mediaType = $mime;
             $msg->fileId = $anim['file_id'] ?? '';
+            $msg->fileUniqueId = $anim['file_unique_id'] ?? '';
             $msg->mediaSize = (string) ($anim['file_size'] ?? '');
             $msg->width = (string) ($anim['width'] ?? '');
             $msg->height = (string) ($anim['height'] ?? '');
@@ -642,11 +650,12 @@ class MessageMapper
             "fields[{$p}MediaDuration]" => $msg->duration,
             "fields[{$p}MediaCaption]" => $msg->mediaCaption,
             "fields[{$p}MessageDate]" => $msg->date,
-            "fields[{$p}EditedDate]" => $msg->editedDate,
             "fields[{$p}MediaGroupId]" => $msg->mediaGroupId,
+            "fields[{$p}EditedDate]" => $msg->editedDate,
             "fields[{$p}ReplyToId]" => $msg->replyToId,
             "fields[{$p}Reactions]" => $msg->reactions,
             "fields[{$p}Hashtags]" => $msg->hashtags,
+            "fields[{$p}FileUniqueId]" => $msg->fileUniqueId,
         ];
 
         if (!empty($msg->uploadedFileIds)) {
@@ -655,10 +664,6 @@ class MessageMapper
 
         if ($msg->mediaUrl !== '') {
             $fields["fields[{$p}MediaUrl]"] = $msg->mediaUrl;
-        }
-
-        if ($msg->fileUrl !== '') {
-            $fields["fields[{$p}FileUrl]"] = $msg->fileUrl;
         }
 
         return $fields;
@@ -682,6 +687,62 @@ class MessageMapper
             $fields["fields[{$p}Reactions]"] = $msg->reactions;
         }
         return $fields;
+    }
+
+    /**
+     * Generar campos a rellenar cuando un item existe pero tiene campos vacíos.
+     * Se usa en import para llenar campos que el webhook no pudo capturar
+     * (ej: Media, MediaUrl cuando el download falló, FileUniqueId).
+     *
+     * NUNCA sobreescribe identity fields (MessageId, ChatId, TopicId, UserId, EditedDate).
+     * Solo rellena si el valor existente está vacío (''/null/'0') y el nuevo valor no.
+     *
+     * @return array Array con formato fields[permName]=valor (solo campos a rellenar)
+     */
+    public function getFillEmptyFields(NormalizedMessage $msg, array $existingItem): array
+    {
+        $p = $this->fieldPrefix;
+
+        // Lista de suffijos de campo que se pueden rellenar (NUNCA identity/lookup)
+        $fillable = [
+            'ChatTitle', 'TopicTitle', 'Username', 'FirstName', 'LastName', 'DisplayName',
+            'MessageType', 'Text', 'Location',
+            'MediaType', 'MediaSize', 'MediaWidth', 'MediaHeight', 'MediaDuration', 'MediaCaption',
+            'MessageDate', 'Media', 'MediaUrl', 'FileUniqueId',
+            'MediaGroupId', 'ReplyToId', 'Reactions', 'Hashtags',
+        ];
+
+        $newFields = $this->toWikiFields($msg);
+        $updateFields = [];
+
+        foreach ($fillable as $suffix) {
+            $permName = $p . $suffix;
+            $apiKey = "fields[{$permName}]";
+
+            // Valor actual en el tracker (soporta ambos formatos de la API)
+            $existingValue = $existingItem['field_' . $permName]
+                ?? $existingItem['fields'][$permName]
+                ?? '';
+
+            // Valor nuevo del import
+            $newValue = $newFields[$apiKey] ?? '';
+
+            // Solo rellenar si existente está vacío y nuevo tiene valor
+            if ($this->isEmptyFieldValue($existingValue) && $newValue !== '') {
+                $updateFields[$apiKey] = $newValue;
+            }
+        }
+
+        return $updateFields;
+    }
+
+    /**
+     * Determinar si un valor de campo se considera "vacío" para el fill.
+     * '' (string vacío), null, y '0' se consideran vacíos.
+     */
+    private function isEmptyFieldValue(mixed $value): bool
+    {
+        return $value === null || $value === '' || $value === '0';
     }
 
     /**

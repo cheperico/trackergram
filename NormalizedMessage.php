@@ -29,7 +29,8 @@ class NormalizedMessage
     /** @var string[] File IDs subidos a TikiWiki (array para soportar múltiples archivos por item) */
     public array $uploadedFileIds = [];
     public string $mediaUrl = '';
-    public string $fileUrl = '';
+    /** Identificador universal del archivo en Telegram (file_unique_id, no expira entre bots) */
+    public string $fileUniqueId = '';
     public string $width = '';
     public string $height = '';
     public string $duration = '';

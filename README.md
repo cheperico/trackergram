@@ -113,7 +113,7 @@ Accedé a `https://tu-dominio.com/trackergram/admin.php` con tus credenciales de
 
 ## Campos del Tracker
 
-El tracker usa **26 campos** con permNames que siguen el patrón `{prefix}TelegramMessageId`, `{prefix}ChatId`, etc. El prefijo por defecto es `telegrammessage` (auto-detectable por conexión).
+El tracker usa **28 campos** con permNames que siguen el patrón `{prefix}TelegramMessageId`, `{prefix}ChatId`, etc. El prefijo por defecto es `telegrammessage` (auto-detectable por conexión).
 
 | PermName (sufijo) | Tipo | Descripción |
 |---|---|---|
@@ -132,7 +132,7 @@ El tracker usa **26 campos** con permNames que siguen el patrón `{prefix}Telegr
 | `MessageDate` | `f` (datetime) | Fecha/hora (timestamp UNIX) |
 | `Media` | `FG` (file gallery) | Archivo multimedia adjunto |
 | `MediaUrl` | `t` (text) | URL pública del archivo en TikiWiki |
-| `FileUrl` | `t` (text) | URL original en Telegram |
+| `FileUniqueId` | `t` (text) | Identificador universal del archivo en Telegram (file_unique_id) |
 | `MediaType` | `t` (text) | Tipo MIME |
 | `MediaSize` | `n` (number) | Tamaño en bytes |
 | `MediaCaption` | `t` (text) | Descripción del media |
@@ -140,6 +140,7 @@ El tracker usa **26 campos** con permNames que siguen el patrón `{prefix}Telegr
 | `MediaDuration` | `DUR` (duration) | Duración en segundos (hh:mm:ss) |
 | `Location` | `G` (geolocation) | Coordenadas GPS (lon, lat, zoom) |
 | `EditedDate` | `t` (text) | Timestamp de última edición |
+| `MediaGroupId` | `t` (text) | ID del grupo de medios (media_group_id) para álbumes |
 | `ReplyToId` | `t` (text) | ID del mensaje al que responde |
 | `Reactions` | `a` (textarea) | Reacciones formateadas (👍 3 · ❤️ 1) |
 | `Hashtags` | `F` (freetags) | Hashtags como etiquetas |
@@ -147,6 +148,27 @@ El tracker usa **26 campos** con permNames que siguen el patrón `{prefix}Telegr
 > **Alternativa más fácil**: Usá la pestaña "Crear Tracker" del panel de admin — genera todos los campos automáticamente.
 >
 > Si necesitás la configuración INI completa para importar campos manualmente en TikiWiki, consultá el [Apéndice en TECHNICAL.md](TECHNICAL.md#apéndice-schema-completo-del-tracker-para-trackergram).
+
+## Visualización del Chat
+
+Una vez que los mensajes están en el tracker, podés crear un **feed tipo chat** en cualquier página wiki de TikiWiki usando `{TRACKERLIST}` con un template Smarty personalizado (`tplwiki`). Esto te permite mostrar los mensajes como burbujas de chat, con colores por tipo, multimedia embebida, reacciones, enlaces a respuestas, etc.
+
+Ejemplo básico de página wiki:
+
+```
+{TRACKERLIST(
+    trackerId="X",
+    fields="15:24:25:26:31:33",
+    sort_mode="f_ID_desc",
+    max="50",
+    tplwiki="MiTemplate"
+) /}
+```
+
+El template Smarty (creado como otra página wiki) recibe cada item como variables `{$f_fieldId}` y puede usar HTML, CSS y plugins de TikiWiki para darle formato. Ver ejemplos funcionales y templates completos en:
+
+- `opt/visualizacion-tiki.md` — template original para tracker con prefix `telegrammessage`
+- `opt/visualizacion-lcc2026.md` — template adaptado para tracker con prefix `lcc2026t`, bordes redondeados
 
 ## Problemas Comunes
 
@@ -186,7 +208,8 @@ Si tu servidor tiene ModSecurity activado, puede bloquear las peticiones a TikiW
 | [roadmap.md](roadmap.md) | Qué falta por hacer, prioridades |
 | [CAMBIOS.md](CAMBIOS.md) | Historial de cambios por versión |
 | `design/*` | Documentos de diseño exploratorio (features en discusión) |
-| `opt/visualizacion-tiki.md` | Template Smarty para feed tipo chat en TikiWiki |
+| `opt/visualizacion-tiki.md` | Template Smarty para feed tipo chat (tracker original) |
+| `opt/visualizacion-lcc2026.md` | Template Smarty para feed tipo chat (tracker lcc2026, bordes redondeados) |
 
 ## Licencia
 

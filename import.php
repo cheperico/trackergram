@@ -680,7 +680,25 @@ function handleProcess(): void
                     $failed++;
                 }
             } else {
-                $skipped++;
+                // ── Fill empty fields: rellenar campos vacíos que el webhook no pudo capturar ──
+                if (!isset($existingItem)) {
+                    $existingItem = $activeTikiClient->getTrackerItem((int) $trackerId, $existingItemId);
+                }
+                if ($existingItem) {
+                    $fillFields = $messageMapper->getFillEmptyFields($normalized, $existingItem);
+                    if (!empty($fillFields)) {
+                        if ($activeTikiClient->updateTrackerItem((int) $trackerId, $existingItemId, $fillFields)) {
+                            $updated++;
+                            log_message("trackerGram import: message_id={$messageIdInt} campos rellenados: " . implode(', ', array_keys($fillFields)));
+                        } else {
+                            $failed++;
+                        }
+                    } else {
+                        $skipped++;
+                    }
+                } else {
+                    $skipped++;
+                }
             }
         } else {
             // No existe → crear normalmente
@@ -1114,7 +1132,25 @@ function handleFull(): void
                     $failed++;
                 }
             } else {
-                $skipped++;
+                // ── Fill empty fields: rellenar campos vacíos que el webhook no pudo capturar ──
+                if (!isset($existingItem)) {
+                    $existingItem = $activeTikiClient->getTrackerItem((int) $trackerId, $existingItemId);
+                }
+                if ($existingItem) {
+                    $fillFields = $messageMapper->getFillEmptyFields($normalized, $existingItem);
+                    if (!empty($fillFields)) {
+                        if ($activeTikiClient->updateTrackerItem((int) $trackerId, $existingItemId, $fillFields)) {
+                            $updated++;
+                            log_message("trackerGram import: message_id={$messageIdInt} campos rellenados: " . implode(', ', array_keys($fillFields)));
+                        } else {
+                            $failed++;
+                        }
+                    } else {
+                        $skipped++;
+                    }
+                } else {
+                    $skipped++;
+                }
             }
         } else {
             // No existe → crear normalmente

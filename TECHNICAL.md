@@ -670,7 +670,7 @@ Este apéndice describe **qué campos debe tener un tracker de TikiWiki** para s
 | 13 | `MessageDate` | `f` (datetime) | Fecha/hora (timestamp UNIX) | | | ✅ | ✅ |
 | 14 | `Media` | `FG` (file gallery) | Archivo multimedia adjunto | | | | ✅ |
 | 15 | `MediaUrl` | `t` (text) | URL pública del archivo en TikiWiki | | | | |
-| 16 | `FileUrl` | `t` (text) | URL original en Telegram | | | | |
+| 16 | `FileUniqueId` | `t` (text) | Identificador universal del archivo en Telegram (file_unique_id, no expira entre bots) | | | | |
 | 17 | `MediaType` | `t` (text) | Tipo MIME del archivo (ej: image/jpeg) | | | | |
 | 18 | `MediaSize` | `n` (number) | Tamaño del archivo en bytes | | | ✅ | |
 | 19 | `MediaCaption` | `t` (text) | Descripción asociada al media | | | | |
@@ -962,10 +962,10 @@ visibleInEditMode = y
 visibleInHistoryMode = y
 
 [FIELD16]
-name = file_url
-permName = telegrammessageFileUrl
+name = file_unique_id
+permName = telegrammessageFileUniqueId
 type = t
-description = URL original del archivo en los servidores de Telegram
+description = Identificador universal del archivo en Telegram (file_unique_id, no expira entre bots)
 isMain = n
 isSearchable = n
 isTblVisible = n

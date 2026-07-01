@@ -332,7 +332,7 @@ El tracker por defecto tiene estos campos (permNames):
 | `telegrammessageMessageDate` | f (datetime) | Fecha/hora del mensaje (timestamp UNIX) |
 | `telegrammessageMedia` | FG (file gallery) | Archivo multimedia adjunto (referencia a File Gallery) |
 | `telegrammessageMediaUrl` | t (text) | URL pública del archivo en TikiWiki |
-| `telegrammessageFileUrl` | t (text) | URL original del archivo en Telegram |
+| `telegrammessageFileUniqueId` | t (text) | Identificador universal del archivo en Telegram (file_unique_id, no expira entre bots) |
 | `telegrammessageMediaWidth` | n (number) | Ancho del media en píxeles |
 | `telegrammessageMediaHeight` | n (number) | Alto del media en píxeles |
 | `telegrammessageMediaDuration` | DUR (duration) | Duración en segundos (audio/video/voice), se muestra como hh:mm:ss |
