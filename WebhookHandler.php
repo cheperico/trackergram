@@ -433,9 +433,12 @@ class WebhookHandler
     /**
      * Procesar edición de mensaje (edited_message / edited_channel_post)
      *
-     * Si el item existe en TikiWiki, actualiza solo Text + EditedDate + Reactions
-     * (campos seguros según toWikiFieldsEdit). Si no existe, lo crea como nuevo
-     * (puede ser un edit de un mensaje anterior a la instalación de trackerGram).
+     * Actualiza solo Text + EditedDate + Reactions (campos seguros según toWikiFieldsEdit).
+     * Usa el mismo TOCTOU lock que processMessage() para evitar race conditions
+     * donde edited_message llega ANTES de que el message original termine de procesarse.
+     *
+     * Si el item no existe en el tracker, lo ignora (no crea duplicados). El message
+     * original llegará por separado como update tipo "message" y se creará normalmente.
      */
     public function processEditedMessage(array $message): void
     {
@@ -456,44 +459,67 @@ class WebhookHandler
             return;
         }
 
-        // Buscar el item existente en TikiWiki por (chat_id, message_id)
-        $existingItemId = $this->tikiWikiClient->findItemByMessageId(
-            $this->trackerId,
-            $messageId,
-            $chatId
-        );
-
-        if ($existingItemId === null) {
-            // No existe en tracker — tratarlo como mensaje nuevo
-            // (puede ser un edit de un mensaje anterior a trackerGram)
-            log_message("trackerGram: edited_message #{$messageId} no existe en tracker — creando como nuevo");
-            $this->processMessage($message);
-            return;
+        // ── Lock TOCTOU: mismo lock que processMessage() para evitar race ──
+        // Si el message original aún se está procesando, esperamos a que termine
+        // para decidir si el item existe o no.
+        $lockDir = defined('TEMP_DIR') ? TEMP_DIR . '/dedup_locks' : sys_get_temp_dir() . '/trackergram_dedup';
+        if (!is_dir($lockDir)) {
+            @mkdir($lockDir, 0700, true);
+        }
+        $lockKey = md5($chatId . ':' . $messageId);
+        $lockFile = $lockDir . '/' . $lockKey . '.lock';
+        $lockFp = @fopen($lockFile, 'c+');
+        if ($lockFp) {
+            flock($lockFp, LOCK_EX);
         }
 
-        // Existe — parsear solo los campos editables via fromWebhook
-        $msg = $this->messageMapper->fromWebhook($message);
+        try {
+            // Buscar el item existente (después del lock, processMessage() ya debió crear el item si existe)
+            $existingItemId = $this->tikiWikiClient->findItemByMessageId(
+                $this->trackerId,
+                $messageId,
+                $chatId
+            );
 
-        // Completar contexto (solo para log / album caption propagation)
-        $msg->messageId = (string) $messageId;
-        $msg->chatId = (string) $chatId;
-        $msg->chatTitle = $chatTitle;
-        $msg->userId = (string) ($message['from']['id'] ?? '');
-        $msg->username = $message['from']['username'] ?? '';
-        $msg->firstName = $message['from']['first_name'] ?? '';
-        $msg->lastName = $message['from']['last_name'] ?? '';
-        $msg->displayName = trim($msg->firstName . ' ' . $msg->lastName);
-        // editedDate ya lo extrajo fromWebhook() de $message['edit_date']
+            if ($existingItemId === null) {
+                // No existe → ignorar. El message original llegará como update "message"
+                // y se creará normalmente. Si es un edit de un mensaje anterior a trackerGram,
+                // se pierde (no tenemos los datos originales para crearlo).
+                log_message("trackerGram: edited_message #{$messageId} no existe en tracker — ignorado (el message original se procesará por separado)");
+                return;
+            }
 
-        // Propagar caption si es parte de álbum (pueden editarse captions)
-        $this->propagateMediaGroupCaption($msg, $message);
+            // Existe — parsear solo los campos editables via fromWebhook
+            $msg = $this->messageMapper->fromWebhook($message);
 
-        // Generar solo campos editables y actualizar
-        $editFields = $this->messageMapper->toWikiFieldsEdit($msg);
-        if ($this->tikiWikiClient->updateTrackerItem($this->trackerId, $existingItemId, $editFields)) {
-            log_message("trackerGram: Editado #{$messageId} → itemId={$existingItemId} en tracker {$this->trackerId}");
-        } else {
-            log_message("ERROR: No se pudo actualizar edit para #{$messageId} itemId={$existingItemId}", true);
+            // Completar contexto (solo para log / album caption propagation)
+            $msg->messageId = (string) $messageId;
+            $msg->chatId = (string) $chatId;
+            $msg->chatTitle = $chatTitle;
+            $msg->userId = (string) ($message['from']['id'] ?? '');
+            $msg->username = $message['from']['username'] ?? '';
+            $msg->firstName = $message['from']['first_name'] ?? '';
+            $msg->lastName = $message['from']['last_name'] ?? '';
+            $msg->displayName = trim($msg->firstName . ' ' . $msg->lastName);
+            // editedDate ya lo extrajo fromWebhook() de $message['edit_date']
+
+            // Propagar caption si es parte de álbum (pueden editarse captions)
+            $this->propagateMediaGroupCaption($msg, $message);
+
+            // Generar solo campos editables y actualizar
+            $editFields = $this->messageMapper->toWikiFieldsEdit($msg);
+            if ($this->tikiWikiClient->updateTrackerItem($this->trackerId, $existingItemId, $editFields)) {
+                log_message("trackerGram: Editado #{$messageId} → itemId={$existingItemId} en tracker {$this->trackerId}");
+            } else {
+                log_message("ERROR: No se pudo actualizar edit para #{$messageId} itemId={$existingItemId}", true);
+            }
+        } finally {
+            // Liberar lock siempre
+            if (isset($lockFp) && $lockFp) {
+                flock($lockFp, LOCK_UN);
+                fclose($lockFp);
+                @unlink($lockFile);
+            }
         }
     }
 
