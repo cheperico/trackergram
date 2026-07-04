@@ -177,7 +177,8 @@ function processBatch(string $bufferDir, int $maxEvents, ConfigManager $configMa
                 telegramClient: $tgClient,
                 messageMapper: $messageMapper,
                 trackerId: (int) $connection['tracker_id'],
-                connectionName: $connectionSlug
+                connectionName: $connectionSlug,
+                collectSessionManager: new CollectSessionManager()
             );
 
             $handler->processUpdate($update);

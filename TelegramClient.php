@@ -390,8 +390,9 @@ class TelegramClient
 
     /**
      * Enviar un mensaje de texto a un chat de Telegram
+     * @return array|bool Devuelve true si ok, o el resultado decodificado si se necesita (message_id, etc.)
      */
-    public function sendMessage(int|string $chatId, string $text, array $extra = []): bool
+    public function sendMessage(int|string $chatId, string $text, array $extra = []): array|bool
     {
         $url = $this->baseUrl . '/bot' . $this->botToken . '/sendMessage';
 
@@ -415,6 +416,114 @@ class TelegramClient
 
         if ($httpCode !== 200) {
             log_message("trackerGram: sendMessage falló (HTTP {$httpCode})", true);
+            return false;
+        }
+
+        $data = json_decode($response, true);
+        if (isset($data['ok']) && $data['ok'] === true) {
+            return $data['result'] ?? true;
+        }
+        return false;
+    }
+
+    /**
+     * Editar el texto de un mensaje existente enviado por el bot
+     */
+    public function editMessageText(int|string $chatId, int $messageId, string $text, array $extra = []): bool
+    {
+        $url = $this->baseUrl . '/bot' . $this->botToken . '/editMessageText';
+
+        $params = array_merge([
+            'chat_id' => $chatId,
+            'message_id' => $messageId,
+            'text' => $text,
+            'parse_mode' => 'HTML',
+            'disable_web_page_preview' => true,
+        ], $extra);
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200) {
+            log_message("trackerGram: editMessageText falló (HTTP {$httpCode})", true);
+            return false;
+        }
+
+        $data = json_decode($response, true);
+        return isset($data['ok']) && $data['ok'] === true;
+    }
+
+    /**
+     * Editar solo los botones inline de un mensaje existente
+     */
+    public function editMessageReplyMarkup(int|string $chatId, int $messageId, array $inlineKeyboard): bool
+    {
+        $url = $this->baseUrl . '/bot' . $this->botToken . '/editMessageReplyMarkup';
+
+        $params = [
+            'chat_id' => $chatId,
+            'message_id' => $messageId,
+            'reply_markup' => json_encode(['inline_keyboard' => $inlineKeyboard]),
+        ];
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200) {
+            log_message("trackerGram: editMessageReplyMarkup falló (HTTP {$httpCode})", true);
+            return false;
+        }
+
+        $data = json_decode($response, true);
+        return isset($data['ok']) && $data['ok'] === true;
+    }
+
+    /**
+     * Responder a un callback_query (saca el relojito del botón)
+     */
+    public function answerCallbackQuery(string $callbackQueryId, string $text = '', bool $showAlert = false): bool
+    {
+        $url = $this->baseUrl . '/bot' . $this->botToken . '/answerCallbackQuery';
+
+        $params = [
+            'callback_query_id' => $callbackQueryId,
+        ];
+        if ($text !== '') {
+            $params['text'] = $text;
+        }
+        if ($showAlert) {
+            $params['show_alert'] = 'true';
+        }
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200) {
+            log_message("trackerGram: answerCallbackQuery falló (HTTP {$httpCode})", true);
             return false;
         }
 

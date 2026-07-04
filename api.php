@@ -74,13 +74,19 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
     }
 
     // 4. Extraer chat_id del update
+    // IMPORTANTE: incluir TODOS los tipos de update que contienen chat.id
+    // Si falta alguno, ese tipo de update se descarta silenciosamente.
     $chatId = 0;
     if (isset($update['message']['chat']['id'])) {
         $chatId = $update['message']['chat']['id'];
     } elseif (isset($update['edited_message']['chat']['id'])) {
         $chatId = $update['edited_message']['chat']['id'];
+    } elseif (isset($update['channel_post']['chat']['id'])) {
+        $chatId = $update['channel_post']['chat']['id'];
     } elseif (isset($update['edited_channel_post']['chat']['id'])) {
         $chatId = $update['edited_channel_post']['chat']['id'];
+    } elseif (isset($update['callback_query']['message']['chat']['id'])) {
+        $chatId = $update['callback_query']['message']['chat']['id'];
     } elseif (isset($update['message_reaction']['chat']['id'])) {
         $chatId = $update['message_reaction']['chat']['id'];
     } elseif (isset($update['message_reaction_count']['chat']['id'])) {
@@ -328,13 +334,15 @@ function processUpdate(array $update, array $connection, string $connectionSlug,
     $scriptDir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? '/'), '/');
     $adminUrl = $protocol . '://' . $host . $scriptDir . '/admin.php';
 
+    $collectManager = new CollectSessionManager();
     $handler = new WebhookHandler(
         tikiWikiClient: $tikiClient,
         telegramClient: $tgClient,
         messageMapper: $messageMapper,
         trackerId: $trackerId,
         adminUrl: $adminUrl,
-        connectionName: $connectionSlug
+        connectionName: $connectionSlug,
+        collectSessionManager: $collectManager
     );
     $handler->processUpdate($update);
 }

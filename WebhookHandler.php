@@ -16,6 +16,7 @@ class WebhookHandler
     private int $maxDownloadSize;
     private string $adminUrl = '';
     private string $connectionName = '';
+    private ?CollectSessionManager $collectSessionManager = null;
 
     public function __construct(
         TikiWikiClient $tikiWikiClient,
@@ -26,7 +27,8 @@ class WebhookHandler
         int $retryDelayMicroseconds = 100000,
         int $maxDownloadSize = 20971520,
         string $adminUrl = '',
-        string $connectionName = ''
+        string $connectionName = '',
+        ?CollectSessionManager $collectSessionManager = null
     ) {
         $this->tikiWikiClient = $tikiWikiClient;
         $this->telegramClient = $telegramClient;
@@ -37,6 +39,7 @@ class WebhookHandler
         $this->maxDownloadSize = $maxDownloadSize;
         $this->adminUrl = $adminUrl;
         $this->connectionName = $connectionName;
+        $this->collectSessionManager = $collectSessionManager;
     }
 
     /**
@@ -276,8 +279,24 @@ class WebhookHandler
             }
         }
         if ($commandText !== '') {
+            if ($commandText === '/gather') {
+                // /gather necesita contexto completo del mensaje
+                $this->handleGather($chatId, $message);
+                return;
+            }
             $this->handleCommand($commandText, $chatId);
             return;
+        }
+
+        // ── Sesión activa de /gather? ──
+        $userId = $message['from']['id'] ?? 0;
+        $sessionKey = $chatId . '_' . $userId;
+        if ($this->collectSessionManager !== null) {
+            $session = $this->collectSessionManager->get($sessionKey);
+            if ($session !== null && ($session['awaiting'] ?? null) !== null) {
+                $this->handleCollectResponse($session, $sessionKey, $message);
+                return;
+            }
         }
 
         $topicId = $message['message_thread_id'] ?? 0;
@@ -772,7 +791,9 @@ class WebhookHandler
             return;
         }
 
-        if (isset($update['message'])) {
+        if (isset($update['callback_query'])) {
+            $this->processCallbackQuery($update['callback_query']);
+        } elseif (isset($update['message'])) {
             $this->processMessage($update['message']);
         } elseif (isset($update['edited_message'])) {
             $this->processEditedMessage($update['edited_message']);
@@ -783,6 +804,333 @@ class WebhookHandler
         } elseif (isset($update['message_reaction_count'])) {
             $this->processMessageReactionCount($update['message_reaction_count']);
         }
+    }
+
+    // ──────────────────────────────────────────────
+    // /gather — formulario de recolección simple
+    // ──────────────────────────────────────────────
+
+    /**
+     * Obtener la clave de sesión para un chat+usuario
+     */
+    private function getSessionKey(int $chatId, int $userId): string
+    {
+        return $chatId . '_' . $userId;
+    }
+
+    /**
+     * Construir el texto del formulario según el estado de la sesión
+     */
+    private function buildFormText(array $session): string
+    {
+        $lines = [];
+        $lines[] = '📋 <b>NUEVO REGISTRO</b>';
+        $lines[] = '─────────────────';
+
+        foreach ($session['fields'] as $key => $field) {
+            $icon = match ($key) {
+                'foto' => '📷',
+                default => '✏️',
+            };
+            $value = $field['value'] ?? null;
+            if ($value !== null && $value !== '') {
+                $display = is_string($value)
+                    ? htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+                    : '✅ adjunta';
+            } else {
+                $display = '<i>(pendiente)</i>';
+            }
+            $lines[] = "{$icon} <b>{$field['label']}:</b> {$display}";
+        }
+
+        $lines[] = '─────────────────';
+        $lines[] = 'Tocá un campo para cargarlo.';
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Construir el teclado inline según el estado de la sesión
+     */
+    private function buildFormKeyboard(array $session): array
+    {
+        $keyboard = [];
+        $allFilled = true;
+
+        foreach ($session['fields'] as $key => $field) {
+            $value = $field['value'] ?? null;
+            $filled = ($value !== null && $value !== '');
+            if (!$filled) {
+                $allFilled = false;
+            }
+
+            $icon = match ($key) {
+                'foto' => '📷',
+                default => '✏️',
+            };
+            $status = $filled ? ' ✅' : '';
+            $keyboard[] = [
+                ['text' => "{$icon} {$field['label']}{$status}", 'callback_data' => "field_{$key}"],
+            ];
+        }
+
+        $keyboard[] = [
+            ['text' => $allFilled ? '✅ Guardar' : '❌ Salir', 'callback_data' => $allFilled ? 'guardar' : 'salir'],
+        ];
+
+        return $keyboard;
+    }
+
+    /**
+     * Manejar /gather — inicia sesión y envía formulario
+     */
+    private function handleGather(int $chatId, array $message): void
+    {
+        if ($this->collectSessionManager === null) {
+            $this->telegramClient->sendMessage($chatId, '❌ El formulario /gather no está disponible (falta CollectSessionManager).');
+            return;
+        }
+
+        $from = $message['from'] ?? [];
+        $userId = $from['id'] ?? 0;
+        $key = $this->getSessionKey($chatId, $userId);
+
+        // Verificar si ya hay una sesión activa
+        $existing = $this->collectSessionManager->get($key);
+        if ($existing !== null) {
+            $this->telegramClient->sendMessage($chatId, '⚠️ Ya tenés un formulario abierto. Terminalo con Guardar o Salir.');
+            return;
+        }
+
+        // Crear sesión con contexto para poder guardar en TikiWiki después
+        $firstName = $from['first_name'] ?? '';
+        $lastName = $from['last_name'] ?? '';
+        $session = [
+            'chatId' => $chatId,
+            'userId' => $userId,
+            'username' => $from['username'] ?? '',
+            'firstName' => $firstName,
+            'lastName' => $lastName,
+            'displayName' => trim($firstName . ' ' . $lastName),
+            'chatTitle' => $message['chat']['title'] ?? $message['chat']['username'] ?? 'Chat ' . $chatId,
+            'formMessageId' => 0,
+            'awaiting' => null,
+            'fields' => [
+                'nombre' => ['label' => 'Nombre', 'value' => null, 'type' => 'text'],
+                'apellido' => ['label' => 'Apellido', 'value' => null, 'type' => 'text'],
+                'foto' => ['label' => 'Foto', 'value' => null, 'type' => 'photo'],
+            ],
+        ];
+
+        $text = $this->buildFormText($session);
+        $keyboard = $this->buildFormKeyboard($session);
+
+        $result = $this->telegramClient->sendMessage($chatId, $text, [
+            'reply_markup' => json_encode(['inline_keyboard' => $keyboard]),
+        ]);
+
+        if ($result === false) {
+            log_message("trackerGram: /gather — no se pudo enviar el formulario", true);
+            return;
+        }
+
+        $messageId = is_array($result) ? ($result['message_id'] ?? 0) : 0;
+        $session['formMessageId'] = $messageId;
+        $this->collectSessionManager->set($key, $session);
+        log_message("trackerGram: /gather iniciado por user={$userId} en chat={$chatId}");
+    }
+
+    /**
+     * Manejar callback_query — toques en los botones del formulario
+     */
+    private function processCallbackQuery(array $callbackQuery): void
+    {
+        $callbackId = $callbackQuery['id'] ?? '';
+        $data = $callbackQuery['data'] ?? '';
+        $from = $callbackQuery['from'] ?? [];
+        $userId = $from['id'] ?? 0;
+        $message = $callbackQuery['message'] ?? [];
+        $chatId = $message['chat']['id'] ?? 0;
+
+        if ($this->collectSessionManager === null) {
+            $this->telegramClient->answerCallbackQuery($callbackId);
+            return;
+        }
+
+        $key = $this->getSessionKey($chatId, $userId);
+        $session = $this->collectSessionManager->get($key);
+        if ($session === null) {
+            $this->telegramClient->answerCallbackQuery($callbackId, '❌ Sesión no encontrada. Usá /gather para empezar.', true);
+            log_message("trackerGram: callback_query sin sesión: user={$userId} chat={$chatId}");
+            return;
+        }
+
+        // Procesar según callback_data
+        if ($data === 'salir') {
+            $this->telegramClient->answerCallbackQuery($callbackId, '❌ Registro cancelado.');
+            $this->telegramClient->editMessageText($chatId, $session['formMessageId'], '❌ Registro cancelado.', [
+                'reply_markup' => json_encode(['inline_keyboard' => []]),
+            ]);
+            $this->collectSessionManager->delete($key);
+            log_message("trackerGram: /gather cancelado por user={$userId} en chat={$chatId}");
+            return;
+        }
+
+        if ($data === 'guardar') {
+            $this->telegramClient->answerCallbackQuery($callbackId, '✅ Guardando...', false);
+
+            // 1. Construir texto del formulario
+            $textParts = [];
+            $textParts[] = '📋 Registro de ' . ($session['displayName'] ?? 'Usuario ' . $session['userId']);
+            $textParts[] = '─────────────────';
+            foreach ($session['fields'] as $keyf => $field) {
+                $plain = $field['value'] ?? '(vacío)';
+                if ($keyf === 'foto' && $plain !== null && $plain !== '' && $plain !== '(vacío)') {
+                    $textParts[] = $field['label'] . ': ✅';
+                } else {
+                    $textParts[] = $field['label'] . ': ' . $plain;
+                }
+            }
+            $formText = implode("\n", $textParts);
+
+            // 2. Crear NormalizedMessage como si viniera de un webhook
+            $msg = new NormalizedMessage();
+            $msg->messageId = 'gather_' . $key . '_' . time();
+            $msg->chatId = (string) $session['chatId'];
+            $msg->chatTitle = $session['chatTitle'] ?? 'Chat ' . $session['chatId'];
+            $msg->topicId = '0';
+            $msg->topicTitle = 'General';
+            $msg->userId = (string) $session['userId'];
+            $msg->username = $session['username'] ?? '';
+            $msg->firstName = $session['firstName'] ?? '';
+            $msg->lastName = $session['lastName'] ?? '';
+            $msg->displayName = $session['displayName'] ?? '';
+            $msg->messageType = 'text';
+            $msg->text = $formText;
+            $msg->date = (string) time();
+
+            // 3. Si hay foto, descargar de Telegram y subir a TikiWiki
+            $photoFileId = $session['fields']['foto']['value'] ?? null;
+            if ($photoFileId !== null && $photoFileId !== '') {
+                $msg->fileId = $photoFileId;
+                $msg->fileName = 'gather_photo_' . $photoFileId . '.jpg';
+                $msg->mimeType = 'image/jpeg';
+                $msg->mediaType = 'image/jpeg';
+                $msg->messageType = 'photo';
+
+                $uploadedFileId = $this->downloadAndUploadMedia($msg);
+                if ($uploadedFileId) {
+                    $msg->uploadedFileIds = [$uploadedFileId];
+                    $msg->mediaUrl = $this->tikiWikiClient->getBaseUrl() . '/tiki-download_file.php?fileId=' . $uploadedFileId;
+                } else {
+                    log_message("trackerGram: /gather — no se pudo subir foto para user={$userId}", true);
+                    $msg->messageType = 'text';
+                    $msg->text .= "\n\n[⚠️ Foto no pudo subirse]";
+                }
+            }
+
+            // 4. Enviar a TikiWiki
+            $success = $this->sendToTikiWikiWithRetries($msg);
+
+            // 5. Mostrar resultado al usuario
+            $resultLines = $success
+                ? ['✅ <b>Guardado en el tracker</b>', '─────────────────']
+                : ['❌ <b>Error al guardar</b>', '─────────────────'];
+
+            foreach ($session['fields'] as $keyf => $field) {
+                $plain = $field['value'] ?? '(vacío)';
+                $safe = htmlspecialchars((string) $plain, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                $resultLines[] = htmlspecialchars($field['label'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . ': ' . $safe;
+            }
+            $resultLines[] = '─────────────────';
+            if ($success) {
+                $resultLines[] = 'Usá /gather para crear otro.';
+            } else {
+                $resultLines[] = '❌ Ocurrió un error al guardar. Revisá los logs.';
+            }
+
+            $this->telegramClient->editMessageText($chatId, $session['formMessageId'], implode("\n", $resultLines), [
+                'reply_markup' => json_encode(['inline_keyboard' => []]),
+            ]);
+            $this->collectSessionManager->delete($key);
+            log_message("trackerGram: /gather " . ($success ? 'guardado' : 'ERROR') . " por user={$userId} en chat={$chatId} — " . json_encode($session['fields']));
+            return;
+        }
+
+        // field_X — click en un campo
+        if (str_starts_with($data, 'field_')) {
+            $fieldKey = substr($data, 6);
+            $field = $session['fields'][$fieldKey] ?? null;
+            if ($field === null) {
+                $this->telegramClient->answerCallbackQuery($callbackId, '❌ Campo desconocido.', true);
+                return;
+            }
+
+            // Dismiss loading indicator
+            $this->telegramClient->answerCallbackQuery($callbackId);
+
+            $session['awaiting'] = $fieldKey;
+            $this->collectSessionManager->set($key, $session);
+
+            // Pedir el valor
+            $prompt = match ($field['type']) {
+                'photo' => "📷 Enviá la <b>{$field['label']}</b>:",
+                default => "✏️ Ingresá el/la <b>{$field['label']}</b>:",
+            };
+            $this->telegramClient->sendMessage($chatId, $prompt, [
+                'reply_to_message_id' => $session['formMessageId'],
+            ]);
+            return;
+        }
+
+        // callback_data desconocido
+        $this->telegramClient->answerCallbackQuery($callbackId, '❌ Acción desconocida.', true);
+        log_message("trackerGram: callback_query con data desconocida: '{$data}' user={$userId}");
+    }
+
+    /**
+     * Manejar respuesta a un campo del formulario (texto o foto)
+     */
+    private function handleCollectResponse(array $session, string $sessionKey, array $message): void
+    {
+        $awaiting = $session['awaiting'];
+        $field = $session['fields'][$awaiting] ?? null;
+        if ($field === null) {
+            return;
+        }
+
+        $chatId = $session['chatId'];
+
+        // Obtener valor según tipo
+        if ($field['type'] === 'photo') {
+            $photos = $message['photo'] ?? [];
+            if (empty($photos)) {
+                // No es una foto, puede ser texto u otro
+                if (isset($message['text'])) {
+                    $this->telegramClient->sendMessage($chatId, '📷 Esperaba una foto. Enviá una foto o toca <b>Salir</b> en el formulario.');
+                }
+                return;
+            }
+            // Usar la foto de mayor resolución (última del array)
+            $bestQuality = end($photos);
+            $session['fields'][$awaiting]['value'] = $bestQuality['file_id'];
+        } else {
+            $text = $message['text'] ?? $message['caption'] ?? '';
+            if ($text === '') {
+                $this->telegramClient->sendMessage($chatId, "✏️ Esperaba texto para <b>{$field['label']}</b>. Escribí el valor o toca <b>Salir</b> en el formulario.");
+                return;
+            }
+            $session['fields'][$awaiting]['value'] = $text;
+        }
+
+        // Campo cargado, limpiar awaiting y actualizar formulario
+        $session['awaiting'] = null;
+        $this->collectSessionManager->set($sessionKey, $session);
+
+        $updatedText = $this->buildFormText($session);
+        $updatedKeyboard = $this->buildFormKeyboard($session);
+        $this->telegramClient->editMessageText($chatId, $session['formMessageId'], $updatedText, [
+            'reply_markup' => json_encode(['inline_keyboard' => $updatedKeyboard]),
+        ]);
     }
 
     /**

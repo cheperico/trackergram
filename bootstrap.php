@@ -8,6 +8,7 @@ require_once __DIR__ . '/NormalizedMessage.php';
 require_once __DIR__ . '/TikiWikiClient.php';
 require_once __DIR__ . '/TelegramClient.php';
 require_once __DIR__ . '/MessageMapper.php';
+require_once __DIR__ . '/CollectSessionManager.php';
 require_once __DIR__ . '/WebhookHandler.php';
 
 // NOTA: No hay DI wiring central. Cada entry point
