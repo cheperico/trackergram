@@ -44,13 +44,15 @@ class ConfigManager
 
         $decoded = json_decode($content, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            log_message("ConfigManager: JSON inválido en {$this->configPath}: " . json_last_error_msg(), true);
-            return false;
+            $msg = "ConfigManager: JSON inválido en {$this->configPath}: " . json_last_error_msg();
+            log_message($msg, true);
+            throw new ConfigException($msg);
         }
 
         if (!is_array($decoded)) {
-            log_message("ConfigManager: Estructura inválida en {$this->configPath}", true);
-            return false;
+            $msg = "ConfigManager: Estructura inválida en {$this->configPath}";
+            log_message($msg, true);
+            throw new ConfigException($msg);
         }
 
         $this->data = $decoded + ['version' => 2, 'connections' => []];

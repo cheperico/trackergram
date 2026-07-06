@@ -25,9 +25,13 @@ function handleError($errno, $errstr, $errfile, $errline) {
 set_error_handler('handleError');
 
 function handleException($exc) {
-    log_message("import.php: EXCEPTION " . $exc->getMessage() . " in " . $exc->getFile() . ":" . $exc->getLine(), true);
-    http_response_code(500);
-    echo json_encode(['error' => 'Error interno del servidor']);
+    $cls = $exc instanceof TrackerGramException
+        ? (new \ReflectionClass($exc))->getShortName()
+        : get_class($exc);
+    $logMsg = "import.php: [{$cls}] " . $exc->getMessage() . " in " . $exc->getFile() . ":" . $exc->getLine();
+    log_message($logMsg, true);
+    http_response_code($exc instanceof ImportException ? 400 : 500);
+    echo json_encode(['error' => $exc->getMessage()]);
     exit;
 }
 set_exception_handler('handleException');

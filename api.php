@@ -286,8 +286,12 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
                 processUpdate($update, $connection, $connectionSlug, $messageMapper, $configManager);
             }
             $fanOutResults[$connectionSlug] = 'ok';
+        } catch (TrackerGramException $e) {
+            $cls = (new \ReflectionClass($e))->getShortName();
+            log_message("trackerGram: Error [{$cls}] en conexión '{$connectionSlug}': " . $e->getMessage(), true);
+            $fanOutResults[$connectionSlug] = 'error: ' . $e->getMessage();
         } catch (Throwable $e) {
-            log_message("trackerGram: Error en fan-out para conexión '{$connectionSlug}': " . $e->getMessage(), true);
+            log_message("trackerGram: Error inesperado en conexión '{$connectionSlug}': " . $e->getMessage(), true);
             $fanOutResults[$connectionSlug] = 'error: ' . $e->getMessage();
         }
     }

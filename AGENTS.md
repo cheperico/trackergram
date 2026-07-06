@@ -41,7 +41,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 | | |
 |---|---|
-| **Versión** | v0.6.0 |
+| **Versión** | v0.6.2 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
 | **Repositorio** | https://github.com/cheperico/trackergram |
@@ -229,6 +229,7 @@ La mayoría de los archivos están en la raíz. Subdirectorios:
 | `MessageMapper.php` | Transforma mensajes → NormalizedMessage → campos TikiWiki |
 | `WebhookHandler.php` | Orquesta: valida, resuelve topics, descarga media, envía a TikiWiki |
 | `ConfigManager.php` | CRUD de conexiones multi-bot/wiki/tracker en `setup.json` |
+| `exceptions.php` | Excepciones de dominio: `TrackerGramException`, `TelegramApiException`, `TikiWikiApiException`, `ImportException`, `ConfigException`, `SecurityException` |
 
 #### Frontend Admin
 
@@ -581,7 +582,7 @@ Ver [CAMBIOS.md](CAMBIOS.md) para el detalle completo por versión.
 |---|---|---|
 | **v0.5.12** | **Fixes de code review externo**: edited_message ruteado por webhook (bug funcional), configure_webhook usa POST (token fuera de URLs), safeRender() elimina innerHTML residual (XSS fix), htmlspecialchars eliminado de fromWebhook() (caption data fix), tmp/test_create.php eliminado (token hardcodeado). Docs sincronizados. |
 | **v0.6.0** | **Desarme admin.php Fase B + fixes post-revision**: Handlers extraídos a `admin_handlers.php` (508 líneas). admin.php: 2529→1114 líneas (-56%). `include` handlers movido ANTES de loops pesados (AJAX responde en ms). `$connectionsSafe` construido al final del procesamiento (datos frescos). `validateCSRFToken()` responde JSON+403 para AJAX. Eliminado `escapeHtml()` en handlers (doble escape). Vista itera `$connectionsSafe` (tokens sanitizados). Eliminado `$webhookStatuses = [];` redundante. |
-| **v0.6.2** | **Backoff exponencial GET + file_path naming + @ operator removal + Reply-To cache + chat_id unificado imports**: TikiWikiClient con retry loop en GETs; cache interno TelegramClient::getFileInfo(); mejora fileName desde file_path; @ eliminado de puntos críticos (dedup, buffer, session, import, worker); reply_cache.json con flock; createTrackerItem() devuelve itemId; detección migrate_to/from_group en imports con chat_id unificado; fix syntax error admin.php. |
+| **v0.6.2** | **#10 Álbumes atómicos + #8 Excepciones + Code review fixes**: `registerOrLookupAlbum()` (atómico, race-free), `appendMediaToTrackerItem()`, `completeAlbumRegistration()`, album buffer con flock + GC. `exceptions.php` con jerarquía `TrackerGramException`. ConfigManager lanza `ConfigException` en JSON corrupto. F3-1 a F3-7 verificados y marcados como hechos (ya implementados previamente). api.php: catch distingue `TrackerGramException`. import.php: `handleException()` con tipo. Code review: worker.php `ftruncate(0)` race fix, api.php `missing_token` rate key + `DirectoryIterator`, import.php `MAX_JSON_IMPORT_SIZE`. |
 | **v0.5.14** | **Code review fixes Julio 2026 (7 hallazgos)**: IPv6 `resolveHostToIp()`, Location en exports, rate limit con flock, Host header sanitizado, dedup lock GC, `TelegramClient::setWebhook()`, Cache-Control en get_connection. |
 | **v0.5.13** | **SSRF DNS Rebinding + Host header poisoning + async buffer fixes**: `CURLOPT_RESOLVE` en TikiWikiClient, `createCurlHandle()`, ConfigManager DNS validation, escritura atómica de buffer async, lock directo sobre .json en worker + GC extendido. |
 | **v0.5.12** | **Code review externo fixes**: edited_message ruteado por webhook (bug funcional), configure_webhook usa POST, safeRender() elimina innerHTML residual, htmlspecialchars eliminado de fromWebhook(), tmp/test_create.php eliminado. Rate limiting con flock, migración grupo→supergrupo, ConfigManager::load() con flock(LOCK_SH), fan-out 502, messageExists() null. |
