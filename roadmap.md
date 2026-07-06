@@ -119,8 +119,8 @@
 | 12 | **Backoff exponencial en GET requests de TikiWikiClient** | 1 sesión | Las requests GET (`messageExists`, `findItemByMessageId`, `getTrackerItem`) no tienen retry. Si TikiWiki está sobrecargado, el webhook falla sin reintentar. Añadir backoff como ya existe para uploads. |
 | **F3-1** | **Hashtags con regex en vez de substr()** | 1 sesión | `extractHashtags()` usa `substr()` con offset UTF-16 de Telegram, que se desalinea si hay emojis antes del hashtag. Reemplazar con `preg_match_all('/#(\w+)/u', $text)`. Código: MessageMapper.php:43. Code Review: Data Flow #1. |
 | **F3-2** | **SSRF fail-closed en initCurlResolve()** | 30 min | Si el hostname resuelve a IP privada, la función solo loguea y sigue. Debe lanzar `RuntimeException`. Código: TikiWikiClient.php:186-189. Code Review: Arq&Seg #1. |
-| **F3-3** | **Race condition álbumes: lock atómico captions** | 1 sesión | `loadMediaGroupCaptions()` suelta `LOCK_SH` antes de que `saveMediaGroupCaptions()` adquiera `LOCK_EX`. Álbumes de 5+ fotos concurrenes pierden captions. Fix: `fopen('c+')` + `flock(LOCK_EX)` sostenido para todo el ciclo read-modify-write. Código: WebhookHandler.php:769-788. Code Review: Data Flow #3. |
-| **F3-4** | **Race condition topics: mismo fix que F3-3** | 1 sesión | `getTopicName()` y escrituras de `topic_names.json` sin locks atómicos. Mismo patrón que álbumes. Código: WebhookHandler.php:47-53,253,305,311. Code Review: Data Flow #4. |
+| **F3-3** | **Race condition álbumes: lock atómico captions** | 1 sesión | ✅ **Resuelto** — `withMediaGroupCaptionsLock()` usa `fopen('c+')` + `flock(LOCK_EX)` sostenido. |
+| **F3-4** | **Race condition topics: mismo fix que F3-3** | 1 sesión | ✅ **Resuelto** — `withTopicNamesLock()` usa `fopen('c+')` + `flock(LOCK_EX)` sostenido. |
 | **F3-5** | **Rate limiting key por secret_token en vez de IP** | 30 min | Todos los webhooks vienen de IPs de Telegram → rate limit compartido entre conexiones. Cambiar key de `md5($ip)` a `md5($secretToken)`. Código: api.php:27. Code Review: Arq&Seg #2. |
 | **F3-6** | **N+1 calls field prefix con flag prefixVerified** | 1 sesión | `resolveFieldPrefix()` hace GET /fields aunque prefix ya esté verificado, en cada mensaje con media. Fix: flag `prefixVerified` que `setFieldPrefix()` marque como true. Código: TikiWikiClient.php:50-56. Code Review: Data Flow #2. |
 | **F3-7** | **Archivos temporales a TEMP_DIR** | 30 min | `topic_names.json` y `media_group_captions.json` en `__DIR__` en vez de `TEMP_DIR`. Código: WebhookHandler.php:47,762. Code Review: Arq&Seg #7. |
@@ -155,9 +155,10 @@ Todavía sin decisión final. Se están evaluando 3 enfoques (no necesariamente 
 | 17 | **JsonFileStorage utility class** | 1-2 sesiones | Centralizar acceso a archivos JSON con `flock()` (LOCK_EX/LOCK_SH). Resolvería race conditions en rate limiting, ConfigManager, topics cache y media group captions (F3-3, F3-4) y varios leaks de caché de un solo golpe. |
 | 18 | **Cache leak: chats_detectados.json — ignored crece sin límite** | 1 sesión | ✅ **Resuelto** — poda: 100 entradas/slug + detecciones >30 días eliminadas. En `saveDetections()`. |
 | 19 | **Cache leak: debug_fallback.log sin rotación** | 30 min | ✅ **Resuelto** — si supera 10MB, se trunca automáticamente. En `config.php`. |
-| **F4-1** | **WebhookHandler refactor (God Object, 823 líneas)** | 2-3 sesiones | Extraer `CommandRouter` (comandos /ayuda /estado), `MediaProcessor` (download + upload + álbumes), `DeduplicationService` (locks TOCTOU). WebhookHandler queda como fachada. Code Review: Arq&Seg #6. |
+| **F4-1** | **WebhookHandler refactor (God Object → 3 subclases)** | 2-3 sesiones | Extraer `CommandRouter` (comandos /ayuda /estado + /gather completo), `MediaProcessor` (download + upload + álbumes + captions), `DeduplicationService` (locks TOCTOU + topic cache + reply cache). WebhookHandler (~400 líneas) queda como fachada que inyecta los 3 en el constructor. Code Review: Arq&Seg #6. |
 | **F4-2** | **HTTP Keep-Alive con curl_reset()** | 1 sesión | Reutilizar handle curl en TikiWikiClient y TelegramClient con `curl_reset()` para habilitar HTTP Keep-Alive y evitar handshake TLS en cada llamada. Code Review: Arq&Seg #4. |
 | **F4-3** | **Head-of-Line blocking en worker.php** | 2-3 sesiones | Worker single-thread: si TikiWiki tarda 30s en upload, la cola se bloquea. Evaluar `curl_multi_exec()` para push concurrente o múltiples workers con lock granular. Code Review: Arq&Seg #5. |
+| **F4-4** | **TikiWikiClient refactor (1 clase → 3: core + fields + galleries)** | 2-3 sesiones | **Objetivo**: Separar 3 responsabilidades mezcladas en 1378 líneas. **Estrategia**: TikiWikiClient mantiene API pública, delega en `TrackerFieldManager` (field prefix, field definitions, create/sync tracker) y `GalleryManager` (gallery CRUD, repair, gallery ID resolution) inyectados como `$client->fields` y `$client->galleries`. **Callers no requieren cambios** — métodos legacy siguen funcionando por delegación. Archivos nuevos: `TrackerFieldManager.php`, `GalleryManager.php`. |
 
 ### ⚪ Fase 5: Pendientes de reevaluación (muy baja prioridad)
 
@@ -201,8 +202,8 @@ Items que no justifican implementación hoy pero se documentan por si el context
 | BUG-002 | `pending_update_count` incluye el update actual durante `/estado` | ⚠️ Workaround (ocultar pending <10). Fix posta: restar 1 al pending o health check externo. |
 | BUG-003 | **debug.log no se escribe en producción** — Cuando `DEBUG_MODE=false`, `log_message()` solo escribe si `$force=true`. Pero `$force` solo se usa en errores críticos. Eventos importantes (mensajes procesados, errores de API, detecciones) no quedan registrados, haciendo imposible troubleshootear sin activar debug mode. | Pendiente de diagnóstico. Posible fix: log levels (INFO/WARN/ERROR) o rotación agresiva y siempre-escribir con límite de tamaño. |
 | BUG-004 | **Hashtags corruptos con emojis** — `extractHashtags()` usa `substr()` con offset UTF-16 de Telegram. Si hay emojis antes del hashtag, el offset se desalinea y extrae texto corrupto. Código: MessageMapper.php:43. Code Review: Data Flow #1. | ✅ Fix listo para implementar (F3-1). |
-| BUG-005 | **Race condition en álbumes** — `loadMediaGroupCaptions()` suelta `LOCK_SH` antes de que `saveMediaGroupCaptions()` adquiera `LOCK_EX`. Álbumes de 5+ fotos pierden captions. Código: WebhookHandler.php:769-788. Code Review: Data Flow #3. | Pendiente de implementar (F3-3). |
-| BUG-006 | **Race condition en topics** — `getTopicName()` sin lock de lectura; escrituras con TOCTOU. Mismo bug que BUG-005. Código: WebhookHandler.php:47-53,253,305,311. Code Review: Data Flow #4. | Pendiente de implementar (F3-4). |
+| BUG-005 | **Race condition en álbumes** — `loadMediaGroupCaptions()` suelta `LOCK_SH` antes de que `saveMediaGroupCaptions()` adquiera `LOCK_EX`. Álbumes de 5+ fotos pierden captions. Código: WebhookHandler.php:769-788. Code Review: Data Flow #3. | ✅ **Resuelto** — `withMediaGroupCaptionsLock()` usa `fopen('c+')` + `flock(LOCK_EX)` sostenido para todo el ciclo read-modify-write. |
+| BUG-006 | **Race condition en topics** — `getTopicName()` sin lock de lectura; escrituras con TOCTOU. Mismo bug que BUG-005. Código: WebhookHandler.php:47-53,253,305,311. Code Review: Data Flow #4. | ✅ **Resuelto** — `withTopicNamesLock()` usa `fopen('c+')` + `flock(LOCK_EX)` sostenido. |
 
 ## Cosas que NO vamos a hacer (por ahora)
 
@@ -242,4 +243,4 @@ Los documentos en `design/` contienen exploraciones detalladas de features que e
 
 Los reportes históricos en `reports/` se conservan como referencia de investigaciones pasadas. Los items accionables ya están consolidados en este documento.
 
-> **Última actualización**: 08/07/2026 — Cache leaks resueltos (F3-10, F3-11, F3-13, #18, #19)
+> **Última actualización**: 08/07/2026 — + Bug-005/006 resueltos, F3-3/F3-4 marcados ✅

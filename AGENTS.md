@@ -62,7 +62,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 - ✅ Seguridad: CSRF, rate limiting, hash de contraseñas, path traversal protection, XSS fix (innerHTML→textContent), DoS protection, 20MB real download limit, token leak fix
 - ✅ Reacciones formateadas como texto legible (👍 3 · ❤️ 1)
 - ✅ Hashtags extraídos como etiquetas Freetags (webhook + import) en campo tipo `F`
-- ✅ Álbumes/grupos de medios (mediaGroup) en webhook (cada foto en su propio item; caption propagada entre fotos del mismo álbum)
+- ✅ Álbumes/grupos de medios (mediaGroup) en webhook (todas las fotos del mismo álbum comparten un solo item en TikiWiki; caption propagada entre fotos)
 - ✅ Auto-reparación de galería (repairFgGallery)
 - ✅ Webhook Secret obligatorio (rechaza 500 si vacío)
 - ✅ Cache de topics por chatId:threadId
@@ -136,6 +136,19 @@ Para datos locales transitorios (cachés, cola async, rate limiting) se usan **a
 | **Rendimiento suficiente** | Para el volumen esperado (cientos de topics, miles de eventos encolados), los archivos JSON con `LOCK_EX` rinden bien. |
 
 > ⚠️ SQLite **no está descartado para siempre** — está en el roadmap como opcional/evaluación de mínima prioridad para cuando el volumen lo justifique, específicamente para la cola async y rate limiting. No aplica a `setup.json` ni a cachés chicas.
+
+### Álbumes: sincronización atómica sin base de datos
+
+Telegram envía las fotos de un álbum como mensajes individuales (distintos `message_id`) en rápida sucesión. Para que todas compartan un solo item en TikiWiki, se usa un buffer JSON con **registro atómico** vía `flock(LOCK_EX)`:
+
+1. `registerOrLookupAlbum()` — dentro de un solo lock: si el álbum no existe, lo **reserva** con `pending=true` y `itemId=0` (modo creator); si ya existe, retorna la entrada (modo append). Esto elimina la race condition entre fotos concurrentes del mismo álbum.
+2. `completeAlbumRegistration()` — tras crear el item exitosamente, llena `itemId` real y quita `pending`.
+3. `removeAlbumRegistration()` — si falló la creación, elimina la entrada pending del buffer.
+4. GC probabilístico (1% por `processUpdate()`) limpia entradas stale: pending >5 min (creator crasheó), completadas >1h.
+
+**Archivo**: `tmp/media_group_album.json` (o `TEMP_DIR/media_group_album.json`).
+
+**Idempotencia**: `appendMediaToTrackerItem()` en `TikiWikiClient` chequea que el `fileId` no esté ya en el campo FG antes de agregarlo.
 
 ### PHP puro, sin framework
 
@@ -290,8 +303,15 @@ $handler->processUpdate()
         → $telegramClient->getFileUrl()        # si tiene media
         → $tikiWikiClient->uploadFile()        # sube a file gallery
         → $tikiWikiClient->messageExists()     # deduplicación
+        → if mediaGroupId set:
+            → registerOrLookupAlbum()          # atómico: reserva pendiente o detecta existente
+            → if álbum existente:
+                → appendMediaToTrackerItem()   # agrega fileId al FG del item creado por 1ra foto
+                → return (no crear item nuevo)
         → $messageMapper->toWikiFields()       # NormalizedMessage → fields[permName]
         → $tikiWikiClient->createTrackerItem() # crea item en TikiWiki
+        → if álbum (primera foto):
+            → completeAlbumRegistration()      # llena itemId real (reemplaza pending)
 ```
 
 ### Importación (ZIP export)

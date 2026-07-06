@@ -185,6 +185,9 @@ function processBatch(string $bufferDir, int $maxEvents, ConfigManager $configMa
 
             $elapsed = round((microtime(true) - $startTime) * 1000);
 
+            // Vaciar antes de soltar el lock: si otro worker agarra el archivo
+            // en la ventana unlock→rename, lee vacío y lo ignora (race condition fix)
+            ftruncate($lockFp, 0);
             flock($lockFp, LOCK_UN);
             fclose($lockFp);
             rename($file, $file . '.done');
@@ -192,6 +195,7 @@ function processBatch(string $bufferDir, int $maxEvents, ConfigManager $configMa
             echo "[" . date('Y-m-d H:i:s') . "] OK {$baseName} ({$connectionSlug}, {$elapsed}ms)\n";
             $success++;
         } catch (Throwable $e) {
+            ftruncate($lockFp, 0);
             flock($lockFp, LOCK_UN);
             fclose($lockFp);
             rename($file, $file . '.failed_' . time());

@@ -24,8 +24,10 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
 
     // 2. Rate limiting ANTES de parsear JSON (previene DoS con parsing pesado)
     // Usa flock(LOCK_EX) para evitar race condition entre requests concurrentes
-    // Key por secret_token (cada bot tiene su propio budget) con fallback a IP
-    $rateKey = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    // Key por secret_token (cada bot tiene su propio budget).
+    // Requests sin token (tráfico inválido/no-Telegram) van a un mismo bucket
+    // 'missing_token' para evitar proliferación de archivos por IP en DDoS.
+    $rateKey = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? 'missing_token';
     $rateFile = TEMP_DIR . '/tg_rate_' . md5($rateKey);
     $window = 60;
     $maxRequests = 30;
@@ -50,14 +52,23 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
     }
 
     // GC probabilístico: 1% de las veces limpia archivos rate limit stale ( > 1 hora sin actividad)
+    // Usa DirectoryIterator (memoria constante) en vez de glob() para evitar
+    // DoS por OOM si hay miles de archivos por ataque DDoS.
     if (mt_rand(1, 100) === 1) {
         $staleThreshold = $now - 3600;
-        foreach (glob(TEMP_DIR . '/tg_rate_*') as $staleFile) {
-            if (is_file($staleFile) && filemtime($staleFile) < $staleThreshold) {
-                if (!unlink($staleFile)) {
-                    $error = error_get_last();
-                    $msg = $error ? $error['message'] : 'unknown error';
-                    log_message("trackerGram: GC no pudo eliminar rate file '{$staleFile}': {$msg}");
+        $rateDir = TEMP_DIR;
+        if (is_dir($rateDir)) {
+            $it = new DirectoryIterator($rateDir);
+            foreach ($it as $file) {
+                if (!$file->isFile()) continue;
+                $fn = $file->getFilename();
+                if (str_starts_with($fn, 'tg_rate_') && $file->getMTime() < $staleThreshold) {
+                    $path = $file->getPathname();
+                    if (!unlink($path)) {
+                        $error = error_get_last();
+                        $msg = $error ? $error['message'] : 'unknown error';
+                        log_message("trackerGram: GC no pudo eliminar rate file '{$fn}': {$msg}");
+                    }
                 }
             }
         }

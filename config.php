@@ -88,6 +88,9 @@ define('MEDIA_DOWNLOAD_MAX_SIZE', 20 * 1024 * 1024);
 // Límite de tamaño total descomprimido del ZIP importado (500 MB)
 define('MAX_ZIP_UNCOMPRESSED_SIZE', 500 * 1024 * 1024);
 
+// Tamaño máximo individual de result.json dentro del import (150 MB)
+define('MAX_JSON_IMPORT_SIZE', 150 * 1024 * 1024);
+
 // Configuración de caché
 define('CACHE_ENABLED', true);
 

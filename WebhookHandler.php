@@ -186,6 +186,182 @@ class WebhookHandler
         return isset($cache[$key]) ? (int) $cache[$key] : null;
     }
 
+    // ─────────────────────────────────────────────────────────
+    // Album buffer (media_group_id → itemId)
+    // ─────────────────────────────────────────────────────────
+
+    private function albumBufferPath(): string
+    {
+        return (defined('TEMP_DIR') ? TEMP_DIR : __DIR__) . '/media_group_album.json';
+    }
+
+    /**
+     * Operación atómica sobre media_group_album.json con flock(LOCK_EX).
+     * @param callable $mutate fn(array $albums): array
+     */
+    private function withAlbumBufferLock(callable $mutate): void
+    {
+        $file = $this->albumBufferPath();
+        $fp = fopen($file, 'c+');
+        if (!$fp) {
+            log_message("trackerGram: No se pudo abrir media_group_album.json para lock atómico", true);
+            $mutate([]);
+            return;
+        }
+        flock($fp, LOCK_EX);
+
+        $content = stream_get_contents($fp);
+        $albums = [];
+        if ($content !== false && $content !== '') {
+            $decoded = json_decode($content, true);
+            if (is_array($decoded)) {
+                $albums = $decoded;
+            }
+        }
+
+        $albums = $mutate($albums);
+
+        rewind($fp);
+        $written = fwrite($fp, json_encode($albums));
+        if ($written !== false) {
+            ftruncate($fp, ftell($fp));
+        }
+
+        flock($fp, LOCK_UN);
+        fclose($fp);
+    }
+
+    /**
+     * Registrar o consultar un álbum atómicamente (race-condition-free).
+     *
+     * Bajo LOCK_EX:
+     * - Si el álbum YA existe (item creado por otro proceso), retorna su entrada → modo append.
+     * - Si el álbum NO existe, lo RESERVA con pending=true → modo creator.
+     * - Si existe pero es pending (itemId=0, creator anterior crasheó), toma el rol de creator.
+     *
+     * @return array|null Entrada existente para append, o null si este proceso es el creator.
+     */
+    private function registerOrLookupAlbum(string $albumKey, array $fileIds): ?array
+    {
+        $result = null;
+        $this->withAlbumBufferLock(function(array $albums) use ($albumKey, $fileIds, &$result): array {
+            if (isset($albums[$albumKey])) {
+                $entry = $albums[$albumKey];
+                // Si es pending (itemId=0), el creator anterior crasheó — tomamos el rol
+                if (($entry['pending'] ?? false) && ($entry['itemId'] ?? 0) === 0) {
+                    $albums[$albumKey] = [
+                        'itemId' => 0,
+                        'fileIds' => $fileIds,
+                        'createdAt' => time(),
+                        'pending' => true,
+                    ];
+                    $result = null;
+                    return $albums;
+                }
+                $result = $entry;
+                return $albums;
+            }
+
+            $albums[$albumKey] = [
+                'itemId' => 0,
+                'fileIds' => $fileIds,
+                'createdAt' => time(),
+                'pending' => true,
+            ];
+            return $albums;
+        });
+        return $result;
+    }
+
+    /**
+     * Completar el registro del álbum tras crear el item exitosamente.
+     */
+    private function completeAlbumRegistration(string $albumKey, int $itemId, array $fileIds): void
+    {
+        $this->withAlbumBufferLock(function(array $albums) use ($albumKey, $itemId, $fileIds): array {
+            if (isset($albums[$albumKey])) {
+                $albums[$albumKey] = [
+                    'itemId' => $itemId,
+                    'fileIds' => $fileIds,
+                    'createdAt' => time(),
+                ];
+            }
+            return $albums;
+        });
+    }
+
+    /**
+     * Remover registro de álbum si falló la creación del item.
+     */
+    private function removeAlbumRegistration(string $albumKey): void
+    {
+        $this->withAlbumBufferLock(function(array $albums) use ($albumKey): array {
+            unset($albums[$albumKey]);
+            return $albums;
+        });
+    }
+
+    /**
+     * GC probabilístico para entradas de álbum stale.
+     * - Completados: >1 hora sin actividad.
+     * - Pending: >5 minutos (creator crasheó sin completar).
+     */
+    private function gcAlbumBuffer(): void
+    {
+        if (mt_rand(1, 100) !== 1) {
+            return;
+        }
+        $this->withAlbumBufferLock(function(array $albums): array {
+            $now = time();
+            $threshold = $now - 3600;
+            $pendingThreshold = $now - 300;
+            foreach ($albums as $key => $entry) {
+                $age = $entry['createdAt'] ?? 0;
+                if (($entry['pending'] ?? false) && $age > 0 && $age < $pendingThreshold) {
+                    log_message("trackerGram: Album buffer GC — álbum '{$key}' pending stale (>5min), eliminado");
+                    unset($albums[$key]);
+                } elseif ($age > 0 && $age < $threshold) {
+                    log_message("trackerGram: Album buffer GC — álbum '{$key}' stale (>1h), eliminado");
+                    unset($albums[$key]);
+                }
+            }
+            return $albums;
+        });
+    }
+
+    /**
+     * Buscar un álbum existente por su media_group_id.
+     * @return array|null Array con itemId, fileIds, createdAt o null si no existe
+     */
+    private function lookupAlbum(string $albumKey): ?array
+    {
+        $path = $this->albumBufferPath();
+        if (!file_exists($path)) {
+            return null;
+        }
+
+        $fp = fopen($path, 'r');
+        if (!$fp) {
+            return null;
+        }
+        flock($fp, LOCK_SH);
+
+        $content = stream_get_contents($fp);
+        flock($fp, LOCK_UN);
+        fclose($fp);
+
+        if ($content === false || $content === '') {
+            return null;
+        }
+
+        $albums = json_decode($content, true);
+        if (!is_array($albums)) {
+            return null;
+        }
+
+        return $albums[$albumKey] ?? null;
+    }
+
     /**
      * Descargar archivo de Telegram y subir a TikiWiki (con reintentos)
      * Con límite real: usa WRITEFUNCTION para contar bytes y abortar si excede
@@ -520,6 +696,34 @@ class WebhookHandler
             }
         }
 
+        // ── Álbum: registro atómico (race-condition-free) ──
+        // registerOrLookupAlbum() usa LOCK_EX sobre media_group_album.json:
+        // atómicamente decide si esta foto es la primera del álbum (crea item)
+        // o si ya existe (append al item existente).
+        $albumKey = null;
+        if ($msg->mediaGroupId !== '' && !empty($msg->uploadedFileIds)) {
+            $albumKey = $chatId . ':' . $msg->mediaGroupId;
+            $existingAlbum = $this->registerOrLookupAlbum($albumKey, $msg->uploadedFileIds);
+            if ($existingAlbum !== null) {
+                foreach ($msg->uploadedFileIds as $fileId) {
+                    $this->tikiWikiClient->appendMediaToTrackerItem(
+                        $this->trackerId,
+                        $existingAlbum['itemId'],
+                        $fileId
+                    );
+                }
+                log_message("trackerGram: Álbum {$msg->mediaGroupId} — foto {$msg->messageId} agregada al item #{$existingAlbum['itemId']}");
+                if (isset($lockFp) && $lockFp) {
+                    flock($lockFp, LOCK_UN);
+                    fclose($lockFp);
+                    if (file_exists($lockFile)) {
+                        unlink($lockFile);
+                    }
+                }
+                return;
+            }
+        }
+
         // Resolver reply_to: buscar el tracker itemId del mensaje original
         // y concatenar el texto del mensaje al que responde (Opción B)
         if ($msg->replyToId !== '') {
@@ -562,9 +766,17 @@ class WebhookHandler
         $newItemId = $this->sendToTikiWikiWithRetries($msg);
         if ($newItemId === false) {
             log_message("ERROR: No se pudo enviar mensaje a TikiWiki después de {$this->retryMaxAttempts} intentos: message_id={$msg->messageId}", true);
+            if ($albumKey !== null) {
+                $this->removeAlbumRegistration($albumKey);
+            }
         } else {
             // Cachear mapeo (chatId, messageId) → itemId para reply-to (F3-9)
             $this->cacheReplyMapping($this->trackerId, $chatId, $message['message_id'], $newItemId);
+
+            // Completar registro del álbum (si aplica)
+            if ($albumKey !== null) {
+                $this->completeAlbumRegistration($albumKey, $newItemId, $msg->uploadedFileIds);
+            }
 
             $postInsertCount = $this->tikiWikiClient->messageExists($this->trackerId, $message['message_id'], $chatId);
             if ($postInsertCount !== null && $postInsertCount > 1) {
@@ -926,6 +1138,9 @@ class WebhookHandler
      */
     public function processUpdate(array $update): void
     {
+        // GC probabilístico para álbumes stale
+        $this->gcAlbumBuffer();
+
         // Detectar si el bot fue agregado a un chat no autorizado (my_chat_member)
         if (isset($update['my_chat_member'])) {
             $this->processMyChatMember($update['my_chat_member']);

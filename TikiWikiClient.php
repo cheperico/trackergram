@@ -590,6 +590,41 @@ class TikiWikiClient
     }
 
     /**
+     * Agregar un fileId al campo FG de un item existente (álbumes).
+     * Lee el valor actual del campo Media, concatena el nuevo fileId y actualiza.
+     * Si el fileId ya existe en el campo, no hace nada (idempotente).
+     */
+    public function appendMediaToTrackerItem(int $trackerId, int $itemId, string $newFileId): bool
+    {
+        $prefix = $this->resolveFieldPrefix($trackerId);
+        $item = $this->getTrackerItem($trackerId, $itemId);
+        if ($item === null) {
+            log_message("TikiWikiClient: appendMedia — no se pudo obtener item {$itemId}", true);
+            return false;
+        }
+
+        // El campo FG puede venir como "field_{prefix}Media" (API moderna) o "fields[prefix]Media" (legacy)
+        $fgField = $item['field_' . $prefix . 'Media']
+            ?? $item['fields'][$prefix . 'Media']
+            ?? '';
+
+        $currentIds = array_filter(explode(',', $fgField), fn($v) => trim($v) !== '');
+        if (in_array($newFileId, $currentIds)) {
+            return true; // ya está, idempotente
+        }
+
+        $currentIds[] = $newFileId;
+        $fields = ["fields[{$prefix}Media]" => implode(',', $currentIds)];
+        $ok = $this->updateTrackerItem($trackerId, $itemId, $fields);
+        if ($ok) {
+            log_message("TikiWikiClient: appendMedia — fileId {$newFileId} agregado a item {$itemId} (total: " . count($currentIds) . ")");
+        } else {
+            log_message("TikiWikiClient: appendMedia — falló al actualizar item {$itemId} con fileId {$newFileId}", true);
+        }
+        return $ok;
+    }
+
+    /**
      * Verificar si un mensaje ya existe en el tracker.
      * @return int|null Cantidad de items encontrados (0 = no existe), o null si hubo error de conexión/timeout
      */

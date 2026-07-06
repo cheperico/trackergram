@@ -240,6 +240,12 @@ function handleExtract(): void
         jsonError('No se encontró result.json en el export');
     }
 
+    // Validar tamaño antes de cargar a memoria (previene OOM con JSON malicioso)
+    if (filesize($jsonFile) > MAX_JSON_IMPORT_SIZE) {
+        rrmdir($tempDir);
+        jsonError('result.json excede el tamaño máximo de ' . formatBytes(MAX_JSON_IMPORT_SIZE));
+    }
+
     // Parsear JSON
     $jsonContent = file_get_contents($jsonFile);
     if ($jsonContent === false || $jsonContent === '') {
@@ -952,6 +958,12 @@ function handleFull(): void
     if (!$jsonFile) {
         rrmdir($tempDir);
         jsonError('No se encontró result.json en el export');
+    }
+
+    // Validar tamaño antes de cargar a memoria
+    if (filesize($jsonFile) > MAX_JSON_IMPORT_SIZE) {
+        rrmdir($tempDir);
+        jsonError('result.json excede el tamaño máximo de ' . formatBytes(MAX_JSON_IMPORT_SIZE));
     }
 
     $jsonContent = file_get_contents($jsonFile);
