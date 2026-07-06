@@ -100,7 +100,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 - ✅ **Updates sin error 409**: `getUpdates()` parsea el body de Telegram y detecta webhook activo; el admin muestra mensaje informativo en vez de "error"
 - ✅ **Health check por conexión**: cada tarjeta en admin crea su propio `TelegramClient` (fix de leak de `$tgClient` entre conexiones)
 - ✅ **checkPermissions sin side effects**: test de `admin_file_galleries` usa `DELETE /api/galleries/99999999/delete` (galería inexistente), no crea galerías reales
-- ✅ **Fan-out con try-catch individual**: si una conexión falla en el fan-out (timeout, error TikiWiki), no rompe las demás conexiones. Log gea el error individualmente y responde 200 con resultados por conexión.
+- ✅ **Fan-out con try-catch individual**: si una conexión falla en el fan-out (timeout, error TikiWiki), no rompe las demás conexiones. Loggea el error individualmente y responde 200 con resultados por conexión.
 - ✅ **Cache auto-detección field prefix**: flag `field_prefix_checked` evita que admin.php y api.php llamen a la API de TikiWiki en cada request. Se ejecuta UNA SOLA VEZ por conexión.
 - ✅ **Mensajes editados capturados en webhook**: `edited_message` y `edited_channel_post` ruteados a `processEditedMessage()` que busca item existente por `(chat_id, message_id)` y aplica `updateTrackerItem()` con solo Text+EditedDate+Reactions. Si no existe, crea item nuevo.
 - ✅ **safeRender() para datos de APIs externas**: admin.php usa función `safeRender()` con `textContent` + nodos `<br>` en vez de `innerHTML` para evitar XSS con datos de Telegram.
@@ -291,8 +291,8 @@ Telegram → api.php
     → Si hay conexión:
         → Crear TikiWikiClient + TelegramClient + WebhookHandler per-conexión
         → $handler->processUpdate()
-    → Si NO hay conexión (legacy):
-        → Usar $webhookHandler global (de bootstrap, config .env)
+    → Si NO hay conexión:
+        → Responder HTTP 403 (legacy mode eliminado en v0.4.0+. Todas las conexiones en setup.json.)
     → Async opcional: buffer a tmp/buffer/ con connection_slug
 ```
 
@@ -344,7 +344,7 @@ El tracker por defecto tiene estos campos (permNames):
 | `telegrammessageFirstName` | t (text) | Nombre del usuario (en import: display name completo) |
 | `telegrammessageLastName` | t (text) | Apellido del usuario (solo disponible en webhook) |
 | `telegrammessageDisplayName` | t (text) | Nombre completo para mostrar (unificado webhook e import) |
-| `telegrammessageMessageType` | t (text) | Tipo: text, photo, video, audio, document, sticker, voice, system, etc. |
+| `telegrammessageMessageType` | t (text) | Tipo: text, photo, video, audio, document, sticker, voice, video_note, animation, location, contact, poll, quiz, system, other |
 | `telegrammessageText` | a (textarea) | Contenido del mensaje (incluye captions de media) |
 | `telegrammessageLocation` | G (geolocation) | Coordenadas GPS (lon, lat, zoom) |
 | `telegrammessageMediaType` | t (text) | Tipo MIME del archivo adjunto |

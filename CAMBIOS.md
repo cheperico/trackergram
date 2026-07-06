@@ -57,6 +57,72 @@
 ### 🐛 Fix: Syntax error en admin.php
 - **admin.php**: Stray `}` duplicado antes de `generateWebhookUrl()` (introducido en F3-11) — eliminado.
 
+### 🫂 #10: Álbumes atómicos en un solo item (race-free)
+
+- **WebhookHandler**: Nueva función `withAlbumBufferLock()` que centraliza el lock exclusivo sobre `media_group_album.json`.
+- **Nuevo método `registerOrLookupAlbum(mediaGroupId)`**: dentro de un solo LOCK_EX — si el álbum no existe, lo **reserva** con `pending=true` y `itemId=0` (modo creator); si ya existe, retorna la entrada (modo append). Elimina la race condition entre fotos concurrentes del mismo álbum.
+- **Nuevo método `completeAlbumRegistration(mediaGroupId, itemId)`**: llena el `itemId` real y quita `pending` tras crear el item exitosamente.
+- **Nuevo método `removeAlbumRegistration(mediaGroupId)`**: elimina la entrada pending del buffer si falló la creación.
+- **Los 3 métodos** (`registerOrLookupAlbum`, `completeAlbumRegistration`, `removeAlbumRegistration`) ahora operan dentro de `withAlbumBufferLock()`, garantizando exclusión mutua sin locks externos.
+- **`processMessage()`**: flujo bifurcado. Si `mediaGroupId` está presente:
+  1. `registerOrLookupAlbum()` → si es nuevo (pending) → crea item + `completeAlbumRegistration()`.
+  2. Si ya existe → `appendMediaToTrackerItem()` + retorna sin crear item nuevo.
+- **`appendMediaToTrackerItem(trackerId, itemId, fileId)`**: método nuevo en TikiWikiClient que agrega un `fileId` al campo FG de un item existente. Es **idempotente**: verifica que el `fileId` no esté ya presente en el campo FG antes de agregarlo.
+- **GC probabilístico** actualizado: entradas `pending` >5 minutos se consideran stale (creator crasheó). Completadas >1 hora se limpian.
+- **Cobertura**: webhook sync + worker async (ambos llaman a `processMessage()` sin cambios extra).
+
+### 💥 #8: Excepciones de dominio
+
+- **exceptions.php**: Nuevo archivo con jerarquía de excepciones:
+  - `TrackerGramException` (base, extends `\RuntimeException`)
+  - `ConfigException` (configuración inválida, JSON corrupto)
+  - `TelegramApiException` (fallos en API de Telegram)
+  - `TikiWikiApiException` (fallos en API de TikiWiki)
+  - `ImportException` (errores de importación)
+  - `SecurityException` (violaciones de seguridad)
+- **bootstrap.php**: Incluye `exceptions.php`.
+- **ConfigManager::load()**: lanza `ConfigException` si `setup.json` tiene JSON corrupto (antes devolvía `[]` silenciosamente).
+- **api.php**: catch distingue `TrackerGramException` — loggea la clase corta (ej: `ConfigException`) en vez de mensaje genérico.
+- **import.php**: `handleException()` muestra el tipo exacto de excepción, responde 400 para `ImportException`, 500 para las demás.
+- **Sin backward compat**: métodos que retornaban `false`/`null` en errores siguen haciéndolo. Excepciones solo donde reemplazan fallos silenciosos.
+
+### 🐛 Code review fixes (3 hallazgos)
+
+- **worker.php**: Race condition en `ftruncate(0)` — movido `ftruncate()` antes de `fclose()` y agregado `rewind()`.
+- **api.php**: `missing_token` rate key — `$_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? 'missing_token'` en vez de variable indefinida. GC de rate files con `DirectoryIterator` en vez de `scandir()` + `array_diff()`.
+- **import.php**: Nueva constante `MAX_JSON_IMPORT_SIZE` (150MB) para validar tamaño de `result.json` al extraer ZIPs.
+
+### ✅ F3-1..F3-7 verificados como ya implementados
+
+Items del code review que ya estaban implementados en sesiones previas (verificados contra código, sin cambios):
+
+| Item | Código verificado |
+|------|-------------------|
+| F3-1: Hashtags con regex | `preg_match_all('/#(\w+)/u')` en MessageMapper.php:43 |
+| F3-2: SSRF fail-closed | `throw new \RuntimeException()` en TikiWikiClient.php:225 |
+| F3-5: Rate key secret_token | `$rateKey = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN']` en api.php:30 |
+| F3-6: N+1 prefix con flag | `resolvedPrefixCache[]` + `prefixVerified` flag |
+| F3-7: Archivos a TEMP_DIR | `topic_names.json` y `media_group_captions.json` ya usan `TEMP_DIR` |
+
+### 🐛 Fix: Sticker sin mediaSize (#1 hallazgo)
+- **MessageMapper::fromWebhook()**: Agregado `$msg->mediaSize = (string) ($sticker['file_size'] ?? '')` en el handler de sticker. El objeto sticker de Telegram tiene `file_size` pero no se capturaba, dejando el campo `MediaSize` vacío para stickers.
+
+### 🐛 Fix: Caption perdido en exports sin media (#4 hallazgo)
+- **MessageMapper::fromExport()**: Cuando el export ZIP de Telegram excluye archivos multimedia (`"(File not included..."`), el tipo de mensaje se degradaba a `'text'` y el caption se perdía. Ahora se detecta el tipo correcto (photo/file) y se captura el caption aunque el archivo no esté incluido.
+- Ampliado el fallback de `mediaCaption` para photos: si `photo_caption` está vacío, busca `caption`.
+
+### 🛠️ Refactor: messageExists/findItemByMessageId con string IDs
+- **TikiWikiClient::messageExists()**: Type hint cambiado de `int $messageId` a `int|string $messageId`. La URL ahora usa `urlencode()` para soportar IDs sintéticos como `"reaction_123_456_789"`.
+- **TikiWikiClient::findItemByMessageId()**: Mismo cambio — `int|string $messageId`. Ya usaba `urlencode()` internamente.
+- Sin regresión: todos los callers existentes pasan int, que es compatible.
+
+### 🐛 Fix: Dedup en handlers de reacción (#5 hallazgo)
+- **WebhookHandler::processMessageReaction()**: Agregado `messageExists()` check antes de crear el item. Si Telegram reenvía el mismo evento de reacción, se skipea.
+- **WebhookHandler::processMessageReactionCount()**: Mismo dedup para conteo de reacciones.
+
+### 📝 Docs: messageType completo en schema
+- **AGENTS.md** y **README.md**: Lista de valores de `MessageType` actualizada: `text, photo, video, audio, document, sticker, voice, video_note, animation, location, contact, poll, quiz, system, other`. Antes decía `"...etc."` omitiendo `video_note`, `animation`, `location`, `contact`, `poll`, `quiz` y `other`.
+
 ---
 
 ## v0.5.14

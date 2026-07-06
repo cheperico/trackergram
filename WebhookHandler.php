@@ -923,6 +923,13 @@ class WebhookHandler
 
         $reactionId = 'reaction_' . $chatId . '_' . $originalMessageId . '_' . $userId . '_' . ($reaction['date'] ?? time());
 
+        // Dedup: evitar duplicados si Telegram reenvía el mismo evento
+        $exists = $this->tikiWikiClient->messageExists($this->trackerId, $reactionId, $chatId);
+        if ($exists !== null && $exists > 0) {
+            log_message("trackerGram: SKIPPING duplicate reaction {$reactionId}");
+            return;
+        }
+
         $msg = new NormalizedMessage();
         $msg->messageId = $reactionId;
         $msg->chatId = (string) $chatId;
@@ -965,6 +972,13 @@ class WebhookHandler
         $text = '💬 Mensaje ' . $originalMessageId . ' - reacciones: ' . implode(', ', $counts);
 
         $reactionCountId = 'reaction_count_' . $chatId . '_' . $originalMessageId . '_' . ($reactionCount['date'] ?? time());
+
+        // Dedup: evitar duplicados si Telegram reenvía el mismo evento
+        $exists = $this->tikiWikiClient->messageExists($this->trackerId, $reactionCountId, $chatId);
+        if ($exists !== null && $exists > 0) {
+            log_message("trackerGram: SKIPPING duplicate reaction_count {$reactionCountId}");
+            return;
+        }
 
         $msg = new NormalizedMessage();
         $msg->messageId = $reactionCountId;

@@ -628,10 +628,10 @@ class TikiWikiClient
      * Verificar si un mensaje ya existe en el tracker.
      * @return int|null Cantidad de items encontrados (0 = no existe), o null si hubo error de conexión/timeout
      */
-    public function messageExists(int $trackerId, int $messageId, ?int $chatId = null): ?int
+    public function messageExists(int $trackerId, int|string $messageId, ?int $chatId = null): ?int
     {
         $prefix = $this->resolveFieldPrefix($trackerId);
-        $url = $this->apiUrl . "trackers/$trackerId/items?filter[fields][{$prefix}TelegramMessageId]=$messageId";
+        $url = $this->apiUrl . "trackers/$trackerId/items?filter[fields][{$prefix}TelegramMessageId]=" . urlencode((string) $messageId);
 
         if ($chatId !== null) {
             $url .= "&filter[fields][{$prefix}ChatId]=$chatId";
@@ -680,7 +680,7 @@ class TikiWikiClient
      * @param int $chatId Telegram chat_id
      * @return int|null El itemId del tracker, o null si no existe
      */
-    public function findItemByMessageId(int $trackerId, int $messageId, int $chatId): ?int
+    public function findItemByMessageId(int $trackerId, int|string $messageId, int $chatId): ?int
     {
         $prefix = $this->resolveFieldPrefix($trackerId);
         $url = $this->apiUrl . "trackers/$trackerId/items"

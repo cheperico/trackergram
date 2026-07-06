@@ -18,7 +18,7 @@
 
 | | |
 |---|---|
-| **Versión actual** | v0.6.0 |
+| **Versión actual** | v0.6.2 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Instancias activas** | Dev (tracker 26) · Prod (tracker 22) |
 | **Filosofía** | Sin DB con servidor · JSON files para estado local (no SQLite) · PHP puro sin framework · MVP pragmático |
@@ -41,7 +41,7 @@
 - ✅ Gallery resolution via endpoint `/fields`
 - ✅ Timeouts separados upload (60s) / api (30s)
 - ✅ debug.log respeta DEBUG_MODE ($force para críticos)
-- ✅ Álbumes/grupos de medios (mediaGroup) en webhook (cada foto en su propio item; caption propagada entre fotos del mismo álbum)
+- ✅ Álbumes/grupos de medios (mediaGroup): todas las fotos del mismo álbum comparten UN solo item en TikiWiki; caption propagada entre fotos. Sincronización atómica con lock exclusivo (race-free).
 - ✅ Cache de topics por chatId:threadId
 - ✅ Cache de gallery ID por tracker
 - ✅ Webhook Secret obligatorio (rechaza si vacío)
@@ -109,26 +109,28 @@
 
 ### 🟢 Fase 3: Bugs + Robustez (mediano plazo)
 
-| # | Item | Esfuerzo | Dependencias |
-|--|------|----------|--------------|
-| 6 | **Chat_id unificado para imports con migración** | 2 sesiones | Los exports de Telegram pueden incluir migración grupo→supergrupo. Los mensajes pre-migración tienen IDs negativos, los post-migración IDs positivos. El chat_id también cambia. Decidir estrategia (un solo chat_id para todo el grupo, o bifurcar) e implementar detección de service messages `migrate_to_supergroup`/`migrate_from_group`. |
-| 8 | **Manejo de errores estandarizado** | 2-3 sesiones | Excepciones de dominio (`ConfigException`, `TelegramException`, `TikiWikiException`, `ImportException`). |
-| 9 | **Import CLI asíncrono** | 2 sesiones | Script CLI para exports grandes sin timeout HTTP. |
-| 10 | **Álbumes/grupos de medios en un solo item** | 2-3 sesiones | Agrupar fotos del mismo `media_group_id` en UN item del tracker con múltiples archivos en el campo FG. Actualmente cada foto crea su propio item. Requiere: (1) método para actualizar items existentes en TikiWikiClient, (2) lógica de detección de grupo y update vs create, (3) concurrencia (fotos llegan casi simultáneas). |
-| 11 | **Nombre de archivo desde file_path de getFile() cuando falta file_name** | 1 sesión | Cuando Telegram no envía `file_name`, el fallback actual es `mimeToExtension()` → `Documento.mp4`. Mejora: cachear la respuesta de `getFile()` (ya se llama en `getFileUrl()`, cero calls extra) y extraer `basename(file_path)`. Ej: `file_path: "documents/video_2025_mp4.mp4"` → `fileName: "video_2025_mp4.mp4"`. No es el nombre original del usuario pero es más descriptivo que `Documento.mp4` y tiene extensión real. **Implementación**: (1) agregar cache interno `$fileInfoCache` en `TelegramClient`, (2) método `getFileInfo()` que cachea, (3) refactor `getFileUrl()` para usarlo, (4) en `MessageMapper::fromWebhook()` documentos/animations, intentar `basename(file_path)` antes de caer a `'Documento'`. |
-| 12 | **Backoff exponencial en GET requests de TikiWikiClient** | 1 sesión | Las requests GET (`messageExists`, `findItemByMessageId`, `getTrackerItem`) no tienen retry. Si TikiWiki está sobrecargado, el webhook falla sin reintentar. Añadir backoff como ya existe para uploads. |
-| **F3-1** | **Hashtags con regex en vez de substr()** | 1 sesión | `extractHashtags()` usa `substr()` con offset UTF-16 de Telegram, que se desalinea si hay emojis antes del hashtag. Reemplazar con `preg_match_all('/#(\w+)/u', $text)`. Código: MessageMapper.php:43. Code Review: Data Flow #1. |
-| **F3-2** | **SSRF fail-closed en initCurlResolve()** | 30 min | Si el hostname resuelve a IP privada, la función solo loguea y sigue. Debe lanzar `RuntimeException`. Código: TikiWikiClient.php:186-189. Code Review: Arq&Seg #1. |
-| **F3-3** | **Race condition álbumes: lock atómico captions** | 1 sesión | ✅ **Resuelto** — `withMediaGroupCaptionsLock()` usa `fopen('c+')` + `flock(LOCK_EX)` sostenido. |
-| **F3-4** | **Race condition topics: mismo fix que F3-3** | 1 sesión | ✅ **Resuelto** — `withTopicNamesLock()` usa `fopen('c+')` + `flock(LOCK_EX)` sostenido. |
-| **F3-5** | **Rate limiting key por secret_token en vez de IP** | 30 min | Todos los webhooks vienen de IPs de Telegram → rate limit compartido entre conexiones. Cambiar key de `md5($ip)` a `md5($secretToken)`. Código: api.php:27. Code Review: Arq&Seg #2. |
-| **F3-6** | **N+1 calls field prefix con flag prefixVerified** | 1 sesión | `resolveFieldPrefix()` hace GET /fields aunque prefix ya esté verificado, en cada mensaje con media. Fix: flag `prefixVerified` que `setFieldPrefix()` marque como true. Código: TikiWikiClient.php:50-56. Code Review: Data Flow #2. |
-| **F3-7** | **Archivos temporales a TEMP_DIR** | 30 min | `topic_names.json` y `media_group_captions.json` en `__DIR__` en vez de `TEMP_DIR`. Código: WebhookHandler.php:47,762. Code Review: Arq&Seg #7. |
-| **F3-8** | **Eliminar operador @ en puntos críticos** | 1 sesión | `@rename`, `@fopen`, `@unlink` silencian errores de disco/permisos. Worker puede reprocesar infinitamente si `@rename` falla. Fix: sacar `@` y loguear con `error_get_last()`. Archivos: worker.php, api.php, varios. Code Review: Arq&Seg #8. |
-| **F3-9** | **Reply-To cache local (chat_id,message_id)→itemId** | 1-2 sesiones | Si el mensaje original se creó hace ms, el índice de TikiWiki puede no tenerlo. Cache local en JSON elimina la llamada API y evita el miss. Código: WebhookHandler.php:346, TikiWikiClient.php:592. Code Review: Data Flow #4. |
-| **F3-10** | **Cache leak: topic_names.json crece sin límite** | 1 sesión | ✅ **Resuelto** — poda automática (>1000 entradas → recorta a 500) en `withTopicNamesLock()`. |
-| **F3-11** | **Cache leak: tg_admin_rate_* sin GC** | 30 min | ✅ **Resuelto** — GC probabilístico 1% >1h en `gcAdminRateFiles()`, llamado desde admin.php. |
-| **F3-13** | **Cache leak: collect_sessions.json acumula sesiones huérfanas** | 1 sesión | ✅ **Resuelto** — `gcSessions()` purga sesiones >1h sin actividad + `last_activity` auto-actualizado en cada `set()`. |
+> **Estado**: 12 de 13 items completados ✅. Solo queda #9 (Import CLI).
+
+| # | Item | Esfuerzo | Estado |
+|--|------|----------|--------|
+| 6 | **Chat_id unificado para imports con migración** | 2 sesiones | ✅ v0.5.6 |
+| 8 | **Manejo de errores estandarizado** | 2-3 sesiones | ✅ v0.6.2 — `exceptions.php` con `TrackerGramException` + 5 subclases (`TelegramApiException`, `TikiWikiApiException`, `ImportException`, `ConfigException`, `SecurityException`). Incluido en `bootstrap.php`. |
+| 9 | **Import CLI asíncrono** | 2 sesiones | ⏳ Pendiente — Script CLI para exports grandes sin timeout HTTP. |
+| 10 | **Álbumes/grupos de medios en un solo item** | 2-3 sesiones | ✅ v0.6.2 — Agrupación atómica con `registerOrLookupAlbum()` (LOCK_EX), `appendMediaToTrackerItem()` idempotente, GC de entradas stale. |
+| 11 | **Nombre de archivo desde file_path de getFile() cuando falta file_name** | 1 sesión | ✅ v0.5.9 — Cache interno `$fileInfoCache` en `TelegramClient`, método `getFileInfo()`. |
+| 12 | **Backoff exponencial en GET requests de TikiWikiClient** | 1 sesión | ✅ v0.5.7 — `messageExists()`, `findItemByMessageId()`, `getTrackerItem()` con retry + backoff. |
+| **F3-1** | **Hashtags con regex en vez de substr()** | 1 sesión | ✅ v0.5.9 — `preg_match_all('/#(\w+)/u')` en MessageMapper.php:43. |
+| **F3-2** | **SSRF fail-closed en initCurlResolve()** | 30 min | ✅ v0.5.13 — `throw new \RuntimeException()` en TikiWikiClient.php:225. |
+| **F3-3** | **Race condition álbumes: lock atómico captions** | 1 sesión | ✅ Resuelto — `withMediaGroupCaptionsLock()` usa `fopen('c+')` + `flock(LOCK_EX)` sostenido. |
+| **F3-4** | **Race condition topics: mismo fix que F3-3** | 1 sesión | ✅ Resuelto — `withTopicNamesLock()` usa `fopen('c+')` + `flock(LOCK_EX)` sostenido. |
+| **F3-5** | **Rate limiting key por secret_token en vez de IP** | 30 min | ✅ v0.5.12 — `$rateKey = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? 'missing_token'`. |
+| **F3-6** | **N+1 calls field prefix con flag prefixVerified** | 1 sesión | ✅ v0.5.6 — flag `prefixVerified` + `setPrefixVerified(true)`. |
+| **F3-7** | **Archivos temporales a TEMP_DIR** | 30 min | ✅ v0.5.6 — `topic_names.json` y `media_group_captions.json` usan `TEMP_DIR`. |
+| **F3-8** | **Eliminar operador @ en puntos críticos** | 1 sesión | ✅ v0.5.14 — `@` eliminado de worker.php, api.php y TikiWikiClient. Solo queda intencionalmente en `config.php:log_message()` para evitar que logger crashee el sistema. |
+| **F3-9** | **Reply-To cache local (chat_id,message_id)→itemId** | 1-2 sesiones | ✅ v0.5.7 — Cache local JSON elimina llamada API. |
+| **F3-10** | **Cache leak: topic_names.json crece sin límite** | 1 sesión | ✅ Resuelto — poda automática >1000 → recorta a 500. |
+| **F3-11** | **Cache leak: tg_admin_rate_* sin GC** | 30 min | ✅ Resuelto — GC probabilístico 1% >1h. |
+| **F3-13** | **Cache leak: collect_sessions.json acumula sesiones huérfanas** | 1 sesión | ✅ Resuelto — `gcSessions()` purga >1h sin actividad. |
 
 ### 🔵 Fase 4: Refactor + Deuda Técnica (largo plazo)
 
@@ -243,4 +245,4 @@ Los documentos en `design/` contienen exploraciones detalladas de features que e
 
 Los reportes históricos en `reports/` se conservan como referencia de investigaciones pasadas. Los items accionables ya están consolidados en este documento.
 
-> **Última actualización**: 08/07/2026 — + Bug-005/006 resueltos, F3-3/F3-4 marcados ✅
+> **Última actualización**: 05/07/2026 — + Fase 3 completada (12/13 items), #8 excepciones, #10 álbumes atómicos

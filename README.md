@@ -127,7 +127,7 @@ El tracker usa **28 campos** con permNames que siguen el patrón `{prefix}Telegr
 | `FirstName` | `t` (text) | Nombre (en import: display name completo) |
 | `LastName` | `t` (text) | Apellido (solo webhook) |
 | `DisplayName` | `t` (text) | Nombre completo (unificado) |
-| `MessageType` | `D` (dropdown) | Tipo: text, photo, video, audio, document, sticker, voice, etc. |
+| `MessageType` | `D` (dropdown) | Tipo: text, photo, video, audio, document, sticker, voice, video_note, animation, location, contact, poll, quiz, system, other |
 | `Text` | `a` (textarea) | Contenido del mensaje (incluye captions) |
 | `MessageDate` | `f` (datetime) | Fecha/hora (timestamp UNIX) |
 | `Media` | `FG` (file gallery) | Archivo multimedia adjunto |

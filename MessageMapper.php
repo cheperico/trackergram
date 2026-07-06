@@ -170,6 +170,7 @@ class MessageMapper
             $msg->text = 'Sticker: image/webp';
             $msg->width = (string) ($sticker['width'] ?? '');
             $msg->height = (string) ($sticker['height'] ?? '');
+            $msg->mediaSize = (string) ($sticker['file_size'] ?? '');
             return $msg;
         }
 
@@ -545,10 +546,10 @@ class MessageMapper
                 $msg->messageType = 'location';
                 $msg->location = $lon . ',' . $lat . ',' . $zoom;
                 $msg->text = (string) ($message['text'] ?? '');
-            } elseif (!empty($message['photo']) && !$this->isMediaExcluded($message['photo'])) {
+            } elseif (!empty($message['photo'])) {
                 $msg->messageType = 'photo';
                 $msg->mediaCaption = $message['photo_caption'] ?? '';
-            } elseif (!empty($message['file']) && !$this->isMediaExcluded($message['file'])) {
+            } elseif (!empty($message['file'])) {
                 $fileType = $message['media_type'] ?? '';
                 $fileName = $message['file_name'] ?? basename((string) $message['file']);
                 if ($fileType === 'sticker' || strpos($message['file'] ?? '', 'sticker') !== false) {
@@ -573,8 +574,12 @@ class MessageMapper
             $msg->duration = (string) ($message['duration_seconds'] ?? '');
             $msg->mediaType = $message['mime_type'] ?? $message['media_type'] ?? '';
             $msg->mediaSize = (string) ($message['file_size'] ?? '');
-            if (empty($msg->mediaCaption) && isset($message['file'])) {
-                $msg->mediaCaption = $message['file_caption'] ?? ($message['caption'] ?? '');
+            if (empty($msg->mediaCaption)) {
+                if (isset($message['file'])) {
+                    $msg->mediaCaption = $message['file_caption'] ?? ($message['caption'] ?? '');
+                } elseif (isset($message['photo'])) {
+                    $msg->mediaCaption = $message['caption'] ?? '';
+                }
             }
 
             // Reacciones: formatear como texto legible en vez de JSON crudo

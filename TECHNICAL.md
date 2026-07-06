@@ -564,14 +564,16 @@ Items **ya resueltos**:
 - ✅ **Admin.php refactorizado (Fase B)**: Handlers POST extraídos a `admin_handlers.php` (508 líneas). admin.php reducido a 1114 líneas (-56% del original). Handlers ejecutados ANTES de loops pesados (AJAX en ms). `$connectionsSafe` construido al final del procesamiento (datos frescos). `validateCSRFToken()` responde JSON+403 para AJAX. Sin doble escape en handlers.
 
 Items aún pendientes:
-- ⬜ **Backoff exponencial en GET**: `messageExists()` y `getTrackerItem()` hacen GET sin backoff. Bajo error 429/503, saturan la API.
-- ⬜ **Manejo de errores inconsistente**: Algunas funciones aún retornan `null`, otras `false`, otras excepciones. Faltan excepciones de dominio tipadas.
 - ⬜ **Tests unitarios**: Las clases son instanciables y testeables, pero faltan los tests. JsonFileStorage utility como primer candidato.
 - ⬜ **PSR-4 autoloading**: Sin autoloader, todo se incluye con `require_once`.
-- ⬜ **Reply-To cache local (chat_id,message_id)→itemId**: Evitar miss de índice TikiWiki mensajes creados hace ms (F3-9).
 - ⬜ **WebhookHandler refactor**: Extraer CommandRouter, MediaProcessor, DeduplicationService (F4-1).
 - ⬜ **HTTP Keep-Alive con curl_reset()**: Reutilizar handle curl entre llamadas (F4-2).
 - ⬜ **Head-of-Line blocking en worker**: Si TikiWiki tarda 30s en upload, la cola se bloquea (F4-3).
+
+Items resueltos recientemente:
+- ✅ **Backoff exponencial en GET**: `messageExists()`, `findItemByMessageId()`, `getTrackerItem()`, `loadTrackerFields()` con retry loop + exponential backoff (v0.6.2, #12).
+- ✅ **Manejo de errores estandarizado**: `exceptions.php` con jerarquía `TrackerGramException` — `ConfigException`, `TelegramApiException`, `TikiWikiApiException`, `ImportException`, `SecurityException`. Cobertura carga inicial en ConfigManager y webhook/import handlers (v0.6.2, #8).
+- ✅ **Reply-To cache local (chat_id,message_id)→itemId**: Cache JSON con operaciones atómicas `flock(LOCK_EX/LOCK_SH)`. Miss → API TikiWiki (v0.6.2, F3-9).
 
 ---
 
@@ -632,7 +634,7 @@ Tanto el webhook como el login del admin tienen rate limiting por IP. Sin esto, 
 1. ✅ ~~Inyección de dependencias desde el inicio~~ — **Ya implementado** (v0.2.0)
 2. ⬜ **Tests unitarios desde el principio**: Muchos bugs se hubieran detectado automáticamente.
 3. ✅ ~~Un modelo intermedio único para mensajes~~ — **Ya implementado** (NormalizedMessage, v0.1.9)
-4. ⬜ **Excepciones de dominio**: En vez de mezclar `null`, `false` y `die()`, usar excepciones tipadas.
+4. ✅ ~~**Excepciones de dominio**~~ — **Ya implementado** (v0.6.2, `exceptions.php` con `TrackerGramException` + 5 subclases)
 
 ---
 
