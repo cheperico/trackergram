@@ -227,8 +227,14 @@ function cleanupDoneFiles(string $bufferDir, int $maxAgeSeconds): void
             continue;
         }
         foreach ($files as $file) {
-            if ($now - @filemtime($file) > $maxAgeSeconds) {
-                @unlink($file);
+            $mtime = filemtime($file);
+            if ($mtime === false) {
+                continue;
+            }
+            if ($now - $mtime > $maxAgeSeconds) {
+                if (!unlink($file)) {
+                    log_message("worker GC: No se pudo eliminar '{$file}'");
+                }
             }
         }
     }

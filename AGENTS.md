@@ -192,7 +192,7 @@ La mayoría de los archivos están en la raíz. Subdirectorios:
 | `opt/` | Investigaciones, templates Smarty, archivos opcionales |
 | `tmp/` | Archivos temporales (rate limiting, buffers async, etc.) |
 | `reports/` | Reportes históricos de auditoría (referencia) |
-| `design/` | **📐 Documentos de diseño** — captura de decisiones, exploraciones y discusiones antes de implementar. **Leer antes de arrancar una feature nueva** para entender el contexto completo, alternativas consideradas y por qué se tomaron ciertas decisiones. Contiene: `001-configuracion-inversa-via-telegram.md`, `002-MiniApp.md`, `003-arquitectura-multi.md`. |
+| `design/` | **📐 Documentos de diseño** — captura de decisiones, exploraciones y discusiones antes de implementar. **Leer antes de arrancar una feature nueva** para entender el contexto completo, alternativas consideradas y por qué se tomaron ciertas decisiones. Contiene: `001-configuracion-inversa-via-telegram.md`, `002-MiniApp.md`, `003-arquitectura-multi.md`, `007-pwa-offline-formularios.md`. |
 | `.opencode/` | Configuración de opencode (agentes, skills) |
 
 #### Entry Points HTTP
@@ -248,7 +248,7 @@ La mayoría de los archivos están en la raíz. Subdirectorios:
 | `CAMBIOS.md` | Historial de cambios por versión |
 | `opt/visualizacion-tiki.md` | Feed tipo chat en TikiWiki (investigación + template Smarty) — específico de wiki.chela.org.ar |
 | `opt/telegram_bots.md` | Tokens de bots de Telegram — **NO versionar** (archivo local) |
-| `design/*` | **📐 Documentos de diseño** — captura de decisiones, alternativas discutidas y arquitectura exploratoria antes de implementar. Leer siempre antes de arrancar una feature nueva (`001-configuracion-inversa-via-telegram.md`, `002-MiniApp.md`, `003-arquitectura-multi.md`). Este archivo se actualiza. |
+| `design/*` | **📐 Documentos de diseño** — captura de decisiones, alternativas discutidas y arquitectura exploratoria antes de implementar. Leer siempre antes de arrancar una feature nueva (`001-configuracion-inversa-via-telegram.md`, `002-MiniApp.md`, `003-arquitectura-multi.md`, `007-pwa-offline-formularios.md`). Este archivo se actualiza. |
 | `..\TikiWiki\` | **Código fuente de TikiWiki 27.5** — fuera del workspace, en `C:\Users\Federico\Documents\OpenCode\TikiWiki\tiki-27.5\`. Solo referencia, no se versiona. El agente `@tiki-expert` lo consulta para entender comportamientos internos de la API. |
 
 ### Orden recomendado de lectura del código
@@ -561,6 +561,7 @@ Ver [CAMBIOS.md](CAMBIOS.md) para el detalle completo por versión.
 |---|---|---|
 | **v0.5.12** | **Fixes de code review externo**: edited_message ruteado por webhook (bug funcional), configure_webhook usa POST (token fuera de URLs), safeRender() elimina innerHTML residual (XSS fix), htmlspecialchars eliminado de fromWebhook() (caption data fix), tmp/test_create.php eliminado (token hardcodeado). Docs sincronizados. |
 | **v0.6.0** | **Desarme admin.php Fase B + fixes post-revision**: Handlers extraídos a `admin_handlers.php` (508 líneas). admin.php: 2529→1114 líneas (-56%). `include` handlers movido ANTES de loops pesados (AJAX responde en ms). `$connectionsSafe` construido al final del procesamiento (datos frescos). `validateCSRFToken()` responde JSON+403 para AJAX. Eliminado `escapeHtml()` en handlers (doble escape). Vista itera `$connectionsSafe` (tokens sanitizados). Eliminado `$webhookStatuses = [];` redundante. |
+| **v0.6.2** | **Backoff exponencial GET + file_path naming + @ operator removal + Reply-To cache + chat_id unificado imports**: TikiWikiClient con retry loop en GETs; cache interno TelegramClient::getFileInfo(); mejora fileName desde file_path; @ eliminado de puntos críticos (dedup, buffer, session, import, worker); reply_cache.json con flock; createTrackerItem() devuelve itemId; detección migrate_to/from_group en imports con chat_id unificado; fix syntax error admin.php. |
 | **v0.5.14** | **Code review fixes Julio 2026 (7 hallazgos)**: IPv6 `resolveHostToIp()`, Location en exports, rate limit con flock, Host header sanitizado, dedup lock GC, `TelegramClient::setWebhook()`, Cache-Control en get_connection. |
 | **v0.5.13** | **SSRF DNS Rebinding + Host header poisoning + async buffer fixes**: `CURLOPT_RESOLVE` en TikiWikiClient, `createCurlHandle()`, ConfigManager DNS validation, escritura atómica de buffer async, lock directo sobre .json en worker + GC extendido. |
 | **v0.5.12** | **Code review externo fixes**: edited_message ruteado por webhook (bug funcional), configure_webhook usa POST, safeRender() elimina innerHTML residual, htmlspecialchars eliminado de fromWebhook(), tmp/test_create.php eliminado. Rate limiting con flock, migración grupo→supergrupo, ConfigManager::load() con flock(LOCK_SH), fan-out 502, messageExists() null. |

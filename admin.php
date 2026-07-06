@@ -42,6 +42,9 @@ require_once 'bootstrap.php';
 require_once 'ConfigManager.php';
 require_once 'detect_helper.php';
 
+// GC probabilístico para archivos tg_admin_rate_* viejos
+gcAdminRateFiles();
+
 // ── Helpers ──
 
 function generateCSRFToken() {
@@ -162,6 +165,23 @@ function resetFailedLogin() {
         $data['attempts'] = 0;
         $data['first_attempt'] = time();
     });
+}
+
+/**
+ * GC probabilístico para archivos tg_admin_rate_* (1% de las requests).
+ * Barre archivos con más de 1 hora de inactividad y los elimina.
+ * Análogo al GC de tg_rate_* en api.php.
+ */
+function gcAdminRateFiles(): void {
+    if (mt_rand(1, 100) !== 1) {
+        return;
+    }
+    $pattern = (defined('TEMP_DIR') ? TEMP_DIR : __DIR__ . '/tmp') . '/tg_admin_rate_*';
+    foreach (glob($pattern) as $file) {
+        if (filemtime($file) < time() - 3600) {
+            @unlink($file);
+        }
+    }
 }
 
 function generateWebhookUrl(): string {

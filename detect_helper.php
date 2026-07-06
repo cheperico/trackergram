@@ -36,6 +36,26 @@ function saveDetections(array $data): bool
     if (!is_dir($dir)) {
         @mkdir($dir, 0700, true);
     }
+
+    // Poda: limitar ignorados a 100 entradas por slug (los más recientes)
+    foreach ($data['ignored'] ?? [] as $slug => $ignoredIds) {
+        if (count($ignoredIds) > 100) {
+            $data['ignored'][$slug] = array_slice($ignoredIds, -100, null, true);
+        }
+    }
+
+    // Poda: eliminar detecciones con más de 30 días de antigüedad
+    $cutoff = strtotime('-30 days');
+    foreach ($data['detections'] ?? [] as $slug => $detections) {
+        $data['detections'][$slug] = array_values(array_filter(
+            $detections,
+            fn($det) => ($det['detected_at'] ?? '') >= date('c', $cutoff)
+        ));
+        if (empty($data['detections'][$slug])) {
+            unset($data['detections'][$slug]);
+        }
+    }
+
     return (bool) @file_put_contents(DETECT_FILE, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX);
 }
 

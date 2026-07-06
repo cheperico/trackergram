@@ -33,7 +33,7 @@ function handleException($exc) {
 set_exception_handler('handleException');
 
 if (session_status() === PHP_SESSION_NONE) {
-    @session_start();
+    session_start();
 }
 
 if (!isset($_SESSION['authenticated']) || $_SESSION['authenticated'] !== true) {
@@ -51,6 +51,20 @@ if (!isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $cs
 }
 
 require_once 'bootstrap.php';
+
+/**
+ * Convertir raw chat_id del export de Telegram al formato final de trackerGram.
+ * Supergrupos/channels: prependea -100.
+ * Grupos básicos/privados: se usa el raw tal cual.
+ */
+function rawChatIdToFinal(int|string $rawId, string $chatType): string
+{
+    $id = (int) $rawId;
+    if (in_array($chatType, ['private_supergroup', 'private_channel']) && $id > 0) {
+        return '-100' . $id;
+    }
+    return (string) $id;
+}
 
 $mode = $_POST['mode'] ?? 'full';
 
@@ -244,16 +258,59 @@ function handleExtract(): void
     $chatTitle = $data['name'] ?? 'Unknown Chat';
     $rawId = $data['id'] ?? 0;
     $chatType = $data['type'] ?? '';
-    if (in_array($chatType, ['private_supergroup', 'private_channel']) && $rawId > 0) {
-        $chatId = '-100' . $rawId;
-    } else {
-        $chatId = $rawId;
+    $chatId = rawChatIdToFinal($rawId, $chatType);
+
+    // ── Detectar migración grupo→supergrupo en el export ──
+    // Cuando un grupo básico migra, el chat_id cambia. El root id del export
+    // puede ser el ID del grupo básico o del supergrupo según cuándo se exportó.
+    // Detectamos service messages migrate_to_supergroup/migrate_from_group
+    // para unificar todos los mensajes bajo el chat_id FINAL (supergrupo con -100).
+    $migrated = false;
+    $migrationPointId = 0;        // message_id del service message migrate_to_supergroup
+    $supergroupIdOverride = 0;    // si el msg trae el ID real del supergrupo
+
+    // Primera pasada: detectar migración
+    foreach ($data['messages'] as $scanMsg) {
+        if (($scanMsg['type'] ?? '') !== 'service') continue;
+        $action = $scanMsg['action'] ?? '';
+        if ($action === 'migrate_to_supergroup') {
+            $migrated = true;
+            $migrationPointId = (int) ($scanMsg['id'] ?? 0);
+            // Algunos exports incluyen el nuevo supergroup ID en el text del mensaje
+            if (!empty($scanMsg['text']) && is_numeric($scanMsg['text'])) {
+                $supergroupIdOverride = (int) $scanMsg['text'];
+            } elseif (!empty($scanMsg['title']) && is_numeric($scanMsg['title'])) {
+                $supergroupIdOverride = (int) $scanMsg['title'];
+            }
+            break; // solo nos interesa la primera migración
+        } elseif ($action === 'migrate_from_group') {
+            $migrated = true;
+            // migrate_from_group confirma que estamos viendo la conversación post-migración
+        }
+    }
+
+    // Si hay migración pero el chat_id NO es de supergrupo, forzar unificación
+    if ($migrated) {
+        if ($supergroupIdOverride > 0) {
+            // Usar el supergroup ID real extraído del mensaje
+            $chatId = '-100' . $supergroupIdOverride;
+            log_message("trackerGram import: 🚚 Migración detectada — chat_id sobreescrito a {$chatId} desde migrate_to_supergroup");
+        } elseif (!str_starts_with((string) $chatId, '-100') && $rawId > 0) {
+            // El root id es del grupo básico, pero hubo migración → usar -100 + root id
+            $chatId = '-100' . $rawId;
+            log_message("trackerGram import: 🚚 Migración detectada — chat_id unificado a {$chatId} (tipo original: {$chatType})");
+        } else {
+            log_message("trackerGram import: 🚚 Migración detectada — chat_id {$chatId} ya es supergrupo, ok");
+        }
     }
 
     // Crear NDJSON (una línea por mensaje, para procesar sin recargar todo)
     $ndjsonFile = $tempDir . '/messages.ndjson';
-    $ndjsonFp = @fopen($ndjsonFile, 'w');
+    $ndjsonFp = fopen($ndjsonFile, 'w');
     if (!$ndjsonFp) {
+        $error = error_get_last();
+        $msg = $error ? $error['message'] : 'unknown error';
+        log_message("import.php: No se pudo crear NDJSON '{$ndjsonFile}': {$msg}", true);
         rrmdir($tempDir);
         jsonError('No se pudo crear archivo temporal de mensajes');
     }
@@ -268,7 +325,7 @@ function handleExtract(): void
 
     // Resolver topics (recorrer mensajes de servicio)
     $topics = [];
-    $ndjsonFp = @fopen($ndjsonFile, 'r');
+    $ndjsonFp = fopen($ndjsonFile, 'r');
     if ($ndjsonFp) {
         while (($line = fgets($ndjsonFp)) !== false) {
             $msg = json_decode($line, true);
@@ -295,7 +352,7 @@ function handleExtract(): void
     $activeTikiClient = $localTikiClient;
 
     // Guardar metadata (sin credenciales Tiki — van a session)
-    $metaWritten = @file_put_contents($tempDir . '/metadata.json', json_encode([
+    $metaWritten = file_put_contents($tempDir . '/metadata.json', json_encode([
         'chat_id' => $chatId,
         'chat_title' => $chatTitle,
         'topics' => $topics,
@@ -303,8 +360,13 @@ function handleExtract(): void
         'total' => $totalMessages,
         'created' => time(),
         'field_prefix' => $fieldPrefix,
+        'migrated' => $migrated,
+        'migration_point_id' => $migrationPointId,
     ]));
     if ($metaWritten === false) {
+        $error = error_get_last();
+        $msg = $error ? $error['message'] : 'unknown error';
+        log_message("import.php: No se pudo escribir metadata.json: {$msg}", true);
         rrmdir($tempDir);
         jsonError('No se pudo escribir metadata.json en directorio temporal');
     }
@@ -326,9 +388,11 @@ function handleExtract(): void
             $fileIndex[$fn] = $f->getPathname();
         }
     }
-    $idxWritten = @file_put_contents($tempDir . '/fileindex.json', json_encode($fileIndex));
+    $idxWritten = file_put_contents($tempDir . '/fileindex.json', json_encode($fileIndex));
     if ($idxWritten === false) {
-        log_message("import.php: ERROR — No se pudo escribir fileindex.json", true);
+        $error = error_get_last();
+        $msg = $error ? $error['message'] : 'unknown error';
+        log_message("import.php: No se pudo escribir fileindex.json: {$msg}", true);
     }
 
     // Resolver gallery ID y persistirlo en metadata para que handleProcess lo re-use
@@ -336,9 +400,11 @@ function handleExtract(): void
     if ($galleryId !== null) {
         $metadata = json_decode(file_get_contents($tempDir . '/metadata.json'), true);
         $metadata['gallery_id'] = $galleryId;
-        $metaWritten2 = @file_put_contents($tempDir . '/metadata.json', json_encode($metadata));
+        $metaWritten2 = file_put_contents($tempDir . '/metadata.json', json_encode($metadata));
         if ($metaWritten2 === false) {
-            log_message("import.php: ERROR — No se pudo actualizar metadata.json con gallery_id", true);
+            $error = error_get_last();
+            $msg = $error ? $error['message'] : 'unknown error';
+            log_message("import.php: No se pudo actualizar metadata.json con gallery_id: {$msg}", true);
         }
         log_message("trackerGram import: Gallery ID {$galleryId} persistido para tracker {$trackerId}");
     } else {
@@ -418,9 +484,11 @@ function handleProcess(): void
             $localTikiClient->setFieldPrefix($resolvedPrefix);
             // Actualizar metadata en disco para chunks subsiguientes
             $metadata['field_prefix'] = $resolvedPrefix;
-            $metaWritten3 = @file_put_contents($metadataPath, json_encode($metadata));
+            $metaWritten3 = file_put_contents($metadataPath, json_encode($metadata));
             if ($metaWritten3 === false) {
-                log_message("import.php process: ERROR — No se pudo actualizar metadata.json con field_prefix", true);
+                $error = error_get_last();
+                $msg = $error ? $error['message'] : 'unknown error';
+                log_message("import.php process: No se pudo actualizar metadata.json con field_prefix: {$msg}", true);
             }
             // Actualizar session
             if (isset($creds)) {
@@ -448,8 +516,11 @@ function handleProcess(): void
         jsonError('Archivo de mensajes no encontrado');
     }
 
-    $fp = @fopen($ndjsonFile, 'r');
+    $fp = fopen($ndjsonFile, 'r');
     if (!$fp) {
+        $error = error_get_last();
+        $msg = $error ? $error['message'] : 'unknown error';
+        log_message("import.php: No se pudo abrir NDJSON '{$ndjsonFile}': {$msg}", true);
         jsonError('No se pudo abrir archivo de mensajes');
     }
 
@@ -894,10 +965,36 @@ function handleFull(): void
     $chatTitle = $data['name'] ?? 'Unknown Chat';
     $rawId = $data['id'] ?? 0;
     $chatType = $data['type'] ?? '';
-    if (in_array($chatType, ['private_supergroup', 'private_channel']) && $rawId > 0) {
-        $chatId = '-100' . $rawId;
-    } else {
-        $chatId = $rawId;
+    $chatId = rawChatIdToFinal($rawId, $chatType);
+
+    // ── Detectar migración grupo→supergrupo (full import) ──
+    $migrated = false;
+    $supergroupIdOverride = 0;
+    foreach ($messages as $scanMsg) {
+        if (($scanMsg['type'] ?? '') !== 'service') continue;
+        $action = $scanMsg['action'] ?? '';
+        if ($action === 'migrate_to_supergroup') {
+            $migrated = true;
+            if (!empty($scanMsg['text']) && is_numeric($scanMsg['text'])) {
+                $supergroupIdOverride = (int) $scanMsg['text'];
+            } elseif (!empty($scanMsg['title']) && is_numeric($scanMsg['title'])) {
+                $supergroupIdOverride = (int) $scanMsg['title'];
+            }
+            break;
+        } elseif ($action === 'migrate_from_group') {
+            $migrated = true;
+        }
+    }
+    if ($migrated) {
+        if ($supergroupIdOverride > 0) {
+            $chatId = '-100' . $supergroupIdOverride;
+            log_message("trackerGram import (full): 🚚 Migración — chat_id sobreescrito a {$chatId}");
+        } elseif (!str_starts_with((string) $chatId, '-100') && $rawId > 0) {
+            $chatId = '-100' . $rawId;
+            log_message("trackerGram import (full): 🚚 Migración — chat_id unificado a {$chatId}");
+        } else {
+            log_message("trackerGram import (full): 🚚 Migración — chat_id {$chatId} ya es supergrupo");
+        }
     }
 
     $topics = [];
@@ -1185,12 +1282,16 @@ function rrmdir($dir): void {
             if (is_dir($path)) {
                 rrmdir($path);
             } else {
-                @unlink($path);
+                if (!unlink($path)) {
+                    log_message("rrmdir: No se pudo eliminar '{$path}'");
+                }
             }
         }
         rmdir($dir);
     } elseif (is_file($dir)) {
-        @unlink($dir);
+        if (!unlink($dir)) {
+            log_message("rrmdir: No se pudo eliminar archivo '{$dir}'");
+        }
     }
 }
 

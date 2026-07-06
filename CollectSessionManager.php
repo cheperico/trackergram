@@ -38,6 +38,7 @@ class CollectSessionManager
     public function set(string $key, array $data): void
     {
         $this->withLock(function(array $sessions) use ($key, $data): array {
+            $data['last_activity'] = time();
             $sessions[$key] = $data;
             return $sessions;
         });
@@ -64,13 +65,34 @@ class CollectSessionManager
     }
 
     /**
+     * Purgar sesiones con más de 1 hora de inactividad.
+     */
+    private function gcSessions(array $sessions): array
+    {
+        $now = time();
+        $maxAge = 3600; // 1 hora
+        $countBefore = count($sessions);
+        $sessions = array_filter($sessions, function(array $session) use ($now, $maxAge): bool {
+            $lastActivity = $session['last_activity'] ?? $session['created_at'] ?? 0;
+            return ($now - $lastActivity) < $maxAge;
+        });
+        $purged = $countBefore - count($sessions);
+        if ($purged > 0) {
+            log_message("trackerGram: CollectSessionManager purged {$purged} expired sessions (>{$maxAge}s)");
+        }
+        return $sessions;
+    }
+
+    /**
      * Operación atómica: LOCK_EX, read, callback, write, unlock
      */
     private function withLock(callable $mutate): array
     {
-        $fp = @fopen($this->storageFile, 'c+');
+        $fp = fopen($this->storageFile, 'c+');
         if (!$fp) {
-            log_message("trackerGram: CollectSessionManager no pudo abrir {$this->storageFile}", true);
+            $error = error_get_last();
+            $msg = $error ? $error['message'] : 'unknown error';
+            log_message("trackerGram: CollectSessionManager no pudo abrir {$this->storageFile}: {$msg}", true);
             return $mutate([]);
         }
         flock($fp, LOCK_EX);
@@ -83,6 +105,9 @@ class CollectSessionManager
                 $sessions = $decoded;
             }
         }
+
+        // GC de sesiones expiradas ANTES de aplicar la mutación
+        $sessions = $this->gcSessions($sessions);
 
         $sessions = $mutate($sessions);
 

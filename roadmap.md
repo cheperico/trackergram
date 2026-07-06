@@ -110,10 +110,8 @@
 ### 🟢 Fase 3: Bugs + Robustez (mediano plazo)
 
 | # | Item | Esfuerzo | Dependencias |
-|---|------|----------|--------------|
+|--|------|----------|--------------|
 | 6 | **Chat_id unificado para imports con migración** | 2 sesiones | Los exports de Telegram pueden incluir migración grupo→supergrupo. Los mensajes pre-migración tienen IDs negativos, los post-migración IDs positivos. El chat_id también cambia. Decidir estrategia (un solo chat_id para todo el grupo, o bifurcar) e implementar detección de service messages `migrate_to_supergroup`/`migrate_from_group`. |
-| 6b | **Reply: link clickeable + texto del original** | 1-2 sesiones | El enlace al mensaje respondido ahora usa `preg_match` (modifier nativo de TikiWiki) para extraer el itemId en templates `tplwiki`. Pendientes: (1) probar que funcione en TikiWiki real (cache de templates_c/), (2) Opción A alternativa: campo `ReplyToText` separado para evitar concatenar texto en `ReplyToId`. Para trackers existentes requiere migración. Referencia: `opt/visualizacion-lcc2026.md`, `opt/visualizacion-tiki.md`. |
-| 7 | **Mensajes estructurados con prefijos** | 2-3 sesiones | Parser en MessageMapper para mensajes tipo `GPS user coord` o `#tag texto`. |
 | 8 | **Manejo de errores estandarizado** | 2-3 sesiones | Excepciones de dominio (`ConfigException`, `TelegramException`, `TikiWikiException`, `ImportException`). |
 | 9 | **Import CLI asíncrono** | 2 sesiones | Script CLI para exports grandes sin timeout HTTP. |
 | 10 | **Álbumes/grupos de medios en un solo item** | 2-3 sesiones | Agrupar fotos del mismo `media_group_id` en UN item del tracker con múltiples archivos en el campo FG. Actualmente cada foto crea su propio item. Requiere: (1) método para actualizar items existentes en TikiWikiClient, (2) lógica de detección de grupo y update vs create, (3) concurrencia (fotos llegan casi simultáneas). |
@@ -128,20 +126,35 @@
 | **F3-7** | **Archivos temporales a TEMP_DIR** | 30 min | `topic_names.json` y `media_group_captions.json` en `__DIR__` en vez de `TEMP_DIR`. Código: WebhookHandler.php:47,762. Code Review: Arq&Seg #7. |
 | **F3-8** | **Eliminar operador @ en puntos críticos** | 1 sesión | `@rename`, `@fopen`, `@unlink` silencian errores de disco/permisos. Worker puede reprocesar infinitamente si `@rename` falla. Fix: sacar `@` y loguear con `error_get_last()`. Archivos: worker.php, api.php, varios. Code Review: Arq&Seg #8. |
 | **F3-9** | **Reply-To cache local (chat_id,message_id)→itemId** | 1-2 sesiones | Si el mensaje original se creó hace ms, el índice de TikiWiki puede no tenerlo. Cache local en JSON elimina la llamada API y evita el miss. Código: WebhookHandler.php:346, TikiWikiClient.php:592. Code Review: Data Flow #4. |
+| **F3-10** | **Cache leak: topic_names.json crece sin límite** | 1 sesión | ✅ **Resuelto** — poda automática (>1000 entradas → recorta a 500) en `withTopicNamesLock()`. |
+| **F3-11** | **Cache leak: tg_admin_rate_* sin GC** | 30 min | ✅ **Resuelto** — GC probabilístico 1% >1h en `gcAdminRateFiles()`, llamado desde admin.php. |
+| **F3-13** | **Cache leak: collect_sessions.json acumula sesiones huérfanas** | 1 sesión | ✅ **Resuelto** — `gcSessions()` purga sesiones >1h sin actividad + `last_activity` auto-actualizado en cada `set()`. |
 
 ### 🔵 Fase 4: Refactor + Deuda Técnica (largo plazo)
 
+#### 🟣 Alternativas en Evaluación — Recolección Estructurada
+
+Todavía sin decisión final. Se están evaluando 3 enfoques (no necesariamente excluyentes) para permitir carga estructurada de datos al tracker:
+
+| Alternativa | Esfuerzo | Documento | Cómo funciona |
+|-------------|----------|-----------|---------------|
+| **Mini App** (Telegram Web App) | 5+ sesiones | `design/002-MiniApp.md` | Formulario web embebido en Telegram, desde un botón inline |
+| **PWA offline** | ~4 sesiones (F1+F2+F3) | `design/007-pwa-offline-formularios.md` | App web offline-first que sincroniza al volver en línea |
+| **Mensajes estructurados con prefijos** | 2-3 sesiones | — | Parser en MessageMapper: `GPS user coord`, `#tag texto` — sin UI nueva |
+
+#### Resto de Fase 4
+
 | # | Item | Esfuerzo | Notas |
 |---|------|----------|-------|
-| 11 | **Mini App** (Telegram Web App) | 5+ sesiones | Frontend embebido + backend. Formulario rico. Ver `design/002-MiniApp.md`. |
-| 12 | **Dashboard de métricas** | 2-3 sesiones | Mensajes procesados, errores, media subidos por conexión. |
-| 13 | **Tests unitarios** | Continuo | MessageMapper, WebhookHandler, clientes. |
-| 14 | **PSR-4 autoloading** | 1 sesión | Mover clases a `src/`, autoloader. |
-| 15 | **Transcripción de voz / OCR** | 3-4 sesiones | Whisper + OCR. Dependencias externas. |
-| 16 | **SQLite para cola async y rate limiting** (evaluación) | 1 sesión | **Opcional.** Evaluar si vale la pena migrar tmp/buffer/ y rate limiting de archivos JSON a SQLite. Prioridad mínima — los archivos actuales funcionan para el volumen esperado. No aplica a setup.json ni topic cache. Code Review: Arq&Seg #9. Postergado. |
-| 17 | **Rotación de logs por fecha** | 1 sesión | Además de por tamaño. |
-| 18 | **Expulsar bot desde admin panel** | 1 sesión | Botón para sacar el bot de un grupo directamente desde la interface, sin tener que hacerlo desde Telegram. |
-| 19 | **JsonFileStorage utility class** | 1-2 sesiones | Centralizar acceso a archivos JSON con `flock()` (LOCK_EX/LOCK_SH). Resolvería race conditions en rate limiting, ConfigManager, topics cache y media group captions (F3-3, F3-4) de un solo golpe. |
+| 11 | **Dashboard de métricas** | 2-3 sesiones | Mensajes procesados, errores, media subidos por conexión. |
+| 12 | **Tests unitarios** | Continuo | MessageMapper, WebhookHandler, clientes. |
+| 13 | **PSR-4 autoloading** | 1 sesión | Mover clases a `src/`, autoloader. |
+| 14 | **SQLite para cola async y rate limiting** (evaluación) | 1 sesión | **Opcional.** Evaluar si vale la pena migrar tmp/buffer/ y rate limiting de archivos JSON a SQLite. Prioridad mínima — los archivos actuales funcionan para el volumen esperado. No aplica a setup.json ni topic cache. Code Review: Arq&Seg #9. Postergado. |
+| 15 | **Rotación de logs por fecha** | 1 sesión | Además de por tamaño. |
+| 16 | **Expulsar bot desde admin panel** | 1 sesión | Botón para sacar el bot de un grupo directamente desde la interface, sin tener que hacerlo desde Telegram. |
+| 17 | **JsonFileStorage utility class** | 1-2 sesiones | Centralizar acceso a archivos JSON con `flock()` (LOCK_EX/LOCK_SH). Resolvería race conditions en rate limiting, ConfigManager, topics cache y media group captions (F3-3, F3-4) y varios leaks de caché de un solo golpe. |
+| 18 | **Cache leak: chats_detectados.json — ignored crece sin límite** | 1 sesión | ✅ **Resuelto** — poda: 100 entradas/slug + detecciones >30 días eliminadas. En `saveDetections()`. |
+| 19 | **Cache leak: debug_fallback.log sin rotación** | 30 min | ✅ **Resuelto** — si supera 10MB, se trunca automáticamente. En `config.php`. |
 | **F4-1** | **WebhookHandler refactor (God Object, 823 líneas)** | 2-3 sesiones | Extraer `CommandRouter` (comandos /ayuda /estado), `MediaProcessor` (download + upload + álbumes), `DeduplicationService` (locks TOCTOU). WebhookHandler queda como fachada. Code Review: Arq&Seg #6. |
 | **F4-2** | **HTTP Keep-Alive con curl_reset()** | 1 sesión | Reutilizar handle curl en TikiWikiClient y TelegramClient con `curl_reset()` para habilitar HTTP Keep-Alive y evitar handshake TLS en cada llamada. Code Review: Arq&Seg #4. |
 | **F4-3** | **Head-of-Line blocking en worker.php** | 2-3 sesiones | Worker single-thread: si TikiWiki tarda 30s en upload, la cola se bloquea. Evaluar `curl_multi_exec()` para push concurrente o múltiples workers con lock granular. Code Review: Arq&Seg #5. |
@@ -204,6 +217,16 @@ Items que no justifican implementación hoy pero se documentan por si el context
 
 ---
 
+## Features Opcionales (no comprometidos, sin fecha)
+
+Features que no están en el roadmap activo. Se documentan como ideas disponibles si el contexto lo justifica, pero no hay compromiso ni plazo de implementación.
+
+| Item | Notas |
+|------|-------|
+| **Transcripción de voz** | Reconocimiento de voz (Whisper) + OCR en imágenes. Dependencias externas pesadas, evaluar si el caso de uso lo justifica. |
+
+---
+
 ## Diseños en Progreso
 
 Los documentos en `design/` contienen exploraciones detalladas de features que están en discusión. Cuando un diseño madura lo suficiente (solo necesita retoques de implementación), pasa a la sección de Prioridades de este roadmap.
@@ -211,9 +234,12 @@ Los documentos en `design/` contienen exploraciones detalladas de features que e
 | Documento | Estado | Feature |
 |-----------|--------|---------|
 | `design/001-configuracion-inversa-via-telegram.md` | Exploración | Configurar trackerGram desde Telegram con comandos |
-| `design/002-MiniApp.md` | Exploración | Frontend embebido para recolección estructurada de datos |
+| `design/002-MiniApp.md` | Exploración | Frontend embebido para recolección estructurada de datos (una de 3 alternativas, ver Fase 4) |
 | `design/003-arquitectura-multi.md` | ✅ Implementado | Multi-conexión (routing, field mapping, etc.) |
+| `design/007-pwa-offline-formularios.md` | Exploración | PWA offline-first para cargas estructuradas (una de 3 alternativas, ver Fase 4) |
+
+> 📌 La Mini App (`002`), la PWA offline (`007`) y los mensajes estructurados con prefijos son **3 alternativas en evaluación** para recolección estructurada de datos. Ninguna reemplaza a otra — se está evaluando cuál implementar (o combinación). Ver sección [Fase 4 — Alternativas en Evaluación](#-alternativas-en-evaluación--recolección-estructurada).
 
 Los reportes históricos en `reports/` se conservan como referencia de investigaciones pasadas. Los items accionables ya están consolidados en este documento.
 
-> **Última actualización**: 06/07/2026
+> **Última actualización**: 08/07/2026 — Cache leaks resueltos (F3-10, F3-11, F3-13, #18, #19)

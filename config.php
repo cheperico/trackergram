@@ -57,7 +57,7 @@ loadEnv();
 
 // Configuración de la aplicación
 define('APP_NAME', 'trackerGram');
-define('TRACKERGRAM_VERSION', 'v0.6.0');
+define('TRACKERGRAM_VERSION', 'v0.6.2');
 define('TIMEZONE', 'America/Argentina/Buenos_Aires');
 
 // Configuración de múltiples chats
@@ -160,6 +160,10 @@ function log_message(string $message, bool $force = false): void
     if ($written === false) {
         // Fallback 1: directorio temporal propio
         $tempLog = TEMP_DIR . '/debug_fallback.log';
+        // Rotación del fallback: si supera 10MB, truncar
+        if (file_exists($tempLog) && filesize($tempLog) > 10 * 1024 * 1024) {
+            @file_put_contents($tempLog, '');
+        }
         $written = @file_put_contents($tempLog, $logLine, FILE_APPEND | LOCK_EX);
     }
     if ($written === false) {

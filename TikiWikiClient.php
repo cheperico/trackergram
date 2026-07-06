@@ -102,33 +102,48 @@ class TikiWikiClient
 
         $url = $this->apiUrl . "trackers/$trackerId/fields";
 
-        $ch = $this->createCurlHandle();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Authorization: Bearer " . $this->token,
-            "User-Agent: Mozilla/5.0"
-        ]);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+        for ($attempt = 0; $attempt < RETRY_MAX_ATTEMPTS; $attempt++) {
+            $ch = $this->createCurlHandle();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Authorization: Bearer " . $this->token,
+                "User-Agent: Mozilla/5.0"
+            ]);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
 
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            curl_close($ch);
 
-        $fields = [];
-        if ($httpCode === 200) {
-            $data = json_decode($response, true);
-            if (isset($data['fields'])) {
-                $fields = $data['fields'];
-            } else {
+            $fields = [];
+            if ($httpCode === 200) {
+                $data = json_decode($response, true);
+                if (isset($data['fields'])) {
+                    $fields = $data['fields'];
+                    $this->trackerFieldsCache[$trackerId] = $fields;
+                    return $fields;
+                }
                 log_message("TikiWikiClient: GET trackers/{$trackerId}/fields sin clave 'fields'. Keys: " . implode(', ', array_keys($data)), true);
+                break; // respuesta inválida, no reintentar
             }
-        } else {
+
+            if ($curlError || $httpCode >= 500) {
+                if ($attempt < RETRY_MAX_ATTEMPTS - 1) {
+                    usleep(RETRY_DELAY_MICROSECONDS * (1 << $attempt));
+                    log_message("TikiWikiClient: loadTrackerFields retry {$attempt} tracker {$trackerId}" . ($curlError ? ": {$curlError}" : " HTTP {$httpCode}"));
+                }
+                continue;
+            }
+
+            // 4xx — no reintentar
             log_message("TikiWikiClient: Error HTTP {$httpCode} al obtener fields de tracker {$trackerId}", true);
+            break;
         }
 
-        $this->trackerFieldsCache[$trackerId] = $fields;
-        return $fields;
+        $this->trackerFieldsCache[$trackerId] = [];
+        return [];
     }
 
     /**
@@ -485,7 +500,11 @@ class TikiWikiClient
         return null;
     }
 
-    public function createTrackerItem(int $trackerId, array $postFields): bool
+    /**
+     * Crear un item en el tracker.
+     * @return int|false itemId en éxito, false en error
+     */
+    public function createTrackerItem(int $trackerId, array $postFields): int|false
     {
         $url = $this->apiUrl . "trackers/$trackerId/items";
 
@@ -523,8 +542,9 @@ class TikiWikiClient
             return false;
         }
 
-        log_message("TikiWikiClient: Item creado - itemId={$responseData['itemId']}");
-        return true;
+        $itemId = (int) $responseData['itemId'];
+        log_message("TikiWikiClient: Item creado - itemId={$itemId}");
+        return $itemId;
     }
 
     /**
@@ -582,25 +602,39 @@ class TikiWikiClient
             $url .= "&filter[fields][{$prefix}ChatId]=$chatId";
         }
 
-        $ch = $this->createCurlHandle();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Authorization: Bearer " . $this->token,
-            "User-Agent: Mozilla/5.0"
-        ]);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+        for ($attempt = 0; $attempt < RETRY_MAX_ATTEMPTS; $attempt++) {
+            $ch = $this->createCurlHandle();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Authorization: Bearer " . $this->token,
+                "User-Agent: Mozilla/5.0"
+            ]);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
 
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            curl_close($ch);
 
-        if ($httpCode !== 200) {
-            return null; // Error de red/timeout/5xx — no se puede determinar si existe
+            if ($curlError || $httpCode >= 500) {
+                // Error de red o server error — reintentar con backoff
+                if ($attempt < RETRY_MAX_ATTEMPTS - 1) {
+                    usleep(RETRY_DELAY_MICROSECONDS * (1 << $attempt));
+                    log_message("TikiWikiClient: messageExists retry {$attempt} para message_id={$messageId}" . ($curlError ? ": {$curlError}" : " HTTP {$httpCode}"));
+                }
+                continue;
+            }
+
+            if ($httpCode !== 200) {
+                return null; // 4xx — no reintentar
+            }
+
+            $data = json_decode($response, true);
+            return count($data['data'] ?? []);
         }
 
-        $data = json_decode($response, true);
-        return count($data['data'] ?? []);
+        return null;
     }
 
     /**
@@ -619,36 +653,48 @@ class TikiWikiClient
             . "&filter[fields][{$prefix}ChatId]=" . urlencode((string) $chatId)
             . "&maxRecords=1";
 
-        $ch = $this->createCurlHandle();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Authorization: Bearer " . $this->token,
-            "User-Agent: Mozilla/5.0"
-        ]);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+        for ($attempt = 0; $attempt < RETRY_MAX_ATTEMPTS; $attempt++) {
+            $ch = $this->createCurlHandle();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Authorization: Bearer " . $this->token,
+                "User-Agent: Mozilla/5.0"
+            ]);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
 
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            curl_close($ch);
 
-        if ($httpCode !== 200) {
-            return null;
+            if ($curlError || $httpCode >= 500) {
+                if ($attempt < RETRY_MAX_ATTEMPTS - 1) {
+                    usleep(RETRY_DELAY_MICROSECONDS * (1 << $attempt));
+                    log_message("TikiWikiClient: findItemByMessageId retry {$attempt} para message_id={$messageId}" . ($curlError ? ": {$curlError}" : " HTTP {$httpCode}"));
+                }
+                continue;
+            }
+
+            if ($httpCode !== 200) {
+                return null;
+            }
+
+            $data = json_decode($response, true);
+            if (!is_array($data)) {
+                return null;
+            }
+
+            $items = $data['data'] ?? $data['result'] ?? [];
+            if (empty($items) || !is_array($items)) {
+                return null;
+            }
+
+            $first = reset($items);
+            return isset($first['itemId']) ? (int) $first['itemId'] : null;
         }
 
-        $data = json_decode($response, true);
-        if (!is_array($data)) {
-            return null;
-        }
-
-        // La API puede devolver los items en 'data' o 'result'
-        $items = $data['data'] ?? $data['result'] ?? [];
-        if (empty($items) || !is_array($items)) {
-            return null;
-        }
-
-        $first = reset($items);
-        return isset($first['itemId']) ? (int) $first['itemId'] : null;
+        return null;
     }
 
     /**
@@ -662,34 +708,47 @@ class TikiWikiClient
     {
         $url = $this->apiUrl . "trackers/$trackerId/items?itemId=" . urlencode((string) $itemId) . "&maxRecords=1";
 
-        $ch = $this->createCurlHandle();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Authorization: Bearer " . $this->token,
-            "User-Agent: Mozilla/5.0"
-        ]);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+        for ($attempt = 0; $attempt < RETRY_MAX_ATTEMPTS; $attempt++) {
+            $ch = $this->createCurlHandle();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Authorization: Bearer " . $this->token,
+                "User-Agent: Mozilla/5.0"
+            ]);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
 
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            curl_close($ch);
 
-        if ($httpCode !== 200) {
-            return null;
+            if ($curlError || $httpCode >= 500) {
+                if ($attempt < RETRY_MAX_ATTEMPTS - 1) {
+                    usleep(RETRY_DELAY_MICROSECONDS * (1 << $attempt));
+                    log_message("TikiWikiClient: getTrackerItem retry {$attempt} para itemId={$itemId}" . ($curlError ? ": {$curlError}" : " HTTP {$httpCode}"));
+                }
+                continue;
+            }
+
+            if ($httpCode !== 200) {
+                return null;
+            }
+
+            $data = json_decode($response, true);
+            if (!is_array($data)) {
+                return null;
+            }
+
+            $items = $data['data'] ?? $data['result'] ?? [];
+            if (empty($items) || !is_array($items)) {
+                return null;
+            }
+
+            return reset($items);
         }
 
-        $data = json_decode($response, true);
-        if (!is_array($data)) {
-            return null;
-        }
-
-        $items = $data['data'] ?? $data['result'] ?? [];
-        if (empty($items) || !is_array($items)) {
-            return null;
-        }
-
-        return reset($items);
+        return null;
     }
 
     /**

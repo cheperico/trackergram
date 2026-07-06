@@ -53,8 +53,12 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
     if (mt_rand(1, 100) === 1) {
         $staleThreshold = $now - 3600;
         foreach (glob(TEMP_DIR . '/tg_rate_*') as $staleFile) {
-            if (filemtime($staleFile) < $staleThreshold) {
-                @unlink($staleFile);
+            if (is_file($staleFile) && filemtime($staleFile) < $staleThreshold) {
+                if (!unlink($staleFile)) {
+                    $error = error_get_last();
+                    $msg = $error ? $error['message'] : 'unknown error';
+                    log_message("trackerGram: GC no pudo eliminar rate file '{$staleFile}': {$msg}");
+                }
             }
         }
     }
@@ -235,7 +239,11 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
                 // Modo async: escribir a buffer y responder rápido
                 $bufferDir = TEMP_DIR . '/buffer';
                 if (!is_dir($bufferDir)) {
-                    @mkdir($bufferDir, 0700, true);
+                    if (!mkdir($bufferDir, 0700, true) && !is_dir($bufferDir)) {
+                        log_message("trackerGram: No se pudo crear buffer dir '{$bufferDir}' — procesando sincrónicamente", true);
+                        processUpdate($update, $connection, $connectionSlug, $messageMapper, $configManager);
+                        break; // sale del case async
+                    }
                 }
 
                 $bufferData = [
@@ -244,14 +252,22 @@ if (basename($_SERVER['SCRIPT_NAME'] ?? '') === 'api.php' && $_SERVER['REQUEST_M
                 ];
                 $bufferFile = $bufferDir . '/event_' . time() . '_' . bin2hex(random_bytes(4)) . '.json';
                 $tmpFile = $bufferFile . '.tmp'; // escritura temporal + rename atómico
-                $written = @file_put_contents($tmpFile, json_encode($bufferData), LOCK_EX);
+                $written = file_put_contents($tmpFile, json_encode($bufferData), LOCK_EX);
                 if ($written === false) {
-                    @unlink($tmpFile);
-                    log_message("trackerGram: No se pudo escribir buffer async — procesando sincrónicamente", true);
+                    $error = error_get_last();
+                    $msg = $error ? $error['message'] : 'unknown error';
+                    if (file_exists($tmpFile)) {
+                        unlink($tmpFile);
+                    }
+                    log_message("trackerGram: No se pudo escribir buffer async ({$msg}) — procesando sincrónicamente", true);
                     processUpdate($update, $connection, $connectionSlug, $messageMapper, $configManager);
-                } elseif (!@rename($tmpFile, $bufferFile)) {
-                    @unlink($tmpFile);
-                    log_message("trackerGram: No se pudo renombrar buffer async — procesando sincrónicamente", true);
+                } elseif (!rename($tmpFile, $bufferFile)) {
+                    $error = error_get_last();
+                    $msg = $error ? $error['message'] : 'unknown error';
+                    if (file_exists($tmpFile)) {
+                        unlink($tmpFile);
+                    }
+                    log_message("trackerGram: No se pudo renombrar buffer async ({$msg}) — procesando sincrónicamente", true);
                     processUpdate($update, $connection, $connectionSlug, $messageMapper, $configManager);
                 }
             } else {

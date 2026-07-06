@@ -86,6 +86,12 @@ class WebhookHandler
 
         $topics = $mutate($topics);
 
+        // Poda: si supera 1000 entradas, conservar solo las últimas 500
+        if (count($topics) > 1000) {
+            $topics = array_slice($topics, -500, null, true);
+            log_message("trackerGram: topic_names.json podado (>1000 entradas, recortado a 500)");
+        }
+
         rewind($fp);
         $written = fwrite($fp, json_encode($topics));
         if ($written !== false) {
@@ -94,6 +100,90 @@ class WebhookHandler
 
         flock($fp, LOCK_UN);
         fclose($fp);
+    }
+
+    /**
+     * Cache de resolución reply-to: mapea "{trackerId}:{chatId}:{messageId}" → itemId.
+     * Evita llamada API a TikiWiki cuando el mensaje original se creó hace ms
+     * y el índice de búsqueda aún no está actualizado (race condition F3-9).
+     */
+    private function replyCachePath(): string
+    {
+        return (defined('TEMP_DIR') ? TEMP_DIR : __DIR__) . '/reply_cache.json';
+    }
+
+    /**
+     * Almacenar mapeo (chatId, messageId) → itemId en cache local con flock(LOCK_EX).
+     */
+    private function cacheReplyMapping(int $trackerId, int $chatId, int $messageId, int $itemId): void
+    {
+        $path = $this->replyCachePath();
+        $fp = fopen($path, 'c+');
+        if (!$fp) {
+            log_message("trackerGram: No se pudo abrir reply_cache.json para escritura", true);
+            return;
+        }
+        flock($fp, LOCK_EX);
+
+        $content = stream_get_contents($fp);
+        $cache = [];
+        if ($content !== false && $content !== '') {
+            $decoded = json_decode($content, true);
+            if (is_array($decoded)) {
+                $cache = $decoded;
+            }
+        }
+
+        $key = "{$trackerId}:{$chatId}:{$messageId}";
+        $cache[$key] = $itemId;
+
+        // Evitar crecimiento infinito: podar a 1000 entradas si supera 5000
+        if (count($cache) > 5000) {
+            $cache = array_slice($cache, -1000, null, true);
+        }
+
+        rewind($fp);
+        $written = fwrite($fp, json_encode($cache));
+        if ($written !== false) {
+            ftruncate($fp, ftell($fp));
+        }
+
+        flock($fp, LOCK_UN);
+        fclose($fp);
+    }
+
+    /**
+     * Buscar itemId en cache local (chatId, messageId) con flock(LOCK_SH).
+     * @return int|null itemId si está cacheado, null si no.
+     */
+    private function lookupReplyCache(int $trackerId, int $chatId, int $messageId): ?int
+    {
+        $path = $this->replyCachePath();
+        if (!file_exists($path)) {
+            return null;
+        }
+
+        $fp = fopen($path, 'r');
+        if (!$fp) {
+            return null;
+        }
+        flock($fp, LOCK_SH);
+
+        $content = stream_get_contents($fp);
+        flock($fp, LOCK_UN);
+        fclose($fp);
+
+        if ($content === false || $content === '') {
+            return null;
+        }
+
+        $cache = json_decode($content, true);
+        if (!is_array($cache)) {
+            return null;
+        }
+
+        $key = "{$trackerId}:{$chatId}:{$messageId}";
+        return isset($cache[$key]) ? (int) $cache[$key] : null;
     }
 
     /**
@@ -214,13 +304,15 @@ class WebhookHandler
 
     /**
      * Enviar datos a TikiWiki con reintentos
+     * @return int|false itemId en éxito, false si fallan todos los reintentos
      */
-    public function sendToTikiWikiWithRetries(NormalizedMessage $msg): bool
+    public function sendToTikiWikiWithRetries(NormalizedMessage $msg): int|false
     {
         for ($i = 0; $i < $this->retryMaxAttempts; $i++) {
             $fields = $this->messageMapper->toWikiFields($msg);
-            if ($this->tikiWikiClient->createTrackerItem($this->trackerId, $fields)) {
-                return true;
+            $itemId = $this->tikiWikiClient->createTrackerItem($this->trackerId, $fields);
+            if ($itemId !== false) {
+                return $itemId;
             }
             if ($i < $this->retryMaxAttempts - 1) {
                 log_message("Reintento " . ($i + 1) . " para message_id={$msg->messageId}");
@@ -344,13 +436,17 @@ class WebhookHandler
         // para el mismo mensaje se serializan aquí.
         $lockDir = defined('TEMP_DIR') ? TEMP_DIR . '/dedup_locks' : sys_get_temp_dir() . '/trackergram_dedup';
         if (!is_dir($lockDir)) {
-            @mkdir($lockDir, 0700, true);
+            if (!mkdir($lockDir, 0700, true) && !is_dir($lockDir)) {
+                log_message("trackerGram: No se pudo crear directorio de locks '{$lockDir}'", true);
+            }
         }
         $lockKey = md5($chatId . ':' . $message['message_id']);
         $lockFile = $lockDir . '/' . $lockKey . '.lock';
-        $lockFp = @fopen($lockFile, 'c+');
+        $lockFp = fopen($lockFile, 'c+');
         if ($lockFp) {
             flock($lockFp, LOCK_EX);
+        } else {
+            log_message("trackerGram: No se pudo abrir lock file '{$lockFile}' — protección TOCTOU desactivada", true);
         }
 
         // Cachear topic names for forum_topic_created/edited (atómico)
@@ -378,9 +474,38 @@ class WebhookHandler
             if (isset($lockFp) && $lockFp) {
                 flock($lockFp, LOCK_UN);
                 fclose($lockFp);
-                @unlink($lockFile);
+                if (file_exists($lockFile)) {
+                    unlink($lockFile);
+                }
             }
             return;
+        }
+
+        // ── Mejorar nombre de archivo desde file_path si es genérico ──
+        // Cuando Telegram no envía file_name en el mensaje, fromWebhook() usa
+        // fallbacks como 'Documento' o 'telegram_photo_...'. getFileInfo()
+        // devuelve file_path (ej: "documents/video_2025_04.mp4") del cual
+        // podemos extraer un nombre más descriptivo vía basename().
+        if ($msg->fileId !== null && $msg->fileName !== '') {
+            $genericPatterns = ['/^Documento/', '/^telegram_/', '/^animation/', '/^file_/'];
+            $isGeneric = false;
+            foreach ($genericPatterns as $pattern) {
+                if (preg_match($pattern, $msg->fileName)) {
+                    $isGeneric = true;
+                    break;
+                }
+            }
+            if ($isGeneric) {
+                $fileInfo = $this->telegramClient->getFileInfo($msg->fileId);
+                if ($fileInfo !== null && isset($fileInfo['file_path'])) {
+                    $basename = basename($fileInfo['file_path']);
+                    // Solo usar si tiene extensión y no es un hash genérico
+                    if (pathinfo($basename, PATHINFO_EXTENSION) !== '') {
+                        log_message("trackerGram: fileName mejorado: '{$msg->fileName}' → '{$basename}'");
+                        $msg->fileName = $basename;
+                    }
+                }
+            }
         }
 
         // Descargar y subir media
@@ -400,11 +525,15 @@ class WebhookHandler
         if ($msg->replyToId !== '') {
             $replyMessageId = (int) $msg->replyToId;
             if ($replyMessageId > 0) {
-                $foundItemId = $this->tikiWikiClient->findItemByMessageId(
-                    $this->trackerId,
-                    $replyMessageId,
-                    $chatId
-                );
+                // Cache local primero (F3-9: evita miss de índice TikiWiki recién creados)
+                $foundItemId = $this->lookupReplyCache($this->trackerId, $chatId, $replyMessageId);
+                if ($foundItemId === null) {
+                    $foundItemId = $this->tikiWikiClient->findItemByMessageId(
+                        $this->trackerId,
+                        $replyMessageId,
+                        $chatId
+                    );
+                }
                 if ($foundItemId !== null) {
                     // Resuelto: guardar referencia al itemId + texto del original
                     $replyRef = '#' . $foundItemId;
@@ -430,9 +559,13 @@ class WebhookHandler
         }
 
         // Enviar a TikiWiki
-        if (!$this->sendToTikiWikiWithRetries($msg)) {
+        $newItemId = $this->sendToTikiWikiWithRetries($msg);
+        if ($newItemId === false) {
             log_message("ERROR: No se pudo enviar mensaje a TikiWiki después de {$this->retryMaxAttempts} intentos: message_id={$msg->messageId}", true);
         } else {
+            // Cachear mapeo (chatId, messageId) → itemId para reply-to (F3-9)
+            $this->cacheReplyMapping($this->trackerId, $chatId, $message['message_id'], $newItemId);
+
             $postInsertCount = $this->tikiWikiClient->messageExists($this->trackerId, $message['message_id'], $chatId);
             if ($postInsertCount !== null && $postInsertCount > 1) {
                 log_message("WARNING: duplicado detectado post-insert para message_id={$message['message_id']} — posible race condition", true);
@@ -443,7 +576,9 @@ class WebhookHandler
         if (isset($lockFp) && $lockFp) {
             flock($lockFp, LOCK_UN);
             fclose($lockFp);
-            @unlink($lockFile);
+            if (file_exists($lockFile)) {
+                unlink($lockFile);
+            }
         }
 
         log_message("Mensaje procesado: Topic $topicId, User {$message['from']['first_name']}");
@@ -483,13 +618,17 @@ class WebhookHandler
         // para decidir si el item existe o no.
         $lockDir = defined('TEMP_DIR') ? TEMP_DIR . '/dedup_locks' : sys_get_temp_dir() . '/trackergram_dedup';
         if (!is_dir($lockDir)) {
-            @mkdir($lockDir, 0700, true);
+            if (!mkdir($lockDir, 0700, true) && !is_dir($lockDir)) {
+                log_message("trackerGram: No se pudo crear directorio de locks '{$lockDir}'", true);
+            }
         }
         $lockKey = md5($chatId . ':' . $messageId);
         $lockFile = $lockDir . '/' . $lockKey . '.lock';
-        $lockFp = @fopen($lockFile, 'c+');
+        $lockFp = fopen($lockFile, 'c+');
         if ($lockFp) {
             flock($lockFp, LOCK_EX);
+        } else {
+            log_message("trackerGram: No se pudo abrir lock file '{$lockFile}' — protección TOCTOU desactivada", true);
         }
 
         try {
@@ -537,7 +676,9 @@ class WebhookHandler
             if (isset($lockFp) && $lockFp) {
                 flock($lockFp, LOCK_UN);
                 fclose($lockFp);
-                @unlink($lockFile);
+                if (file_exists($lockFile)) {
+                    unlink($lockFile);
+                }
             }
         }
     }

@@ -9,6 +9,8 @@ class TelegramClient
     private string $botToken;
     private int $timeout;
     private int $downloadTimeout;
+    /** Cache interno de respuestas getFile para evitar llamadas API duplicadas */
+    private array $fileInfoCache = [];
 
     public function __construct(
         string $botToken,
@@ -20,8 +22,18 @@ class TelegramClient
         $this->downloadTimeout = $downloadTimeout;
     }
 
-    public function getFileUrl(string $fileId): ?string
+    /**
+     * Obtener información completa de un archivo de Telegram (file_path, file_size, etc.)
+     * Cachea el resultado para evitar llamadas API duplicadas entre getFileUrl() y getFileInfo().
+     *
+     * @return array{file_path: string, file_size?: int, file_unique_id?: string}|null
+     */
+    public function getFileInfo(string $fileId): ?array
     {
+        if (isset($this->fileInfoCache[$fileId])) {
+            return $this->fileInfoCache[$fileId];
+        }
+
         $apiUrl = $this->baseUrl . '/bot' . $this->botToken . '/getFile';
 
         $ch = curl_init();
@@ -33,12 +45,28 @@ class TelegramClient
         curl_close($ch);
 
         $data = json_decode($response, true);
+        $result = $data['result'] ?? null;
 
-        if (isset($data['result']['file_path'])) {
-            return $this->baseUrl . '/file/bot' . $this->botToken . '/' . $data['result']['file_path'];
+        if ($result !== null && isset($result['file_path'])) {
+            $this->fileInfoCache[$fileId] = $result;
+            return $result;
         }
 
+        $this->fileInfoCache[$fileId] = null;
         return null;
+    }
+
+    /**
+     * Obtener URL pública de descarga para un file_id.
+     * Reusa el cache de getFileInfo() para evitar llamadas API duplicadas.
+     */
+    public function getFileUrl(string $fileId): ?string
+    {
+        $info = $this->getFileInfo($fileId);
+        if ($info === null || !isset($info['file_path'])) {
+            return null;
+        }
+        return $this->baseUrl . '/file/bot' . $this->botToken . '/' . $info['file_path'];
     }
 
     public function getChat(int $chatId): ?array

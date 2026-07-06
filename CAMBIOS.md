@@ -1,5 +1,64 @@
 # Cambios - Changelog
 
+## v0.6.2
+
+### 🧹 Cache leaks resueltos (F3-10, F3-11, F3-13, #18, #19)
+
+#### F3-10: `topic_names.json` crecía sin límite
+- **WebhookHandler::withTopicNamesLock()**: Poda automática cuando supera 1000 entradas, recorta a las 500 más recientes.
+
+#### F3-11: `tg_admin_rate_*` sin GC
+- **admin.php**: Nueva función `gcAdminRateFiles()` con GC probabilístico 1% (>1h sin actividad), mismo patrón que `tg_rate_*` en api.php. Se ejecuta al inicio de cada request.
+
+#### F3-13: `collect_sessions.json` acumulaba sesiones huérfanas
+- **CollectSessionManager**: Nuevo método `gcSessions()` que purga sesiones con más de 1 hora sin actividad. Se ejecuta en cada `withLock()`. `last_activity` se actualiza automáticamente en cada `set()`.
+
+#### #18: `chats_detectados.json` — ignored crecía sin límite
+- **detect_helper.php**: `saveDetections()` ahora poda: max 100 entradas por slug en ignored, y elimina detecciones con más de 30 días de antigüedad.
+
+#### #19: `debug_fallback.log` sin rotación
+- **config.php**: Si `debug_fallback.log` supera 10MB, se trunca automáticamente.
+
+**Nota**: F3-12 (import chunked temp leak) ya estaba resuelto desde antes — `handleProcess()` limpia con `rrmdir()` al final del último batch.
+
+---
+
+### 🔧 Backoff exponencial en GET requests de TikiWikiClient (#12)
+- **TikiWikiClient**: `findItemByMessageId()`, `getTrackerItem()` y `loadTrackerFields()` ahora tienen retry loop con exponential backoff (`RETRY_DELAY_MICROSECONDS × 2^attempt`, solo en curl errors o HTTP 5xx). `loadTrackerFields()` no reintenta en 4xx o respuesta inválida.
+
+### 📎 Nombre de archivo desde file_path (#11)
+- **TelegramClient**: Nuevo método `getFileInfo($fileId)` que cachea la respuesta de `getFile()` en `$fileInfoCache[]`. `getFileUrl()` refactorizado para reusar el cache.
+- **WebhookHandler::processMessage()**: Si `fileName` es genérico (`Documento`, `telegram_photo_*`, `animation`), llama a `getFileInfo()` y extrae `basename(file_path)` para un nombre más descriptivo.
+
+### 🗑️ F3-8: @ operator eliminado en puntos críticos
+- **WebhookHandler.php**: `@fopen` en dedup locks reemplazado con log + graceful fallback; `@unlink` reemplazado con `file_exists()` + `unlink()`.
+- **api.php**: `@mkdir`, `@file_put_contents`, `@rename` en buffer async reemplazados con log de errores + fallback a sync processing.
+- **CollectSessionManager.php**: `@fopen` reemplazado con log de `error_get_last()`.
+- **import.php**: 3× `@fopen`, 4× `@file_put_contents`, `@session_start`, `@unlink` en `rrmdir()` reemplazados.
+- **worker.php**: `@filemtime`, `@unlink` en GC reemplazados.
+- `@` se mantiene solo en `log_message()` de `config.php` (intencional: no crashear por fallo de logging).
+
+### 💾 F3-9: Reply-To cache local (chat_id, message_id) → itemId
+- **TikiWikiClient::createTrackerItem()**: Cambia tipo de retorno de `bool` a `int|false` (devuelve el itemId).
+- **WebhookHandler::sendToTikiWikiWithRetries()**: Cambia tipo de retorno de `bool` a `int|false`.
+- **WebhookHandler**: Nuevos métodos `replyCachePath()`, `cacheReplyMapping()`, `lookupReplyCache()` con operaciones atómicas `flock(LOCK_EX/LOCK_SH)` en `reply_cache.json`.
+- `processMessage()` cachea `(trackerId, chatId, messageId) → itemId` post-creación.
+- Reply resolution consulta cache primero; API de TikiWiki solo si miss.
+
+### 🚚 #6: Chat_id unificado para imports con migración grupo→supergrupo
+- **import.php**: Detección de service messages `migrate_to_supergroup` / `migrate_from_group` durante la creación del NDJSON.
+- **Estrategia unificada**: todos los mensajes de la conversación usan el chat_id FINAL (supergrupo con `-100`).
+- Si el `migrate_to_supergroup` trae el ID real del supergrupo en `text`/`title`, lo usa como override.
+- Si el root `id` es del grupo básico pero hubo migración, fuerza el prefijo `-100`.
+- Helper `rawChatIdToFinal()` extraído para reuso.
+- Cubre ambos paths: chunked (extract + process) y legacy (full).
+- Flag `migrated` + `migration_point_id` persistido en metadata.json.
+
+### 🐛 Fix: Syntax error en admin.php
+- **admin.php**: Stray `}` duplicado antes de `generateWebhookUrl()` (introducido en F3-11) — eliminado.
+
+---
+
 ## v0.5.14
 
 ### 🐛 Fixes de code review de julio 2026
