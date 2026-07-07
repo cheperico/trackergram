@@ -715,12 +715,13 @@ function handleProcess(): void
         $fields = $messageMapper->toWikiFields($normalized);
 
         // ── Deduplicación (chunked batch): ¿ya existe este mensaje? ──
+        // Soportamos IDs negativos (mensajes pre-migración grupo→supergrupo)
         $messageIdInt = (int) $normalized->messageId;
-        $existingItemId = ($messageIdInt > 0)
+        $existingItemId = ($messageIdInt !== 0)
             ? $activeTikiClient->findItemByMessageId((int) $trackerId, $messageIdInt, (int) $chatId)
             : null;
 
-        if ($existingItemId === null && $messageIdInt > 0 && !empty($oldChatId)) {
+        if ($existingItemId === null && $messageIdInt !== 0 && !empty($oldChatId)) {
             $existingItemId = $activeTikiClient->findItemByMessageId((int) $trackerId, $messageIdInt, (int) $oldChatId);
             if ($existingItemId !== null) {
                 log_message("trackerGram import: message_id={$messageIdInt} encontrado bajo el chat_id antiguo {$oldChatId} (migrado) — itemId={$existingItemId}");
@@ -1208,12 +1209,13 @@ function handleFull(): void
         $fields = $messageMapper->toWikiFields($normalized);
 
         // ── Deduplicación (full import): ¿ya existe este mensaje? ──
+        // Soportamos IDs negativos (mensajes pre-migración grupo→supergrupo)
         $messageIdInt = (int) $normalized->messageId;
-        $existingItemId = ($messageIdInt > 0)
+        $existingItemId = ($messageIdInt !== 0)
             ? $activeTikiClient->findItemByMessageId((int) $trackerId, $messageIdInt, (int) $chatId)
             : null;
 
-        if ($existingItemId === null && $messageIdInt > 0 && !empty($oldChatId)) {
+        if ($existingItemId === null && $messageIdInt !== 0 && !empty($oldChatId)) {
             $existingItemId = $activeTikiClient->findItemByMessageId((int) $trackerId, $messageIdInt, (int) $oldChatId);
             if ($existingItemId !== null) {
                 log_message("trackerGram import (full): message_id={$messageIdInt} encontrado bajo el chat_id antiguo {$oldChatId} (migrado) — itemId={$existingItemId}");
