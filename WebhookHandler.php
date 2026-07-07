@@ -195,10 +195,6 @@ class WebhookHandler
         return (defined('TEMP_DIR') ? TEMP_DIR : __DIR__) . '/media_group_album.json';
     }
 
-    /**
-     * Operación atómica sobre media_group_album.json con flock(LOCK_EX).
-     * @param callable $mutate fn(array $albums): array
-     */
     private function withAlbumBufferLock(callable $mutate): void
     {
         $file = $this->albumBufferPath();
@@ -241,23 +237,40 @@ class WebhookHandler
      *
      * @return array|null Entrada existente para append, o null si este proceso es el creator.
      */
-    private function registerOrLookupAlbum(string $albumKey, array $fileIds): ?array
+    private function registerOrLookupAlbum(string $albumKey, string $messageId, array $fileIds): ?array
     {
         $result = null;
-        $this->withAlbumBufferLock(function(array $albums) use ($albumKey, $fileIds, &$result): array {
+        $this->withAlbumBufferLock(function(array $albums) use ($albumKey, $messageId, $fileIds, &$result): array {
             if (isset($albums[$albumKey])) {
                 $entry = $albums[$albumKey];
+                
+                // Si ya procesamos este message_id, es un duplicado/reintento
+                if (isset($entry['messageIds']) && in_array($messageId, $entry['messageIds'])) {
+                    $result = ['duplicate' => true];
+                    return $albums;
+                }
+
                 // Si es pending (itemId=0), el creator anterior crasheó — tomamos el rol
                 if (($entry['pending'] ?? false) && ($entry['itemId'] ?? 0) === 0) {
                     $albums[$albumKey] = [
                         'itemId' => 0,
                         'fileIds' => $fileIds,
+                        'messageIds' => [$messageId],
                         'createdAt' => time(),
                         'pending' => true,
                     ];
                     $result = null;
                     return $albums;
                 }
+
+                // Modo append: acumular message_id y fileIds
+                $entry['messageIds'][] = $messageId;
+                foreach ($fileIds as $fid) {
+                    if (!in_array($fid, $entry['fileIds'] ?? [])) {
+                        $entry['fileIds'][] = $fid;
+                    }
+                }
+                $albums[$albumKey] = $entry;
                 $result = $entry;
                 return $albums;
             }
@@ -265,6 +278,7 @@ class WebhookHandler
             $albums[$albumKey] = [
                 'itemId' => 0,
                 'fileIds' => $fileIds,
+                'messageIds' => [$messageId],
                 'createdAt' => time(),
                 'pending' => true,
             ];
@@ -280,11 +294,9 @@ class WebhookHandler
     {
         $this->withAlbumBufferLock(function(array $albums) use ($albumKey, $itemId, $fileIds): array {
             if (isset($albums[$albumKey])) {
-                $albums[$albumKey] = [
-                    'itemId' => $itemId,
-                    'fileIds' => $fileIds,
-                    'createdAt' => time(),
-                ];
+                $albums[$albumKey]['itemId'] = $itemId;
+                $albums[$albumKey]['pending'] = false;
+                $albums[$albumKey]['createdAt'] = time();
             }
             return $albums;
         });
@@ -703,8 +715,19 @@ class WebhookHandler
         $albumKey = null;
         if ($msg->mediaGroupId !== '' && !empty($msg->uploadedFileIds)) {
             $albumKey = $chatId . ':' . $msg->mediaGroupId;
-            $existingAlbum = $this->registerOrLookupAlbum($albumKey, $msg->uploadedFileIds);
+            $existingAlbum = $this->registerOrLookupAlbum($albumKey, $msg->messageId, $msg->uploadedFileIds);
             if ($existingAlbum !== null) {
+                if (isset($existingAlbum['duplicate']) && $existingAlbum['duplicate'] === true) {
+                    log_message("trackerGram: Mensaje duplicado de álbum detectado en buffer (media_group_id={$msg->mediaGroupId}, message_id={$msg->messageId}) — ignorando");
+                    if (isset($lockFp) && $lockFp) {
+                        flock($lockFp, LOCK_UN);
+                        fclose($lockFp);
+                        if (file_exists($lockFile)) {
+                            unlink($lockFile);
+                        }
+                    }
+                    return;
+                }
                 foreach ($msg->uploadedFileIds as $fileId) {
                     $this->tikiWikiClient->appendMediaToTrackerItem(
                         $this->trackerId,
@@ -803,8 +826,9 @@ class WebhookHandler
      * Usa el mismo TOCTOU lock que processMessage() para evitar race conditions
      * donde edited_message llega ANTES de que el message original termine de procesarse.
      *
-     * Si el item no existe en el tracker, lo ignora (no crea duplicados). El message
-     * original llegará por separado como update tipo "message" y se creará normalmente.
+     * Si el item no existe en el tracker (out-of-order: edit llegó antes que el original):
+     * libera el TOCTOU lock y delega a processMessage() para crear el item con los datos del edit.
+     * El message original que llegue después será capturado por deduplicación.
      */
     public function processEditedMessage(array $message): void
     {
@@ -852,10 +876,20 @@ class WebhookHandler
             );
 
             if ($existingItemId === null) {
-                // No existe → ignorar. El message original llegará como update "message"
-                // y se creará normalmente. Si es un edit de un mensaje anterior a trackerGram,
-                // se pierde (no tenemos los datos originales para crearlo).
-                log_message("trackerGram: edited_message #{$messageId} no existe en tracker — ignorado (el message original se procesará por separado)");
+                // No existe → out-of-order: el edited_message llegó antes que el message original.
+                // Delegamos a processMessage() para crear el item con los datos del edit.
+                // Liberamos el TOCTOU lock antes (processMessage() adquirirá el suyo propio).
+                $hadLock = isset($lockFp) && $lockFp;
+                if ($hadLock) {
+                    flock($lockFp, LOCK_UN);
+                    fclose($lockFp);
+                    if (file_exists($lockFile)) {
+                        unlink($lockFile);
+                    }
+                    $lockFp = null; // Evita doble-release en finally
+                }
+                log_message("trackerGram: edited_message #{$messageId} no existe en tracker — delegando a processMessage para crearlo (out-of-order)");
+                $this->processMessage($message);
                 return;
             }
 

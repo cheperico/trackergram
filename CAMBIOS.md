@@ -123,6 +123,18 @@ Items del code review que ya estaban implementados en sesiones previas (verifica
 ### 📝 Docs: messageType completo en schema
 - **AGENTS.md** y **README.md**: Lista de valores de `MessageType` actualizada: `text, photo, video, audio, document, sticker, voice, video_note, animation, location, contact, poll, quiz, system, other`. Antes decía `"...etc."` omitiendo `video_note`, `animation`, `location`, `contact`, `poll`, `quiz` y `other`.
 
+### 🐛 Data Flow — Code Review (3 hallazgos)
+
+#### F1: Album dedup gap (✅ ya implementado previamente)
+- **WebhookHandler::registerOrLookupAlbum()**: Guarda `messageIds[]` por entrada de álbum. Cuando Telegram reintenta una foto secundaria con el mismo `message_id`, el buffer detecta el duplicado vía `['duplicate' => true]` y el caller en `processMessage()` lo ignora.
+- **WebhookHandler::processMessage()**: Handler de `['duplicate' => true]` libera el lock y retorna sin modificar el item.
+
+#### F2: Import migration dup — fallback en full import
+- **import.php::handleFull()**: Agregado fallback de `$oldChatId` en la búsqueda de deduplicación (previamente solo existía en `handleProcess()`). Cuando un mensaje de chat migrado no se encuentra por el `chat_id` unificado (`-100xxx`), reintenta la búsqueda con el `chat_id` antiguo (`-xxx`). Aplica a la ruta de importación completa (no-chunked).
+
+#### F3: Edited message out-of-order — delegación segura
+- **WebhookHandler::processEditedMessage()**: Cuando el item no existe (edited_message llegó antes que el message original), libera el TOCTOU lock y delega a `processMessage()` para crear el item con los datos del edit. El mensaje original que llegue después será capturado por deduplicación. No hay deadlock porque se libera el lock antes de la delegación.
+
 ---
 
 ## v0.5.14

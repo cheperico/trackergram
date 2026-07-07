@@ -362,7 +362,7 @@ function handleExtract(): void
     $activeTikiClient = $localTikiClient;
 
     // Guardar metadata (sin credenciales Tiki — van a session)
-    $metaWritten = file_put_contents($tempDir . '/metadata.json', json_encode([
+    $metaData = [
         'chat_id' => $chatId,
         'chat_title' => $chatTitle,
         'topics' => $topics,
@@ -372,7 +372,11 @@ function handleExtract(): void
         'field_prefix' => $fieldPrefix,
         'migrated' => $migrated,
         'migration_point_id' => $migrationPointId,
-    ]));
+    ];
+    if ($migrated && $rawId > 0) {
+        $metaData['old_chat_id'] = '-' . $rawId;
+    }
+    $metaWritten = file_put_contents($tempDir . '/metadata.json', json_encode($metaData));
     if ($metaWritten === false) {
         $error = error_get_last();
         $msg = $error ? $error['message'] : 'unknown error';
@@ -467,6 +471,7 @@ function handleProcess(): void
     $topics = $metadata['topics'] ?? [];
     $total = $metadata['total'] ?? 0;
     $trackerId = $metadata['tracker_id'] ?? 0;
+    $oldChatId = $metadata['old_chat_id'] ?? null;
 
     // Crear TikiWikiClient local desde credenciales en session (obligatorio)
     $importSessionKey = 'import_creds_' . $extractId;
@@ -714,6 +719,13 @@ function handleProcess(): void
         $existingItemId = ($messageIdInt > 0)
             ? $activeTikiClient->findItemByMessageId((int) $trackerId, $messageIdInt, (int) $chatId)
             : null;
+
+        if ($existingItemId === null && $messageIdInt > 0 && !empty($oldChatId)) {
+            $existingItemId = $activeTikiClient->findItemByMessageId((int) $trackerId, $messageIdInt, (int) $oldChatId);
+            if ($existingItemId !== null) {
+                log_message("trackerGram import: message_id={$messageIdInt} encontrado bajo el chat_id antiguo {$oldChatId} (migrado) — itemId={$existingItemId}");
+            }
+        }
 
         if ($existingItemId !== null) {
             $shouldUpdate = false;
@@ -1012,6 +1024,7 @@ function handleFull(): void
             log_message("trackerGram import (full): 🚚 Migración — chat_id {$chatId} ya es supergrupo");
         }
     }
+    $oldChatId = ($migrated && $rawId > 0) ? '-' . $rawId : null;
 
     $topics = [];
     foreach ($messages as $msg) {
@@ -1199,6 +1212,13 @@ function handleFull(): void
         $existingItemId = ($messageIdInt > 0)
             ? $activeTikiClient->findItemByMessageId((int) $trackerId, $messageIdInt, (int) $chatId)
             : null;
+
+        if ($existingItemId === null && $messageIdInt > 0 && !empty($oldChatId)) {
+            $existingItemId = $activeTikiClient->findItemByMessageId((int) $trackerId, $messageIdInt, (int) $oldChatId);
+            if ($existingItemId !== null) {
+                log_message("trackerGram import (full): message_id={$messageIdInt} encontrado bajo el chat_id antiguo {$oldChatId} (migrado) — itemId={$existingItemId}");
+            }
+        }
 
         if ($existingItemId !== null) {
             $shouldUpdate = false;
