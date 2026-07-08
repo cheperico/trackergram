@@ -148,7 +148,7 @@ function checkRateLimit() {
 
     if ($data['attempts'] >= $maxAttempts) {
         $remainingTime = $lockoutTime - (time() - $data['first_attempt']);
-        die("Demasiados intentos de login. Por favor espere " . ceil($remainingTime / 60) . " minutos antes de intentar nuevamente.");
+        die(sprintf(__('login.rate_limit'), ceil($remainingTime / 60)));
     }
 }
 
@@ -225,7 +225,7 @@ function checkAuth() {
     $password = $_ENV['ADMIN_PASSWORD'] ?? null;
     
     if ($password === null || $password === '') {
-        die('Error: ADMIN_PASSWORD no está configurado en .env.');
+        die(__('login.no_password'));
     }
 
     if (!isset($_SESSION['authenticated'])) {
@@ -282,9 +282,9 @@ if (!checkAuth()) {
     $loginFailed = $_SERVER['REQUEST_METHOD'] === 'POST';
     ?>
     <!DOCTYPE html>
-    <html lang="es">
+<html lang="<?php echo $langCode; ?>">
     <head>
-        <title>trackerGram - Login</title>
+        <title>trackerGram - <?php echo __('login.button'); ?></title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
             body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
@@ -303,14 +303,14 @@ if (!checkAuth()) {
     <body>
         <div class="login-card" role="region" aria-labelledby="login-heading">
             <h1 id="login-heading">trackerGram</h1>
-            <p>Ingresá con tu usuario y contraseña</p>
-            <?php if ($loginFailed): ?><div class="error" role="alert">Usuario o contraseña incorrectos</div><?php endif; ?>
+            <p><?php echo __('login.subtitle'); ?></p>
+            <?php if ($loginFailed): ?><div class="error" role="alert"><?php echo __('login.failed'); ?></div><?php endif; ?>
             <form method="post">
-                <label for="login-username">Usuario</label>
+                <label for="login-username"><?php echo __('login.username'); ?></label>
                 <input type="text" name="login_username" id="login-username" required aria-required="true">
-                <label for="login-password">Contraseña</label>
+                <label for="login-password"><?php echo __('login.password'); ?></label>
                 <input type="password" name="login_password" id="login-password" required aria-required="true">
-                <button type="submit">Iniciar sesión</button>
+                <button type="submit"><?php echo __('login.button'); ?></button>
             </form>
         </div>
     </body>
@@ -467,6 +467,12 @@ if (!in_array($view, ['classic', 'grouped'])) {
     $view = 'grouped';
 }
 
+// Build query params to preserve tab+view when switching language
+$langQueryParams = [];
+if ($activeTab !== 'webhook') $langQueryParams['tab'] = $activeTab;
+if ($view !== 'grouped') $langQueryParams['view'] = $view;
+$langQueryString = $langQueryParams ? '&' . http_build_query($langQueryParams) : '';
+
 // Para la edición, cargar conexión si se pasa slug
 $editConnection = null;
 if (isset($_GET['edit'])) {
@@ -483,23 +489,28 @@ if (isset($_GET['edit'])) {
 </head>
 <body>
 <!-- Skip link for keyboard users -->
-<a href="#main-content" class="skip-link">Saltar al contenido principal</a>
+<a href="#main-content" class="skip-link"><?php echo __('nav.skip'); ?></a>
 
 <!-- Navbar -->
-<nav class="navbar" aria-label="Navegación principal">
-    <a href="admin.php" class="navbar-brand" aria-label="Volver al inicio (pestaña Webhook)">
+<nav class="navbar" aria-label="<?php echo __('nav.aria'); ?>">
+    <a href="admin.php" class="navbar-brand" aria-label="<?php echo __('nav.home_aria'); ?>">
         trackerGram <span>Admin <span style="font-weight:400;font-size:0.65em;opacity:0.6;margin-left:4px;"><?php echo TRACKERGRAM_VERSION; ?></span></span>
     </a>
     <div class="navbar-actions">
-        <a href="?action=logout" aria-label="Cerrar sesión de administrador">Cerrar sesion</a>
+        <div class="lang-switch">
+            <a href="?lang=es<?php echo $langQueryString; ?>" class="<?php echo $langCode === 'es' ? 'active' : ''; ?>" aria-label="Español">ES</a>
+            <span class="sep">|</span>
+            <a href="?lang=en<?php echo $langQueryString; ?>" class="<?php echo $langCode === 'en' ? 'active' : ''; ?>" aria-label="English">EN</a>
+        </div>
+        <a href="?action=logout" aria-label="<?php echo __('nav.logout'); ?>"><?php echo __('nav.logout'); ?></a>
     </div>
 </nav>
 
 <!-- Tabs -->
-<nav class="tabs" aria-label="Secciones de administración">
-    <a href="?tab=webhook" class="tab <?php echo $activeTab === 'webhook' ? 'active' : ''; ?>" aria-current="<?php echo $activeTab === 'webhook' ? 'page' : 'false'; ?>">Webhook</a>
-    <a href="?tab=import" class="tab <?php echo $activeTab === 'import' ? 'active' : ''; ?>" aria-current="<?php echo $activeTab === 'import' ? 'page' : 'false'; ?>">Importar</a>
-    <a href="?tab=create" class="tab <?php echo $activeTab === 'create' ? 'active' : ''; ?>" aria-current="<?php echo $activeTab === 'create' ? 'page' : 'false'; ?>">Crear Tracker</a>
+<nav class="tabs" aria-label="<?php echo __('tabs.aria'); ?>">
+    <a href="?tab=webhook" class="tab <?php echo $activeTab === 'webhook' ? 'active' : ''; ?>" aria-current="<?php echo $activeTab === 'webhook' ? 'page' : 'false'; ?>"><?php echo __('tab.webhook'); ?></a>
+    <a href="?tab=import" class="tab <?php echo $activeTab === 'import' ? 'active' : ''; ?>" aria-current="<?php echo $activeTab === 'import' ? 'page' : 'false'; ?>"><?php echo __('tab.import'); ?></a>
+    <a href="?tab=create" class="tab <?php echo $activeTab === 'create' ? 'active' : ''; ?>" aria-current="<?php echo $activeTab === 'create' ? 'page' : 'false'; ?>"><?php echo __('tab.create_tracker'); ?></a>
 </nav>
 
 <div class="container" id="main-content" role="main">
@@ -517,42 +528,42 @@ if (isset($_GET['edit'])) {
 
 <!-- View toggle: classic / grouped -->
 <div class="view-toggle">
-    <a href="?tab=webhook&view=classic" class="btn btn-sm <?php echo $view === 'classic' ? 'btn-primary' : 'btn-outline'; ?>">Vista clasica</a>
-    <a href="?tab=webhook&view=grouped" class="btn btn-sm <?php echo $view === 'grouped' ? 'btn-primary' : 'btn-outline'; ?>">Vista agrupada</a>
+    <a href="?tab=webhook&view=classic" class="btn btn-sm <?php echo $view === 'classic' ? 'btn-primary' : 'btn-outline'; ?>"><?php echo __('view.classic'); ?></a>
+    <a href="?tab=webhook&view=grouped" class="btn btn-sm <?php echo $view === 'grouped' ? 'btn-primary' : 'btn-outline'; ?>"><?php echo __('view.grouped'); ?></a>
 </div>
 
 <?php if ($view === 'classic'): ?>
 <!-- ── VISTA CLASICA ── -->
 <div class="section">
-    <div class="section-header">Conexiones Activas</div>
+    <div class="section-header"><?php echo __('webhook.section_title'); ?></div>
     <div class="section-content">
         <?php if (empty($connections)): ?>
             <div class="empty-state">
-                <p>No hay conexiones configuradas.</p>
-                <button class="btn btn-primary" onclick="resetConnectionForm(); openModal('connection-modal')" title="Agregar una nueva conexión entre un bot de Telegram y un tracker de TikiWiki">+ Agregar conexion</button>
+                <p><?php echo __('webhook.empty'); ?></p>
+                <button class="btn btn-primary" onclick="resetConnectionForm(); openModal('connection-modal')" title="<?php echo __('form.add_button_title'); ?>"><?php echo __('form.add_button'); ?></button>
             </div>
         <?php else: ?>
             <div style="margin-bottom:16px;">
-                <button class="btn btn-primary" onclick="resetConnectionForm(); openModal('connection-modal')" title="Agregar una nueva conexión entre un bot de Telegram y un tracker de TikiWiki">+ Agregar conexion</button>
+                <button class="btn btn-primary" onclick="resetConnectionForm(); openModal('connection-modal')" title="<?php echo __('form.add_button_title'); ?>"><?php echo __('form.add_button'); ?></button>
             </div>
             <div class="conn-list">
                 <?php foreach ($connectionsSafe as $slug => $conn): ?>
                 <div class="conn-card">
                     <div class="conn-header">
                         <div class="conn-name">
-                            <span class="conn-status <?php echo $conn['enabled'] ? 'active' : 'inactive'; ?>" aria-label="<?php echo $conn['enabled'] ? 'Conexión activa' : 'Conexión inactiva'; ?>"></span>
+                            <span class="conn-status <?php echo $conn['enabled'] ? 'active' : 'inactive'; ?>" aria-label="<?php echo $conn['enabled'] ? __('conn.active_label') : __('conn.inactive_label'); ?>"></span>
                             <?php echo escapeHtml($conn['name']); ?>
                             <?php if (!$conn['enabled']): ?>
-                                <span style="font-size:0.8em;color:var(--text-secondary);font-weight:400;">(inactivo)</span>
+                                <span style="font-size:0.8em;color:var(--text-secondary);font-weight:400;"><?php echo __('conn.inactive_tag'); ?></span>
                             <?php endif; ?>
                         </div>
                     </div>
                     <div class="conn-details">
-                        <span>Bot: <?php 
-                            $botDisplay = !empty($conn['bot_name']) ? '@' . escapeHtml($conn['bot_name']) : ($conn['bot_token'] ?? 'Sin token');
+                        <span><?php echo __('conn.bot_label'); ?> <?php 
+                            $botDisplay = !empty($conn['bot_name']) ? '@' . escapeHtml($conn['bot_name']) : ($conn['bot_token'] ?? __('conn.bot_missing'));
                             echo $botDisplay;
                         ?></span>
-                        <span>Chat: <?php
+                        <span><?php echo __('conn.chat_label'); ?> <?php
                             $chatIdVal = (int) ($conn['chat_id'] ?? 0);
                             if (!empty($conn['chat_title'])) {
                                 echo escapeHtml($conn['chat_title']);
@@ -562,12 +573,12 @@ if (isset($_GET['edit'])) {
                             } elseif ($chatIdVal != 0) {
                                 echo 'ID: ' . $chatIdVal;
                             } else {
-                                echo 'Pendiente';
+                                echo __('conn.pending');
                             }
                         ?></span>
-                        <span>Tracker: #<?php echo (int) $conn['tracker_id']; ?></span>
+                        <span><?php echo __('conn.tracker_label'); ?> #<?php echo (int) $conn['tracker_id']; ?></span>
                         <span><?php echo escapeHtml(parse_url($conn['tiki_api_url'] ?? '', PHP_URL_HOST) ?: $conn['tiki_api_url']); ?></span>
-                        <span title="Estado del webhook">Webhook: <?php 
+                        <span title="<?php echo __('conn.webhook_title_short'); ?>"><?php echo __('conn.webhook_label'); ?> <?php 
                             $ws = $webhookStatuses[$slug] ?? ['label' => '❓'];
                             echo $ws['label'];
                         ?></span>
@@ -576,22 +587,22 @@ if (isset($_GET['edit'])) {
                         <form method="get" class="inline-form">
                             <input type="hidden" name="tab" value="webhook">
                             <input type="hidden" name="edit" value="<?php echo escapeHtml($slug); ?>">
-                            <button type="submit" class="btn btn-outline btn-sm" onclick="event.preventDefault(); openEditModal('<?php echo escapeHtml($slug); ?>')" title="Editar los datos de esta conexión">Editar</button>
+                            <button type="submit" class="btn btn-outline btn-sm" onclick="event.preventDefault(); openEditModal('<?php echo escapeHtml($slug); ?>')" title="<?php echo __('conn.edit_title'); ?>"><?php echo __('conn.edit'); ?></button>
                         </form>
                         
                         <form method="post" class="inline-form">
                             <input type="hidden" name="action" value="duplicate_connection">
                             <input type="hidden" name="slug" value="<?php echo escapeHtml($slug); ?>">
                             <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-                            <button type="submit" class="btn btn-outline btn-sm" title="Duplicar esta conexión para crear una similar">Duplicar</button>
+                            <button type="submit" class="btn btn-outline btn-sm" title="<?php echo __('conn.duplicate_title'); ?>"><?php echo __('conn.duplicate'); ?></button>
                         </form>
                         
                         <form method="post" class="inline-form">
                             <input type="hidden" name="action" value="toggle_connection">
                             <input type="hidden" name="slug" value="<?php echo escapeHtml($slug); ?>">
                             <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-                            <button type="submit" class="btn btn-sm <?php echo $conn['enabled'] ? 'btn-warning' : 'btn-success'; ?>" title="<?php echo $conn['enabled'] ? 'Desactivar temporalmente esta conexión' : 'Activar esta conexión'; ?>">
-                                <?php echo $conn['enabled'] ? 'Desactivar' : 'Activar'; ?>
+                            <button type="submit" class="btn btn-sm <?php echo $conn['enabled'] ? 'btn-warning' : 'btn-success'; ?>" title="<?php echo $conn['enabled'] ? __('conn.toggle_deact_title') : __('conn.toggle_act_title'); ?>">
+                                <?php echo $conn['enabled'] ? __('conn.toggle_deactivate') : __('conn.toggle_activate'); ?>
                             </button>
                         </form>
                         
@@ -599,18 +610,18 @@ if (isset($_GET['edit'])) {
                             <input type="hidden" name="action" value="configure_webhook">
                             <input type="hidden" name="slug" value="<?php echo escapeHtml($slug); ?>">
                             <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-                            <button type="submit" class="btn btn-outline btn-sm" title="Configurar el webhook en Telegram para recibir mensajes">Configurar Webhook</button>
+                            <button type="submit" class="btn btn-outline btn-sm" title="<?php echo __('conn.webhook_title'); ?>"><?php echo __('conn.webhook'); ?></button>
                         </form>
                         
-                        <button class="btn btn-outline btn-sm" onclick="testConnection('<?php echo escapeHtml($slug); ?>', this)" title="Probar conexión con Telegram y TikiWiki">Test</button>
+                        <button class="btn btn-outline btn-sm" onclick="testConnection('<?php echo escapeHtml($slug); ?>', this)" title="<?php echo __('conn.test_title'); ?>"><?php echo __('conn.test'); ?></button>
                         
-                        <button class="btn btn-outline btn-sm" onclick="checkPrivacy('<?php echo escapeHtml($slug); ?>', this)" title="Ver últimos mensajes recibidos por el bot (para verificar privacy mode)">📡 Updates</button>
+                        <button class="btn btn-outline btn-sm" onclick="checkPrivacy('<?php echo escapeHtml($slug); ?>', this)" title="<?php echo __('conn.updates_title'); ?>"><?php echo __('conn.updates'); ?></button>
                         
-                        <form method="post" class="inline-form" onsubmit="return confirm('¿Eliminar conexion \'<?php echo escapeHtml($conn['name']); ?>\'?')">
+                        <form method="post" class="inline-form" onsubmit="return confirm('<?php echo addslashes(sprintf(__('conn.delete_confirm'), $conn['name'])); ?>')">
                             <input type="hidden" name="action" value="delete_connection">
                             <input type="hidden" name="slug" value="<?php echo escapeHtml($slug); ?>">
                             <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-                            <button type="submit" class="btn btn-danger btn-sm" title="Eliminar esta conexión permanentemente">Eliminar</button>
+                            <button type="submit" class="btn btn-danger btn-sm" title="<?php echo __('conn.delete_title'); ?>"><?php echo __('conn.delete'); ?></button>
                         </form>
                         
                         <div class="test-result" style="display:none;flex-basis:100%;" aria-live="polite" aria-atomic="true"></div>
@@ -652,14 +663,14 @@ foreach ($connectionsSafe as $slug => $conn) {
     <div class="section">
         <div class="section-content">
             <div class="empty-state">
-                <p>No hay conexiones configuradas.</p>
-                <button class="btn btn-primary" onclick="resetConnectionForm(); openModal('connection-modal')" title="Agregar una nueva conexión">+ Agregar conexion</button>
+                <p><?php echo __('webhook.empty'); ?></p>
+                <button class="btn btn-primary" onclick="resetConnectionForm(); openModal('connection-modal')" title="<?php echo __('form.add_button_title'); ?>"><?php echo __('form.add_button'); ?></button>
             </div>
         </div>
     </div>
 <?php else: ?>
     <div style="margin-bottom:16px;">
-        <button class="btn btn-primary" onclick="resetConnectionForm(); openModal('connection-modal')" title="Agregar una nueva conexión">+ Agregar conexion</button>
+        <button class="btn btn-primary" onclick="resetConnectionForm(); openModal('connection-modal')" title="<?php echo __('form.add_button_title'); ?>"><?php echo __('form.add_button'); ?></button>
     </div>
     <?php foreach ($grouped as $botToken => $bot): ?>
         <?php 
@@ -676,20 +687,20 @@ foreach ($connectionsSafe as $slug => $conn) {
                             <?php if (!empty($bot['bot_name'])): ?>
                                 @<?php echo escapeHtml($bot['bot_name']); ?>
                             <?php else: ?>
-                                Bot sin nombre
+                                <?php echo __('bot.unnamed'); ?>
                             <?php endif; ?>
                             <span style="font-weight:400;font-size:0.8em;color:var(--text-secondary);margin-left:6px;">
-                                (<?php echo $connCount; ?> conexion<?php echo $connCount !== 1 ? 'es' : ''; ?>)
+                                (<?php echo sprintf(_n('bot.connections_label', 'bot.connections_plural', $connCount), $connCount); ?>)
                             </span>
                         </div>
                         <div class="bot-token-masked">
-                            Token: <?php echo escapeHtml($bot['bot_token']); ?>
+                            <?php echo __('bot.token_label'); ?> <?php echo escapeHtml($bot['bot_token']); ?>
                         </div>
                     </div>
                 </div>
                 <div class="bot-webhook-col">
                     <span class="webhook-indicator <?php echo $whStatus['ok'] ? 'ok' : 'fail';?>">
-                        Webhook: <?php echo $whStatus['label']; ?>
+                        <?php echo __('conn.webhook_label'); ?> <?php echo $whStatus['label']; ?>
                     </span>
                     <?php if (($whStatus['pending'] ?? 0) > 0): ?>
                         <span class="pending-badge"><?php echo (int) $whStatus['pending']; ?> pend.</span>
@@ -701,27 +712,27 @@ foreach ($connectionsSafe as $slug => $conn) {
                     <input type="hidden" name="action" value="configure_webhook">
                     <input type="hidden" name="slug" value="<?php echo escapeHtml($firstSlug); ?>">
                     <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-                    <button type="submit" class="btn btn-outline btn-sm" title="Configurar el webhook en Telegram para este bot">Configurar Webhook</button>
+                    <button type="submit" class="btn btn-outline btn-sm" title="<?php echo __('bot.webhook_title'); ?>"><?php echo __('conn.webhook'); ?></button>
                 </form>
-                <button class="btn btn-outline btn-sm" onclick="testBotConnection('<?php echo escapeHtml($firstSlug); ?>', this)" title="Probar conexión con Telegram y estado del webhook">Test Bot</button>
-                <button class="btn btn-outline btn-sm" onclick="checkPrivacy('<?php echo escapeHtml($firstSlug); ?>', this)" title="Ver mensajes recibidos para verificar privacy mode">📡 Updates</button>
+                <button class="btn btn-outline btn-sm" onclick="testBotConnection('<?php echo escapeHtml($firstSlug); ?>', this)" title="<?php echo __('bot.test_title'); ?>"><?php echo __('bot.test'); ?></button>
+                <button class="btn btn-outline btn-sm" onclick="checkPrivacy('<?php echo escapeHtml($firstSlug); ?>', this)" title="<?php echo __('bot.updates_title'); ?>"><?php echo __('conn.updates'); ?></button>
                 <div class="test-result" style="display:none;flex-basis:100%;" aria-live="polite" aria-atomic="true"></div>
             </div>
             <div class="bot-connections">
                 <?php foreach ($bot['connections'] as $conn): ?>
                 <div class="sub-conn-card">
                     <div class="sub-conn-header">
-                        <span class="conn-status <?php echo $conn['enabled'] ? 'active' : 'inactive'; ?>" aria-label="<?php echo $conn['enabled'] ? 'Activa' : 'Inactiva'; ?>"></span>
+                        <span class="conn-status <?php echo $conn['enabled'] ? 'active' : 'inactive'; ?>" aria-label="<?php echo $conn['enabled'] ? __('conn.active_label') : __('conn.inactive_label'); ?>"></span>
                         <span class="sub-conn-name">
                             <?php echo escapeHtml($conn['name']); ?>
                             <?php if (!$conn['enabled']): ?>
-                                <span class="inactive-label">(inactivo)</span>
+                                <span class="inactive-label"><?php echo __('conn.inactive_tag'); ?></span>
                             <?php endif; ?>
                         </span>
-                        <span class="tracker-badge">Tracker #<?php echo (int) $conn['tracker_id']; ?></span>
+                        <span class="tracker-badge"><?php echo __('conn.tracker_label'); ?> #<?php echo (int) $conn['tracker_id']; ?></span>
                     </div>
                     <div class="sub-conn-details">
-                        <span>Chat: <?php
+                        <span><?php echo __('conn.chat_label'); ?> <?php
                             $chatIdVal = (int) ($conn['chat_id'] ?? 0);
                             if (!empty($conn['chat_title'])) {
                                 echo escapeHtml($conn['chat_title']);
@@ -731,40 +742,40 @@ foreach ($connectionsSafe as $slug => $conn) {
                             } elseif ($chatIdVal != 0) {
                                 echo 'ID: ' . $chatIdVal;
                             } else {
-                                echo 'Pendiente';
+                                echo __('conn.pending');
                             }
                         ?></span>
                         <span><?php echo escapeHtml(parse_url($conn['tiki_api_url'] ?? '', PHP_URL_HOST) ?: $conn['tiki_api_url']); ?></span>
-                        <span>Prefix: <?php echo escapeHtml($conn['field_prefix'] ?? 'telegrammessage'); ?></span>
+                        <span><?php echo __('subconn.prefix_label'); ?>: <?php echo escapeHtml($conn['field_prefix'] ?? 'telegrammessage'); ?></span>
                     </div>
                     <div class="sub-conn-actions">
-                        <button class="btn btn-outline btn-sm" onclick="event.preventDefault(); openEditModal('<?php echo escapeHtml($conn['slug']); ?>')" title="Editar">Editar</button>
+                        <button class="btn btn-outline btn-sm" onclick="event.preventDefault(); openEditModal('<?php echo escapeHtml($conn['slug']); ?>')" title="<?php echo __('subconn.edit_title'); ?>"><?php echo __('conn.edit'); ?></button>
                         <form method="post" class="inline-form">
                             <input type="hidden" name="action" value="duplicate_connection">
                             <input type="hidden" name="slug" value="<?php echo escapeHtml($conn['slug']); ?>">
                             <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-                            <button type="submit" class="btn btn-outline btn-sm" title="Duplicar esta conexión">Duplicar</button>
+                            <button type="submit" class="btn btn-outline btn-sm" title="<?php echo __('subconn.duplicate_title'); ?>"><?php echo __('conn.duplicate'); ?></button>
                         </form>
                         <form method="post" class="inline-form">
                             <input type="hidden" name="action" value="toggle_connection">
                             <input type="hidden" name="slug" value="<?php echo escapeHtml($conn['slug']); ?>">
                             <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-                            <button type="submit" class="btn btn-sm <?php echo $conn['enabled'] ? 'btn-warning' : 'btn-success'; ?>" title="<?php echo $conn['enabled'] ? 'Desactivar' : 'Activar'; ?>">
-                                <?php echo $conn['enabled'] ? 'Desactivar' : 'Activar'; ?>
+                            <button type="submit" class="btn btn-sm <?php echo $conn['enabled'] ? 'btn-warning' : 'btn-success'; ?>" title="<?php echo $conn['enabled'] ? __('conn.toggle_deact_title') : __('conn.toggle_act_title'); ?>">
+                                <?php echo $conn['enabled'] ? __('conn.toggle_deactivate') : __('conn.toggle_activate'); ?>
                             </button>
                         </form>
-                        <button class="btn btn-outline btn-sm" onclick="testTikiConnection('<?php echo escapeHtml($conn['slug']); ?>', this)" title="Probar conexión con TikiWiki">Test Tiki</button>
+                        <button class="btn btn-outline btn-sm" onclick="testTikiConnection('<?php echo escapeHtml($conn['slug']); ?>', this)" title="<?php echo __('subconn.test_tiki_title'); ?>"><?php echo __('subconn.test_tiki'); ?></button>
                         <form method="post" class="inline-form" style="display:inline;">
                             <input type="hidden" name="action" value="sync_tracker">
                             <input type="hidden" name="slug" value="<?php echo escapeHtml($conn['slug']); ?>">
                             <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-                            <button type="submit" class="btn btn-outline btn-sm" title="Sincronizar campos del tracker con los esperados por trackerGram">🛠️ Sync</button>
+                            <button type="submit" class="btn btn-outline btn-sm" title="<?php echo __('subconn.sync_title'); ?>"><?php echo __('subconn.sync'); ?></button>
                         </form>
-                        <form method="post" class="inline-form" onsubmit="return confirm('<?php echo addslashes('¿Eliminar conexion \'' . $conn['name'] . '\'?'); ?>')">
+                        <form method="post" class="inline-form" onsubmit="return confirm('<?php echo addslashes(sprintf(__('conn.delete_confirm'), $conn['name'])); ?>')">
                             <input type="hidden" name="action" value="delete_connection">
                             <input type="hidden" name="slug" value="<?php echo escapeHtml($conn['slug']); ?>">
                             <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-                            <button type="submit" class="btn btn-danger btn-sm" title="Eliminar esta conexión permanentemente">Eliminar</button>
+                            <button type="submit" class="btn btn-danger btn-sm" title="<?php echo __('subconn.delete_title'); ?>"><?php echo __('conn.delete'); ?></button>
                         </form>
                         <div class="test-result sync-result" style="display:none;flex-basis:100%;" aria-live="polite" aria-atomic="true"></div>
                     </div>
@@ -787,28 +798,27 @@ foreach ($detections as $det) {
 ?>
 <?php if (!empty($detectionsBySlug)): ?>
 <div class="section">
-    <div class="section-header">📡 Chats detectados</div>
+    <div class="section-header"><?php echo __('detected.title'); ?></div>
     <div class="section-content">
         <p style="font-size:0.85em;color:var(--text-secondary);margin-bottom:16px;">
-            El bot recibió mensajes de chats que aún no tienen un chat_id asignado.
-            Verificá que sea el grupo correcto y asignalo a la conexión correspondiente.
+            <?php echo __('detected.description'); ?>
         </p>
         <?php foreach ($detectionsBySlug as $slug => $chats): 
             $conn = $configManager->getConnection($slug);    
         ?>
         <div style="margin-bottom:16px;padding:12px;border:1px solid var(--border);border-radius:8px;">
             <div style="font-weight:600;font-size:0.9em;margin-bottom:8px;">
-                Conexión: <?php echo escapeHtml($conn['name'] ?? $slug); ?>
-                <span style="font-weight:400;color:var(--text-secondary);">(slug: <?php echo escapeHtml($slug); ?>)</span>
+                <?php echo __('detected.connection'); ?> <?php echo escapeHtml($conn['name'] ?? $slug); ?>
+                <span style="font-weight:400;color:var(--text-secondary);"><?php echo sprintf(__('detected.slug'), escapeHtml($slug)); ?></span>
             </div>
             <?php foreach ($chats as $det): ?>
             <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;margin-bottom:6px;border:1px solid var(--border);border-radius:6px;">
                 <div>
                     <strong><?php echo escapeHtml($det['chat_title']); ?></strong><br>
                     <span style="font-size:0.85em;color:var(--text-secondary);">
-                        ID: <?php echo (int) $det['chat_id']; ?> — 
-                        Detectado: <?php echo date('Y-m-d H:i', strtotime($det['detected_at'])); ?>
-                        (<?php echo (int) ($det['detected_count'] ?? 1); ?> veces)
+                        <?php echo __('detected.id_label'); ?>: <?php echo (int) $det['chat_id']; ?> — 
+                        <?php echo __('detected.detected_at'); ?>: <?php echo date('Y-m-d H:i', strtotime($det['detected_at'])); ?>
+                        (<?php echo (int) ($det['detected_count'] ?? 1); ?> <?php echo __('detected.times'); ?>)
                     </span>
                 </div>
                 <div style="display:flex;gap:6px;flex-shrink:0;">
@@ -817,14 +827,14 @@ foreach ($detections as $det) {
                         <input type="hidden" name="slug" value="<?php echo escapeHtml($slug); ?>">
                         <input type="hidden" name="chat_id" value="<?php echo (int) $det['chat_id']; ?>">
                         <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-                        <button type="submit" class="btn btn-success btn-sm" title="Asignar este chat a la conexión">Asignar</button>
+                        <button type="submit" class="btn btn-success btn-sm" title="<?php echo __('detected.assign_title'); ?>"><?php echo __('detected.assign'); ?></button>
                     </form>
                     <form method="post" style="display:inline;">
                         <input type="hidden" name="action" value="ignore_chat">
                         <input type="hidden" name="slug" value="<?php echo escapeHtml($slug); ?>">
                         <input type="hidden" name="chat_id" value="<?php echo (int) $det['chat_id']; ?>">
                         <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-                        <button type="submit" class="btn btn-outline btn-sm" title="Ignorar este chat y no mostrar más esta detección">Ignorar</button>
+                        <button type="submit" class="btn btn-outline btn-sm" title="<?php echo __('detected.ignore_title'); ?>"><?php echo __('detected.ignore'); ?></button>
                     </form>
                 </div>
             </div>
@@ -842,76 +852,75 @@ foreach ($detections as $det) {
             <input type="hidden" name="action" value="save_connection">
             <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
             <input type="hidden" name="slug" id="form-slug" value="">
-            
             <div class="modal-header">
-                <span id="modal-title">Nueva conexion</span>
-                <button type="button" class="modal-close" onclick="closeModal('connection-modal')" aria-label="Cerrar">&times;</button>
+                <span id="modal-title"><?php echo __('form.new_title'); ?></span>
+                <button type="button" class="modal-close" onclick="closeModal('connection-modal')" aria-label="<?php echo __('modal.close'); ?>">&times;</button>
             </div>
             
             <div class="modal-body">
                 <div class="form-group">
-                    <label for="form-name">Nombre de la conexion</label>
-                    <input type="text" name="name" id="form-name" required aria-required="true" placeholder="Ej: QPCH Produccion" title="Nombre descriptivo para identificar esta conexión">
+                    <label for="form-name"><?php echo __('form.name'); ?></label>
+                    <input type="text" name="name" id="form-name" required aria-required="true" placeholder="<?php echo __('form.name_placeholder'); ?>" title="<?php echo __('form.name_title'); ?>">
                 </div>
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="form-bot_token">Bot Token</label>
+                        <label for="form-bot_token"><?php echo __('form.bot_token'); ?></label>
                         <div class="input-wrapper">
-                            <input type="password" name="bot_token" id="form-bot_token" required aria-required="true" autocomplete="new-password" placeholder="Token de @BotFather" title="Token del bot de Telegram obtenido de @BotFather">
-                            <button type="button" class="icon-btn" onclick="togglePassword(this)" title="Mostrar u ocultar el token" aria-label="Mostrar contraseña">Mostrar</button>
+                            <input type="password" name="bot_token" id="form-bot_token" required aria-required="true" autocomplete="new-password" placeholder="<?php echo __('form.bot_token_placeholder'); ?>" title="<?php echo __('form.bot_token_title'); ?>">
+                            <button type="button" class="icon-btn" onclick="togglePassword(this)" title="<?php echo __('form.show_title'); ?>" aria-label="<?php echo __('form.show_aria'); ?>"><?php echo __('misc.show'); ?></button>
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="form-webhook_secret">Webhook Secret</label>
+                        <label for="form-webhook_secret"><?php echo __('form.webhook_secret'); ?></label>
                         <div class="input-wrapper">
-                            <input type="password" name="webhook_secret" id="form-webhook_secret" autocomplete="new-password" placeholder="Auto-generado si se deja vacio" aria-describedby="hint-webhook_secret" title="Secreto del webhook para verificar que los mensajes vienen de Telegram">
-                            <button type="button" class="icon-btn" onclick="togglePassword(this)" title="Mostrar u ocultar el secreto" aria-label="Mostrar contraseña">Mostrar</button>
+                            <input type="password" name="webhook_secret" id="form-webhook_secret" autocomplete="new-password" placeholder="<?php echo __('form.webhook_secret_placeholder'); ?>" aria-describedby="hint-webhook_secret" title="<?php echo __('form.webhook_secret_title'); ?>">
+                            <button type="button" class="icon-btn" onclick="togglePassword(this)" title="<?php echo __('form.show_title'); ?>" aria-label="<?php echo __('form.show_aria'); ?>"><?php echo __('misc.show'); ?></button>
                         </div>
-                        <div class="hint" id="hint-webhook_secret">Dejar vacio para generar uno automaticamente</div>
+                        <div class="hint" id="hint-webhook_secret"><?php echo __('form.webhook_secret_hint'); ?></div>
                     </div>
                 </div>
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="form-chat_id">Chat ID</label>
-                        <input type="number" name="chat_id" id="form-chat_id" value="0" placeholder="0 = pendiente" aria-describedby="hint-chat_id" title="ID numérico del grupo o chat de Telegram">
-                        <div class="hint" id="hint-chat_id">Agrega el bot al grupo y revisa los logs para obtenerlo</div>
+                        <label for="form-chat_id"><?php echo __('form.chat_id'); ?></label>
+                        <input type="number" name="chat_id" id="form-chat_id" value="0" placeholder="<?php echo __('form.chat_id_placeholder'); ?>" aria-describedby="hint-chat_id" title="<?php echo __('form.chat_id_title'); ?>">
+                        <div class="hint" id="hint-chat_id"><?php echo __('form.chat_id_hint'); ?></div>
                     </div>
                     <div class="form-group">
-                        <label for="form-tracker_id">Tracker ID</label>
-                        <input type="number" name="tracker_id" id="form-tracker_id" required aria-required="true" placeholder="Ej: 22" title="ID del tracker en TikiWiki donde se guardarán los mensajes">
+                        <label for="form-tracker_id"><?php echo __('form.tracker_id'); ?></label>
+                        <input type="number" name="tracker_id" id="form-tracker_id" required aria-required="true" placeholder="<?php echo __('form.tracker_id_placeholder'); ?>" title="<?php echo __('form.tracker_id_title'); ?>">
                     </div>
                 </div>
                 
                 <div class="form-group">
-                    <label for="form-tiki_api_url">Tiki API URL</label>
-                    <input type="text" name="tiki_api_url" id="form-tiki_api_url" required aria-required="true" placeholder="https://wiki.ejemplo.org/api/" title="URL base de la API REST de TikiWiki">
+                    <label for="form-tiki_api_url"><?php echo __('form.tiki_api_url'); ?></label>
+                    <input type="text" name="tiki_api_url" id="form-tiki_api_url" required aria-required="true" placeholder="<?php echo __('form.tiki_api_url_placeholder'); ?>" title="<?php echo __('form.tiki_api_url_title'); ?>">
                 </div>
                 
                 <div class="form-group">
-                    <label for="form-tiki_api_token">Tiki API Token</label>
+                    <label for="form-tiki_api_token"><?php echo __('form.tiki_api_token'); ?></label>
                     <div class="input-wrapper">
-                        <input type="password" name="tiki_api_token" id="form-tiki_api_token" required aria-required="true" autocomplete="new-password" placeholder="Token de TikiWiki" title="Token de autenticación de la API de TikiWiki">
-                        <button type="button" class="icon-btn" onclick="togglePassword(this)" title="Mostrar u ocultar el token" aria-label="Mostrar contraseña">Mostrar</button>
+                        <input type="password" name="tiki_api_token" id="form-tiki_api_token" required aria-required="true" autocomplete="new-password" placeholder="<?php echo __('form.tiki_api_token_placeholder'); ?>" title="<?php echo __('form.tiki_api_token_title'); ?>">
+                        <button type="button" class="icon-btn" onclick="togglePassword(this)" title="<?php echo __('form.show_title'); ?>" aria-label="<?php echo __('form.show_aria'); ?>"><?php echo __('misc.show'); ?></button>
                     </div>
                 </div>
                 
                 <div class="checkbox-row">
                     <input type="checkbox" name="enabled" id="form-enabled" checked>
-                    <label for="form-enabled">Activa</label>
+                    <label for="form-enabled"><?php echo __('form.enabled'); ?></label>
                 </div>
                 
                 <div class="checkbox-row">
                     <input type="checkbox" name="async_processing" id="form-async_processing" aria-describedby="hint-async">
-                    <label for="form-async_processing">Procesamiento asincrono (buffer + worker)</label>
-                    <div class="hint" id="hint-async" style="margin-left:24px;">api.php responde 200 al instante, worker.php procesa en background (requiere cron)</div>
+                    <label for="form-async_processing"><?php echo __('form.async'); ?></label>
+                    <div class="hint" id="hint-async" style="margin-left:24px;"><?php echo __('form.async_hint'); ?></div>
                 </div>
             </div>
             
             <div class="modal-footer">
-                <button type="button" class="btn btn-outline" onclick="closeModal('connection-modal')" title="Cancelar y cerrar">Cancelar</button>
-                <button type="submit" class="btn btn-primary" title="Guardar los datos de la conexión">Guardar conexion</button>
+                <button type="button" class="btn btn-outline" onclick="closeModal('connection-modal')" title="<?php echo __('form.cancel_title'); ?>"><?php echo __('form.cancel'); ?></button>
+                <button type="submit" class="btn btn-primary" title="<?php echo __('form.save_title'); ?>"><?php echo __('form.save'); ?></button>
             </div>
         </form>
     </div>
@@ -922,11 +931,10 @@ foreach ($detections as $det) {
 <!-- ===== TAB: IMPORTAR ===== -->
 
 <div class="section">
-    <div class="section-header">Importar conversaciones (backfill)</div>
+    <div class="section-header"><?php echo __('import.title'); ?></div>
     <div class="section-content">
         <p style="margin-bottom:16px;">
-            Importa un archivo ZIP exportado de Telegram para poblar un tracker con mensajes
-            anteriores a la llegada del bot.
+            <?php echo __('import.description'); ?>
         </p>
         
         <form id="import-form" enctype="multipart/form-data">
@@ -935,9 +943,9 @@ foreach ($detections as $det) {
             
             <?php if (!empty($connections)): ?>
             <div class="form-group">
-                    <label for="import-connection-slug">Usar conexion existente (opcional)</label>
-                        <select name="connection_slug" id="import-connection-slug" onchange="fillConnectionSlug(this, 'import-')" title="Seleccionar una conexión existente">
-                            <option value="">— Ingresar manual —</option>
+                    <label for="import-connection-slug"><?php echo __('import.connection_label'); ?></label>
+                        <select name="connection_slug" id="import-connection-slug" onchange="fillConnectionSlug(this, 'import-')" title="<?php echo __('import.connection_label'); ?>">
+                            <option value=""><?php echo __('import.connection_default'); ?></option>
                         <?php foreach ($connectionsSafe as $slug => $conn): ?>
                         <option value="<?php echo escapeHtml($slug); ?>">
                             <?php echo escapeHtml($conn['name']); ?>
@@ -950,14 +958,14 @@ foreach ($detections as $det) {
             
             <div class="form-row">
                 <div class="form-group">
-                    <label for="import-tiki_url">Tiki API URL</label>
-                    <input type="text" name="tiki_api_url" id="import-tiki_url" required aria-required="true" placeholder="https://wiki.ejemplo.org/api/" title="URL base de la API REST de TikiWiki">
+                    <label for="import-tiki_url"><?php echo __('import.tiki_url'); ?></label>
+                    <input type="text" name="tiki_api_url" id="import-tiki_url" required aria-required="true" placeholder="<?php echo __('import.tiki_url_placeholder'); ?>" title="<?php echo __('import.tiki_url_title'); ?>">
                 </div>
                 <div class="form-group">
-                    <label for="import-tiki_token">Tiki API Token</label>
+                    <label for="import-tiki_token"><?php echo __('import.tiki_token'); ?></label>
                     <div class="input-wrapper">
-                        <input type="password" name="tiki_api_token" id="import-tiki_token" required aria-required="true" autocomplete="new-password" placeholder="Token de TikiWiki" title="Token de autenticación de la API de TikiWiki">
-                        <button type="button" class="icon-btn" onclick="togglePassword(this)" title="Mostrar u ocultar el token" aria-label="Mostrar contraseña">Mostrar</button>
+                        <input type="password" name="tiki_api_token" id="import-tiki_token" required aria-required="true" autocomplete="new-password" placeholder="<?php echo __('import.tiki_token_placeholder'); ?>" title="<?php echo __('import.tiki_token_title'); ?>">
+                        <button type="button" class="icon-btn" onclick="togglePassword(this)" title="<?php echo __('form.show_title'); ?>" aria-label="<?php echo __('form.show_aria'); ?>"><?php echo __('misc.show'); ?></button>
                     </div>
                 </div>
             </div>
@@ -965,17 +973,17 @@ foreach ($detections as $det) {
             
             <div class="form-row">
                 <div class="form-group">
-                    <label for="import-tracker_id">Tracker ID</label>
-                    <input type="number" name="tracker_id" id="import-tracker_id" required aria-required="true" placeholder="Ej: 22" title="ID del tracker en TikiWiki donde se importarán los mensajes">
+                    <label for="import-tracker_id"><?php echo __('import.tracker_id'); ?></label>
+                    <input type="number" name="tracker_id" id="import-tracker_id" required aria-required="true" placeholder="<?php echo __('import.tracker_id_placeholder'); ?>" title="<?php echo __('import.tracker_id_title'); ?>">
                 </div>
                 <div class="form-group">
-                    <label for="import-export_file">Archivo ZIP exportado de Telegram</label>
-                    <input type="file" name="export_file" id="import-export_file" accept=".zip" required title="Archivo ZIP con el export de conversaciones de Telegram">
+                    <label for="import-export_file"><?php echo __('import.file'); ?></label>
+                    <input type="file" name="export_file" id="import-export_file" accept=".zip" required title="<?php echo __('import.file_title'); ?>">
                 </div>
             </div>
             
             <div style="margin-top:16px;">
-                <button type="button" class="btn btn-primary" onclick="startImport()" title="Iniciar importación del archivo ZIP seleccionado">Importar</button>
+                <button type="button" class="btn btn-primary" onclick="startImport()" title="<?php echo __('import.button_title'); ?>"><?php echo __('import.button'); ?></button>
             </div>
         </form>
         
@@ -990,12 +998,10 @@ foreach ($detections as $det) {
 <!-- ===== TAB: CREAR TRACKER ===== -->
 
 <div class="section">
-    <div class="section-header">Crear tracker en TikiWiki</div>
+    <div class="section-header"><?php echo __('create.title'); ?></div>
     <div class="section-content">
         <p style="margin-bottom:16px;">
-            Crea un tracker completo en TikiWiki con todos los campos necesarios
-            para recibir mensajes de Telegram. Se crea automáticamente la galería
-            de medios y se configura el campo FG.
+            <?php echo __('create.description'); ?>
         </p>
         
         <form method="post">
@@ -1003,30 +1009,29 @@ foreach ($detections as $det) {
             <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
             
             <div class="form-group">
-                <label for="create-tracker-name">Nombre del tracker *</label>
-                <input type="text" name="tracker_name" id="create-tracker-name" required aria-required="true" placeholder="Ej: Conversaciones del grupo de Telegram" value="<?php echo escapeHtml($_POST['tracker_name'] ?? ''); ?>" aria-describedby="hint-tracker-name" title="Nombre con el que se creará el tracker en TikiWiki">
-                <div class="hint" id="hint-tracker-name">Este nombre se usará como nombre del tracker en TikiWiki</div>
+                <label for="create-tracker-name"><?php echo __('create.name'); ?></label>
+                <input type="text" name="tracker_name" id="create-tracker-name" required aria-required="true" placeholder="<?php echo __('create.name_placeholder'); ?>" value="<?php echo escapeHtml($_POST['tracker_name'] ?? ''); ?>" aria-describedby="hint-tracker-name" title="<?php echo __('create.name_title'); ?>">
+                <div class="hint" id="hint-tracker-name"><?php echo __('create.name_hint'); ?></div>
             </div>
             
             <div class="form-group">
-                <label for="create-tracker-desc">Descripción (opcional)</label>
-                <input type="text" name="tracker_description" id="create-tracker-desc" placeholder="Breve descripción del tracker" value="<?php echo escapeHtml($_POST['tracker_description'] ?? ''); ?>" title="Descripción opcional del tracker">
+                <label for="create-tracker-desc"><?php echo __('create.desc'); ?></label>
+                <input type="text" name="tracker_description" id="create-tracker-desc" placeholder="<?php echo __('create.desc_placeholder'); ?>" value="<?php echo escapeHtml($_POST['tracker_description'] ?? ''); ?>" title="<?php echo __('create.desc_title'); ?>">
             </div>
             
             <div class="form-row">
                 <div class="form-group">
-                    <label for="create-field-prefix">Field prefix</label>
-                    <input type="text" name="field_prefix" id="create-field-prefix" value="<?php echo escapeHtml($_POST['field_prefix'] ?? 'telegrammessage'); ?>" placeholder="telegrammessage" pattern="[a-z][a-z0-9]*" maxlength="16" aria-describedby="hint-prefix" title="Prefijo para los nombres de campo del tracker">
+                    <label for="create-field-prefix"><?php echo __('create.field_prefix'); ?></label>
+                    <input type="text" name="field_prefix" id="create-field-prefix" value="<?php echo escapeHtml($_POST['field_prefix'] ?? 'telegrammessage'); ?>" placeholder="<?php echo __('create.field_prefix_placeholder'); ?>" pattern="[a-z][a-z0-9]*" maxlength="16" aria-describedby="hint-prefix" title="<?php echo __('create.field_prefix_title'); ?>">
                     <div class="hint" id="hint-prefix">
-                        Prefijo para los nombres de campo (permNames). 
-                        Solo minúsculas + números, máximo 16 caracteres.
+                        <?php echo __('create.field_prefix_hint'); ?>
                         Ej: <code>qpch</code>, <code>soporte</code>, <code>chelapedia</code>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="create-connection-slug">Asignar a conexión (opcional)</label>
-                    <select name="connection_slug" id="create-connection-slug" onchange="fillConnectionSlug(this, 'create-')" title="Seleccioná una conexión para ver sus datos abajo">
-                        <option value="">— Solo crear tracker —</option>
+                    <label for="create-connection-slug"><?php echo __('create.connection_label'); ?></label>
+                    <select name="connection_slug" id="create-connection-slug" onchange="fillConnectionSlug(this, 'create-')" title="<?php echo __('create.connection_label'); ?>">
+                        <option value=""><?php echo __('create.connection_default'); ?></option>
                         <?php foreach ($connectionsSafe as $slug => $conn): ?>
                         <option value="<?php echo escapeHtml($slug); ?>"
                             <?php echo ($_POST['connection_slug'] ?? '') === $slug ? 'selected' : ''; ?>>
@@ -1034,27 +1039,27 @@ foreach ($detections as $det) {
                         </option>
                         <?php endforeach; ?>
                     </select>
-                    <div class="hint">Seleccioná una conexión para recordar sus datos al asignar</div>
+                    <div class="hint"><?php echo __('create.connection_hint'); ?></div>
                 </div>
             </div>
             
             <div class="form-row">
                 <div class="form-group">
-                    <label for="create-tiki-url">Tiki API URL <span id="create-url-required" style="color:var(--error);">*</span></label>
-                    <input type="text" name="tiki_api_url" id="create-tiki-url" required aria-required="true" placeholder="https://wiki.ejemplo.org/api/" value="<?php echo escapeHtml($_POST['tiki_api_url'] ?? ''); ?>" title="URL base de la API REST de TikiWiki">
+                    <label for="create-tiki-url"><?php echo __('create.tiki_url'); ?> <span id="create-url-required" style="color:var(--error);">*</span></label>
+                    <input type="text" name="tiki_api_url" id="create-tiki-url" required aria-required="true" placeholder="<?php echo __('create.tiki_url_placeholder'); ?>" value="<?php echo escapeHtml($_POST['tiki_api_url'] ?? ''); ?>" title="<?php echo __('create.tiki_url_title'); ?>">
                 </div>
                 <div class="form-group">
-                    <label for="create-tiki-token">Tiki API Token <span id="create-token-required" style="color:var(--error);">*</span></label>
+                    <label for="create-tiki-token"><?php echo __('create.tiki_token'); ?> <span id="create-token-required" style="color:var(--error);">*</span></label>
                     <div class="input-wrapper">
-                        <input type="password" name="tiki_api_token" id="create-tiki-token" required aria-required="true" autocomplete="new-password" placeholder="Token de TikiWiki" value="<?php echo escapeHtml($_POST['tiki_api_token'] ?? ''); ?>" title="Token de autenticación de la API de TikiWiki">
-                        <button type="button" class="icon-btn" onclick="togglePassword(this)" title="Mostrar u ocultar el token" aria-label="Mostrar contraseña">Mostrar</button>
+                        <input type="password" name="tiki_api_token" id="create-tiki-token" required aria-required="true" autocomplete="new-password" placeholder="<?php echo __('create.tiki_token_placeholder'); ?>" value="<?php echo escapeHtml($_POST['tiki_api_token'] ?? ''); ?>" title="<?php echo __('create.tiki_token_title'); ?>">
+                        <button type="button" class="icon-btn" onclick="togglePassword(this)" title="<?php echo __('form.show_title'); ?>" aria-label="<?php echo __('form.show_aria'); ?>"><?php echo __('misc.show'); ?></button>
                     </div>
                 </div>
             </div>
             
             <div class="form-group">
                 <div style="border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-size:0.85em;color:var(--text);" aria-live="polite" aria-atomic="true">
-                    <strong>📋 Vista previa de campos que se crearán:</strong>
+                    <strong><?php echo __('create.preview_label'); ?>:</strong>
                     <div style="margin-top:6px;font-family:monospace;font-size:0.9em;" id="field-preview">
                         <span id="preview-prefix"><?php echo escapeHtml($_POST['field_prefix'] ?? 'telegrammessage'); ?></span>TelegramMessageId,
                         <span id="preview-prefix2"><?php echo escapeHtml($_POST['field_prefix'] ?? 'telegrammessage'); ?></span>ChatId,
@@ -1064,16 +1069,15 @@ foreach ($detections as $det) {
             </div>
             
             <div class="form-group">
-                <label for="create-gallery-id">Gallery ID (opcional)</label>
-                <input type="number" name="gallery_id" id="create-gallery-id" placeholder="Dejar vacío para auto-crear" value="<?php echo escapeHtml($_POST['gallery_id'] ?? ''); ?>" title="Si ya tenés una galería, ingresá su ID para usarla">
+                <label for="create-gallery-id"><?php echo __('create.gallery_id'); ?></label>
+                <input type="number" name="gallery_id" id="create-gallery-id" placeholder="<?php echo __('create.gallery_id_placeholder'); ?>" value="<?php echo escapeHtml($_POST['gallery_id'] ?? ''); ?>" title="<?php echo __('create.gallery_id_title'); ?>">
                 <div class="hint" id="hint-gallery-id">
-                    Si ya tenés una galería de archivos en TikiWiki, ingresá su ID para usarla.
-                    Si se deja vacío, trackerGram intentará crear una automáticamente.
+                    <?php echo __('create.gallery_id_hint'); ?>
                 </div>
             </div>
             
             <div style="margin-top:16px;">
-                <button type="submit" class="btn btn-primary" title="Crear el tracker en TikiWiki con los campos especificados">Crear Tracker</button>
+                <button type="submit" class="btn btn-primary" title="<?php echo __('create.button_title'); ?>"><?php echo __('create.button'); ?></button>
             </div>
         </form>
     </div>
@@ -1084,19 +1088,19 @@ foreach ($detections as $det) {
 <!-- Footer: configuracion global -->
 <div class="section" style="margin-top:32px;">
     <div class="section-header" style="cursor:pointer;" onclick="toggleGlobalConfig(this)" role="button" tabindex="0" aria-expanded="false" aria-controls="config-content" onkeydown="if(event.key==='Enter'||event.key===' ') { event.preventDefault(); toggleGlobalConfig(this); }">
-        Configuracion global
+        <?php echo __('config.title'); ?>
     </div>
     <div class="section-content" id="config-content" style="display:none;">
         <div class="form-group">
-            <label for="admin-password-input">Contraseña de admin</label>
+            <label for="admin-password-input"><?php echo __('config.password'); ?></label>
             <form method="post">
                 <input type="hidden" name="action" value="change_password">
                 <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
                 <div style="display:flex;gap:8px;align-items:flex-end;">
                     <div style="flex:1;">
-                        <input type="password" name="admin_password" id="admin-password-input" required minlength="8" placeholder="Minimo 8 caracteres" title="Nueva contraseña de administrador (mínimo 8 caracteres)">
+                        <input type="password" name="admin_password" id="admin-password-input" required minlength="8" placeholder="<?php echo __('config.password_placeholder'); ?>" title="<?php echo __('config.password_title'); ?>">
                     </div>
-                    <button type="submit" class="btn btn-outline" title="Cambiar la contraseña de administrador">Cambiar</button>
+                    <button type="submit" class="btn btn-outline" title="<?php echo __('config.change_title'); ?>"><?php echo __('config.change'); ?></button>
                 </div>
             </form>
         </div>
@@ -1104,18 +1108,18 @@ foreach ($detections as $det) {
         <hr>
         
         <div class="form-group">
-            <label>URL del Webhook</label>
+            <label><?php echo __('config.webhook_url'); ?></label>
             <div class="webhook-url">
-                <div class="label">URL auto-detectada (usada al configurar webhook)</div>
+                <div class="label"><?php echo __('config.webhook_url_desc'); ?></div>
                 <?php echo escapeHtml(generateWebhookUrl()); ?>
             </div>
         </div>
         
         <div class="form-group">
-            <label>Estado de debug</label>
+            <label><?php echo __('config.debug'); ?></label>
             <p style="font-size:0.9em;color:var(--text-secondary);">
-                DEBUG_MODE: <?php echo defined('DEBUG_MODE') && DEBUG_MODE ? 'Activado' : 'Desactivado'; ?>
-                &middot; Async: <?php echo defined('ASYNC_PROCESSING') && ASYNC_PROCESSING ? 'Activado' : 'Desactivado'; ?>
+                DEBUG_MODE: <?php echo defined('DEBUG_MODE') && DEBUG_MODE ? __('config.debug_on') : __('config.debug_off'); ?>
+                &middot; Async: <?php echo defined('ASYNC_PROCESSING') && ASYNC_PROCESSING ? __('config.async_on') : __('config.async_off'); ?>
             </p>
         </div>
     </div>

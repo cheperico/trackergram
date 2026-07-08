@@ -4,6 +4,10 @@
  * Todos los entry points deben requerir este archivo.
  */
 require_once __DIR__ . '/config.php';
+
+// ── Carga de idioma ──
+require_once __DIR__ . '/lang/load.php';
+
 require_once __DIR__ . '/exceptions.php';
 require_once __DIR__ . '/NormalizedMessage.php';
 require_once __DIR__ . '/TikiWikiClient.php';

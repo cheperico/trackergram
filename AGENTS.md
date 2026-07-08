@@ -205,7 +205,8 @@ La mayoría de los archivos están en la raíz. Subdirectorios:
 | `opt/` | Investigaciones, templates Smarty, archivos opcionales |
 | `tmp/` | Archivos temporales (rate limiting, buffers async, etc.) |
 | `reports/` | Reportes históricos de auditoría (referencia) |
-| `design/` | **📐 Documentos de diseño** — captura de decisiones, exploraciones y discusiones antes de implementar. **Leer antes de arrancar una feature nueva** para entender el contexto completo, alternativas consideradas y por qué se tomaron ciertas decisiones. Contiene: `001-configuracion-inversa-via-telegram.md`, `002-MiniApp.md`, `003-arquitectura-multi.md`, `007-pwa-offline-formularios.md`. |
+| `design/` | **📐 Documentos de diseño activos** — captura de decisiones, exploraciones y discusiones antes de implementar. **Leer antes de arrancar una feature nueva**. Contiene: `001-configuracion-inversa-via-telegram.md`, `004-trabajo-sobre-existentes.md`, `005-crear-tracker-en-conexion.md`, `006-mtproto-pyrogram.md`, `008-estrategia-recoleccion-estructurada.md`, `009-permisos-por-tracker-tikiwiki.md`, `999-a-tener-en-cuenta.md`. |
+| `design/archived/` | **🗄️ Diseños históricos** — implementados o consolidados en otros docs. Se mantienen como referencia de decisiones pasadas. Contiene: `002-MiniApp.md`, `003-arquitectura-multi.md`, `007-pwa-offline-formularios.md`, `010-tikipickit-pwa-recoleccion.md`. |
 | `.opencode/` | Configuración de opencode (agentes, skills) |
 
 #### Entry Points HTTP
@@ -262,7 +263,8 @@ La mayoría de los archivos están en la raíz. Subdirectorios:
 | `CAMBIOS.md` | Historial de cambios por versión |
 | `opt/visualizacion-tiki.md` | Feed tipo chat en TikiWiki (investigación + template Smarty) — específico de wiki.chela.org.ar |
 | `opt/telegram_bots.md` | Tokens de bots de Telegram — **NO versionar** (archivo local) |
-| `design/*` | **📐 Documentos de diseño** — captura de decisiones, alternativas discutidas y arquitectura exploratoria antes de implementar. Leer siempre antes de arrancar una feature nueva (`001-configuracion-inversa-via-telegram.md`, `002-MiniApp.md`, `003-arquitectura-multi.md`, `007-pwa-offline-formularios.md`). Este archivo se actualiza. |
+| `design/*` | **📐 Documentos de diseño activos** — captura de decisiones, alternativas discutidas y arquitectura exploratoria antes de implementar. Leer siempre antes de arrancar una feature nueva. |
+| `design/archived/*` | **🗄️ Diseños históricos** — implementados o consolidados en otros docs. Referencia de decisiones pasadas. |
 | `..\TikiWiki\` | **Código fuente de TikiWiki 27.5** — fuera del workspace, en `C:\Users\Federico\Documents\OpenCode\TikiWiki\tiki-27.5\`. Solo referencia, no se versiona. El agente `@tiki-expert` lo consulta para entender comportamientos internos de la API. |
 
 ### Orden recomendado de lectura del código
@@ -626,7 +628,8 @@ La documentación del proyecto se distribuye en varios archivos. Cada uno con pr
 | `roadmap.md` | Equipo de desarrollo | Items pendientes por fase | Marcar completados, agregar nuevos, consolidar |
 | `AGENTS.md` | Agentes de IA | Contexto completo del proyecto | Fuente de verdad para agentes |
 | `CAMBIOS.md` | Todos | Historial de cambios por versión | Changelog cronológico |
-| `design/*` | Equipo de desarrollo | Diseño exploratorio pre-implementación | Mantener como referencia, pasar a roadmap cuando madure |
+| `design/*` | Equipo de desarrollo | Diseño exploratorio pre-implementación (activos) | Mantener como referencia, pasar a roadmap cuando madure |
+| `design/archived/*` | Equipo de desarrollo | Diseños implementados o consolidados | **Nunca borrar** — referencia histórica de decisiones |
 | `reports/*` | Histórico | Auditorías externas | NO borrar, roadmap consolida items accionables |
 | `opt/*` | Uso local | Credenciales, templates de instancia | NO versionar en GitHub |
 | `config.php` | Todos | Constantes globales, timeouts, versión del proyecto | **`TRACKERGRAM_VERSION` debe actualizarse en cada versión** — es la fuente de verdad que se muestra en la UI del admin |
@@ -659,9 +662,10 @@ La documentación del proyecto se distribuye en varios archivos. Cada uno con pr
 - **Formato**: Tabla por fase con #, Item, Esfuerzo, Notas/Por qué ahora
 
 **design/***
-- **Propósito**: Capturar decisiones, alternativas y discusiones antes de implementar
+- **Propósito**: Capturar decisiones, alternativas y discusiones antes de implementar (activos)
 - **Cuándo pasan a roadmap**: Cuando el diseño avanza lo suficiente y solo necesita retoques de implementación
-- **NO**: Borrar — mantener como referencia histórica de decisiones
+- **Cuándo archivar**: Cuando el diseño está implementado o consolidado en otro documento — mover a `design/archived/`
+- **NO**: Borrar — mantener como referencia histórica de decisiones (archivados también)
 
 **reports/***
 - **Propósito**: Referencia histórica de investigaciones/auditorías externas

@@ -1,6 +1,19 @@
 # Cambios - Changelog
 
-## v0.6.2
+## v0.6.3
+
+### 🌐 Sistema de internacionalización (admin.php)
+- **Nuevo**: `lang/` directorio con `es.php` (español) y `en.php` (inglés) ~80 claves c/u.
+- **Nuevo**: `lang/load.php` — Loader con detección de idioma (GET > sesión > default 'es'), helpers `__()` y `_n()`.
+- **Nuevo**: Selector ES|EN en navbar con persistencia en sesión. Links preservan tab/view activo.
+- **Cambio**: bootstrap.php ahora incluye `lang/load.php`.
+- **Cambio**: admin.php — ~60 strings visibles reemplazadas por `__()` (login, navbar, tabs, view toggle, classic + grouped view, modal, import, create tracker, global config). `<html lang>` dinámico.
+- **Cambio**: admin_handlers.php — ~15 mensajes de success/error traducidos.
+- **Nuevo**: admin.css — Estilos para `.lang-switch` en navbar.
+- **Pendiente**: 3 strings en admin.js (modal title, mostrar/ocultar) y ~10 errores de borde en handlers aún sin traducir (trackeado en roadmap.md F4-5, F4-6).
+- **Nota técnicas**: Las funciones `__()` y `_n()` están disponibles en todos los entry points via bootstrap. La sesión se arranca con guard `session_status()===NONE` para evitar double-start. api.php, import.php y worker.php son seguros.
+
+---
 
 ### 🧹 Cache leaks resueltos (F3-10, F3-11, F3-13, #18, #19)
 
@@ -134,6 +147,10 @@ Items del code review que ya estaban implementados en sesiones previas (verifica
 
 #### F3: Edited message out-of-order — delegación segura
 - **WebhookHandler::processEditedMessage()**: Cuando el item no existe (edited_message llegó antes que el message original), libera el TOCTOU lock y delega a `processMessage()` para crear el item con los datos del edit. El mensaje original que llegue después será capturado por deduplicación. No hay deadlock porque se libera el lock antes de la delegación.
+
+#### F4: GC de lock files huérfanos de dedup
+- **WebhookHandler::gcDedupLocks()**: Nueva función de GC probabilístico (~1% por `processUpdate()`) que limpia archivos `*.lock` en `TEMP_DIR/dedup_locks/` con más de 1 hora de antigüedad. Si PHP crashea entre la creación del lock file y su `unlink()`, el archivo queda huérfano. Este GC evita su acumulación.
+- **WebhookHandler::processUpdate()**: Llama a `gcDedupLocks()` junto con `gcAlbumBuffer()`.
 
 ---
 

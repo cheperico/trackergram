@@ -342,6 +342,35 @@ class WebhookHandler
     }
 
     /**
+     * GC probabilístico para lock files huérfanos de dedup.
+     *
+     * Si PHP crashea entre la creación del lock file y su unlink(),
+     * queda un archivo .lock huérfano. Este GC los limpia después de 1 hora.
+     * Probabilidad: ~1% por processUpdate().
+     */
+    private function gcDedupLocks(): void
+    {
+        if (mt_rand(1, 100) !== 1) {
+            return;
+        }
+        $lockDir = defined('TEMP_DIR') ? TEMP_DIR . '/dedup_locks' : sys_get_temp_dir() . '/trackergram_dedup';
+        if (!is_dir($lockDir)) {
+            return;
+        }
+        $files = glob($lockDir . '/*.lock');
+        if (!is_array($files)) {
+            return;
+        }
+        $threshold = time() - 3600;
+        foreach ($files as $file) {
+            if (is_file($file) && filemtime($file) < $threshold) {
+                @unlink($file);
+                log_message("trackerGram: Dedup lock GC — lock file huérfano eliminado: " . basename($file));
+            }
+        }
+    }
+
+    /**
      * Buscar un álbum existente por su media_group_id.
      * @return array|null Array con itemId, fileIds, createdAt o null si no existe
      */
@@ -1186,8 +1215,9 @@ class WebhookHandler
      */
     public function processUpdate(array $update): void
     {
-        // GC probabilístico para álbumes stale
+        // GC probabilístico para álbumes stale y lock files huérfanos
         $this->gcAlbumBuffer();
+        $this->gcDedupLocks();
 
         // Detectar si el bot fue agregado a un chat no autorizado (my_chat_member)
         if (isset($update['my_chat_member'])) {

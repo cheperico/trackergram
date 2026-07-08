@@ -18,7 +18,7 @@
 
 | | |
 |---|---|
-| **Versión actual** | v0.6.2 |
+| **Versión actual** | v0.6.3 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Instancias activas** | Dev (tracker 26) · Prod (tracker 22) |
 | **Filosofía** | Sin DB con servidor · JSON files para estado local (no SQLite) · PHP puro sin framework · MVP pragmático |
@@ -72,6 +72,7 @@
 - ✅ **configure_webhook usa POST**: el token de bot viaja en body HTTP, no en URL query string.
 - ✅ **htmlspecialchars eliminado de fromWebhook()**: captions y titles se guardan crudos; el escape HTML es responsabilidad de la capa de vista.
 - ✅ **Rate limiting con flock(LOCK_EX)**: `fopen('c+')` + `flock()` reemplaza a `file_get_contents()`/`file_put_contents()` sin lock, eliminando race condition entre requests concurrentes.
+- ✅ **Internacionalización del panel admin**: Sistema de idioma con `__()`/`_n()`, selector ES|EN en navbar con persistencia en sesión. Traducciones completas en admin.php. Cobertura: ~80 claves en español e inglés.
 - ✅ **Detección de migración grupo→supergrupo**: `migrate_to_chat_id` detectado automáticamente y `chat_id` actualizado en la conexión. Soporte para post-migración con `migrate_from_chat_id` y auto-asignación por heurística (basic→supergroup).
 - ✅ **GC de archivos rate limit**: limpieza probabilística (1%) de archivos `tmp/tg_rate_*` con más de 1 hora de inactividad.
 - ✅ **ConfigManager::load() con flock(LOCK_SH)**: lectura de `setup.json` con lock compartido, previniendo JSON truncado por escritura concurrente.
@@ -140,8 +141,8 @@ Todavía sin decisión final. Se están evaluando 3 enfoques (no necesariamente 
 
 | Alternativa | Esfuerzo | Documento | Cómo funciona |
 |-------------|----------|-----------|---------------|
-| **Mini App** (Telegram Web App) | 5+ sesiones | `design/002-MiniApp.md` | Formulario web embebido en Telegram, desde un botón inline |
-| **PWA offline** | ~4 sesiones (F1+F2+F3) | `design/007-pwa-offline-formularios.md` | App web offline-first que sincroniza al volver en línea |
+| **Mini App** (Telegram Web App) | 5+ sesiones | `design/008-estrategia-recoleccion-estructurada.md` | Formulario web embebido en Telegram, desde un botón inline |
+| **PWA offline** | ~4 sesiones (F1+F2+F3) | `design/008-estrategia-recoleccion-estructurada.md` | App web offline-first que sincroniza al volver en línea |
 | **Mensajes estructurados con prefijos** | 2-3 sesiones | — | Parser en MessageMapper: `GPS user coord`, `#tag texto` — sin UI nueva |
 
 #### Resto de Fase 4
@@ -161,6 +162,8 @@ Todavía sin decisión final. Se están evaluando 3 enfoques (no necesariamente 
 | **F4-2** | **HTTP Keep-Alive con curl_reset()** | 1 sesión | Reutilizar handle curl en TikiWikiClient y TelegramClient con `curl_reset()` para habilitar HTTP Keep-Alive y evitar handshake TLS en cada llamada. Code Review: Arq&Seg #4. |
 | **F4-3** | **Head-of-Line blocking en worker.php** | 2-3 sesiones | Worker single-thread: si TikiWiki tarda 30s en upload, la cola se bloquea. Evaluar `curl_multi_exec()` para push concurrente o múltiples workers con lock granular. Code Review: Arq&Seg #5. |
 | **F4-4** | **TikiWikiClient refactor (1 clase → 3: core + fields + galleries)** | 2-3 sesiones | **Objetivo**: Separar 3 responsabilidades mezcladas en 1378 líneas. **Estrategia**: TikiWikiClient mantiene API pública, delega en `TrackerFieldManager` (field prefix, field definitions, create/sync tracker) y `GalleryManager` (gallery CRUD, repair, gallery ID resolution) inyectados como `$client->fields` y `$client->galleries`. **Callers no requieren cambios** — métodos legacy siguen funcionando por delegación. Archivos nuevos: `TrackerFieldManager.php`, `GalleryManager.php`. |
+| **F4-5** | **Internacionalización: strings en admin.js** | 1 sesión | Pasar datos de idioma al frontend (ej: `<script>var LANG={...}</script>`) y reemplazar las 3 strings hardcodeadas en admin.js: modal title "Nueva conexion", toggle password "Mostrar"/"Ocultar". |
+| **F4-6** | **Internacionalización: mensajes de error de borde** | 30 min | Traducir ~10 strings de validación en admin_handlers.php y detect_helper.php (ej: "El field prefix debe comenzar con una letra", "Error al sincronizar tracker", etc.). Prioridad baja — son condiciones raras que el admin casi nunca ve. |
 
 ### ⚪ Fase 5: Pendientes de reevaluación (muy baja prioridad)
 
@@ -213,7 +216,7 @@ Items que no justifican implementación hoy pero se documentan por si el context
 |------|--------|
 | Base de datos local con servidor (MySQL/PostgreSQL) | Rompe la filosofía "sin DB". TikiWiki es el almacenamiento. |
 | Framework PHP (Laravel/Symfony) | Overhead innecesario para un puente de ~10 archivos. |
-| Soporte multi-idioma | No agrega valor al caso de uso actual. |
+| Soporte multi-idioma (admin.php) | El sistema base (carga de idioma, selector, __()) está implementado. Queda traducir las strings hardcodeadas en admin.js (3 strings) y los mensajes de error de borde en admin_handlers.php (~10). Ver items en Fase 4. |
 | Modo espejo (vs archivo) | Decidido: trackerGram es **archivo inmutable con eventos**. Los editados/borrados se guardan como eventos adicionales, no modifican el original. |
 | Reproducción de mensajes previos a nuevo tracker | El flujo real (export ZIP manual) ya cubre este caso. No agrega valor tenerlo integrado. |
 | Long Polling (getUpdates) en vez de Webhook | Webhook + async worker es la arquitectura correcta para hosting compartido (sin proceso persistente). Long Polling requeriría proceso CLI long-running con supervisor/systemd. Descartado en code review Arq&Seg #10. |
@@ -237,12 +240,15 @@ Los documentos en `design/` contienen exploraciones detalladas de features que e
 | Documento | Estado | Feature |
 |-----------|--------|---------|
 | `design/001-configuracion-inversa-via-telegram.md` | Exploración | Configurar trackerGram desde Telegram con comandos |
-| `design/002-MiniApp.md` | Exploración | Frontend embebido para recolección estructurada de datos (una de 3 alternativas, ver Fase 4) |
-| `design/003-arquitectura-multi.md` | ✅ Implementado | Multi-conexión (routing, field mapping, etc.) |
-| `design/007-pwa-offline-formularios.md` | Exploración | PWA offline-first para cargas estructuradas (una de 3 alternativas, ver Fase 4) |
+| `design/004-trabajo-sobre-existentes.md` | F1+F2 ✅, F3 ⏳ | Reply, edit, delete sobre mensajes existentes |
+| `design/005-crear-tracker-en-conexion.md` | ⏳ Pendiente | Crear tracker integrado en modal de conexión |
+| `design/006-mtproto-pyrogram.md` | Exploración | MTProto/Pyrogram como alternativa a Bot API |
+| `design/008-estrategia-recoleccion-estructurada.md` | 🟢 Activo | Estrategia de recolección estructurada (consolida 002 y 007) |
+| `design/009-permisos-por-tracker-tikiwiki.md` | ✅ Diseño completo ⏳ Pendiente | Restringir trackerGram a trackers específicos vía permisos TikiWiki |
+| `design/999-a-tener-en-cuenta.md` | Referencia | Seguridad TikiWiki: SQL injection conocido en `list_items()` |
 
-> 📌 La Mini App (`002`), la PWA offline (`007`) y los mensajes estructurados con prefijos son **3 alternativas en evaluación** para recolección estructurada de datos. Ninguna reemplaza a otra — se está evaluando cuál implementar (o combinación). Ver sección [Fase 4 — Alternativas en Evaluación](#-alternativas-en-evaluación--recolección-estructurada).
+> 📌 Los documentos `002-MiniApp.md`, `003-arquitectura-multi.md` y `007-pwa-offline-formularios.md` fueron **archivados** en `design/archived/` (implementados o consolidados en otros docs). Se mantienen como referencia histórica.
 
 Los reportes históricos en `reports/` se conservan como referencia de investigaciones pasadas. Los items accionables ya están consolidados en este documento.
 
-> **Última actualización**: 05/07/2026 — + Fase 3 completada (12/13 items), #8 excepciones, #10 álbumes atómicos
+> **Última actualización**: 08/07/2026 — Archivados 002, 003, 007 en design/archived/. Agregados 008, 009, 999 a tabla activa.

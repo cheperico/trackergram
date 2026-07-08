@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         case 'change_password':
             $newPassword = trim($_POST['admin_password'] ?? '');
             if (strlen($newPassword) < 8) {
-                $errorMessage = 'La contraseña debe tener al menos 8 caracteres';
+                $errorMessage = __('msg.password_short');
             } else {
                 $envFile = __DIR__ . '/.env';
                 if (file_exists($envFile)) {
@@ -61,12 +61,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     );
                     if (@file_put_contents($envFile, $env, LOCK_EX)) {
                         session_regenerate_id(true);
-                        $successMessage = 'Contraseña cambiada exitosamente';
+                        $successMessage = __('msg.password_changed');
                     } else {
-                        $errorMessage = 'Error al guardar la nueva contraseña';
+                        $errorMessage = __('msg.password_error');
                     }
                 } else {
-                    $errorMessage = 'Archivo .env no encontrado';
+                    $errorMessage = __('msg.env_not_found');
                 }
             }
             break;
@@ -98,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             
             try {
                 $newSlug = $configManager->saveConnection($data);
-                $successMessage = 'Conexión "' . $data['name'] . '" guardada exitosamente (slug: ' . $newSlug . ')';
+                $successMessage = sprintf(__('msg.saved'), $data['name'], $newSlug);
                 $connections = $configManager->listConnections(); // refrescar
 
                 // Intentar fetchear bot_name y chat_title (no crítico si falla)
@@ -120,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     }
                 }
             } catch (Exception $e) {
-                $errorMessage = 'Error al guardar conexión: ' . $e->getMessage();
+                $errorMessage = __('msg.save_error') . ': ' . $e->getMessage();
             }
             break;
         
@@ -128,10 +128,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         case 'delete_connection':
             $slug = $_POST['slug'] ?? '';
             if ($configManager->deleteConnection($slug)) {
-                $successMessage = 'Conexión eliminada';
+                $successMessage = __('msg.deleted');
                 $connections = $configManager->listConnections();
             } else {
-                $errorMessage = 'Error al eliminar conexión';
+                $errorMessage = __('msg.delete_error');
             }
             break;
         
@@ -140,10 +140,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $slug = $_POST['slug'] ?? '';
             $newSlug = $configManager->duplicateConnection($slug);
             if ($newSlug) {
-                $successMessage = 'Conexión duplicada como "' . ($configManager->getConnection($newSlug)['name'] ?? $newSlug) . '"';
+                $newName = $configManager->getConnection($newSlug)['name'] ?? $newSlug;
+                $successMessage = sprintf(__('msg.duplicated'), $newName);
                 $connections = $configManager->listConnections();
             } else {
-                $errorMessage = 'Error al duplicar conexión';
+                $errorMessage = __('msg.duplicate_error');
             }
             break;
         
@@ -154,28 +155,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             if ($conn) {
                 if ($conn['enabled']) {
                     $configManager->disableConnection($slug);
-                    $successMessage = 'Conexión desactivada';
+                    $successMessage = __('msg.toggled_off');
                 } else {
                     $configManager->enableConnection($slug);
-                    $successMessage = 'Conexión activada';
+                    $successMessage = __('msg.toggled_on');
                 }
                 $connections = $configManager->listConnections();
             } else {
-                $errorMessage = 'Conexión no encontrada';
+                $errorMessage = __('msg.err_not_found');
             }
             break;
-        
+
         // ── Sincronizar tracker: crear campos faltantes ──
         case 'sync_tracker':
             $slug = $_POST['slug'] ?? '';
             $conn = $configManager->getConnection($slug);
             if (!$conn) {
-                $errorMessage = 'Conexión no encontrada';
+                $errorMessage = __('msg.err_not_found');
                 break;
             }
             $trackerId = (int) ($conn['tracker_id'] ?? 0);
             if ($trackerId <= 0) {
-                $errorMessage = 'La conexión no tiene tracker asignado';
+                $errorMessage = __('msg.err_no_tracker');
                 break;
             }
             $storedPrefix = $conn['field_prefix'] ?? 'telegrammessage';
@@ -223,7 +224,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $slug = $_POST['slug'] ?? '';
             $conn = $configManager->getConnection($slug);
             if (!$conn) {
-                $errorMessage = 'Conexión no encontrada';
+                $errorMessage = __('msg.err_not_found');
                 break;
             }
             
@@ -232,11 +233,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $webhookUrl = generateWebhookUrl();
             
             if (empty($botToken)) {
-                $errorMessage = 'La conexión no tiene bot_token';
+                $errorMessage = __('msg.err_no_bot_token');
                 break;
             }
             if (empty($webhookSecret)) {
-                $errorMessage = 'La conexión no tiene webhook_secret';
+                $errorMessage = __('msg.err_no_webhook_secret');
                 break;
             }
             
@@ -244,7 +245,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $result = $tgClient->setWebhook($webhookUrl, $webhookSecret);
             
             if ($result['ok']) {
-                $successMessage = 'Webhook configurado para "' . $conn['name'] . '": ' . $webhookUrl;
+                $successMessage = sprintf(__('msg.webhook_ok'), $conn['name']) . ': ' . $webhookUrl;
                 // Refrescar estado del webhook en los cards
                 try {
                     $wh = $tgClient->getWebhookInfo();
@@ -441,7 +442,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             if ($connectionSlug !== '') {
                 $conn = $configManager->getConnection($connectionSlug);
                 if (!$conn) {
-                    $errorMessage = 'Conexión no encontrada';
+                    $errorMessage = __('msg.err_not_found');
                     break;
                 }
                 $tikiApiUrl = $conn['tiki_api_url'];
@@ -487,9 +488,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 }
                 
                 $galleryMsg = ($galleryId !== null) ? ", galería: #{$galleryId}" : "";
-                $msg = "Tracker \"{$trackerName}\" creado exitosamente (ID: {$newTrackerId}, prefix: {$cleanPrefix}{$galleryMsg})";
+                $msg = sprintf(__('msg.tracker_created'), $trackerName, $newTrackerId, $cleanPrefix . $galleryMsg);
                 if ($connectionSlug !== '') {
-                    $msg .= " y asignado a la conexión \"{$conn['name']}\"";
+                    $msg .= sprintf(__('msg.tracker_assigned'), $conn['name']);
                 }
                 $successMessage = $msg;
                 

@@ -2,6 +2,7 @@
 
 > **Contexto**: Análisis de seguridad realizado sobre TikiWiki 27.5 (trackerlib.php).
 > **Fecha**: Junio 2026
+> **Última revisión**: Julio 2026 (v0.6.2)
 > **Aplica a**: trackerGram — puente Telegram → TikiWiki
 > **Propósito**: Documentar vulnerabilidades conocidas del lado de TikiWiki que afectan las decisiones de diseño de trackerGram.
 
@@ -126,7 +127,7 @@ Construye condiciones con `?` y `$bindvars` (trackerlib.php:3333).
 
 ---
 
-## 6. Evaluación contra trackerGram Actual (v0.5.4)
+## 6. Evaluación contra trackerGram Actual (v0.6.2)
 
 ### Resumen
 
@@ -139,16 +140,24 @@ Construye condiciones con `?` y `$bindvars` (trackerlib.php:3333).
 | Flujo | Cómo se hace | Por qué es seguro |
 |-------|-------------|-------------------|
 | Webhook (`api.php` → `WebhookHandler`) | `TikiWikiClient::createTrackerItem()` → POST `fields[permName]=valor` vía `http_build_query()` | Va por API REST que usa `Tracker_Query` ORM con bind vars. El contenido del mensaje de Telegram se serializa a form-urlencoded. |
+| Actualizar item (editado) | `TikiWikiClient::updateTrackerItem()` → POST `fields[permName]=valor` | Ídem. Solo Text+EditedDate+Reactions. |
+| Subir archivo | `TikiWikiClient::uploadFile()` → `POST /api/galleries/upload` | API REST. Sube a file gallery por token. |
+| Adjuntar media a álbum | `TikiWikiClient::appendMediaToTrackerItem()` | Modifica `option[files]` del campo FG vía `POST /api/trackers/{id}/fields/{id}`. Idempotente: chequea fileId duplicado. |
 | Import (`import.php`) | Mismo `createTrackerItem()` | Ídem. El texto del export ZIP va como valor de campo. |
 | Async worker (`worker.php`) | Mismo `createTrackerItem()` desde buffer JSON | Ídem. Los datos viajan serializados y se recrean como POST fields. |
+| Crear tracker | `TikiWikiClient::createTracker()` → `POST /api/trackers` | API REST. Field prefix sanitizado con regex `[a-z0-9]+`, max 16 chars. |
 
 #### Lectura (consultar items) ✅ Seguro
 
 | Flujo | Cómo se hace | Por qué es seguro |
 |-------|-------------|-------------------|
-| **Deduplicación** (`messageExists()`) | `GET /api/trackers/{id}/items?filter[fields][...]=valor` | Usa API REST de TikiWiki. El controlador filtra inputs con `$input->int()`, `$input->word()`. Además, `$messageId` y `$chatId` están type-hinted como `int`. |
-| **Auto-detección de prefix** (`resolveFieldPrefix()`) | `GET /api/trackers/{id}/fields` | API REST de solo lectura. No acepta parámetros de usuario. |
-| **Gallery ID** (`getMediaGalleryId()`) | `GET /api/trackers/{id}/fields` | Ídem. |
+| **Deduplicación** (`messageExists()`) | `GET /api/trackers/{id}/items?filter[fields][...]=valor` | Usa API REST de TikiWiki. El controlador filtra inputs con `$input->int()`, `$input->word()`. `$messageId` type-hinted `int\|string`, `$chatId` como `?int`. |
+| **Deduplicación mejorada** (`findItemByMessageId()`) | `GET /api/trackers/{id}/items?filter[fields][...]=valor&maxRecords=1` | Misma API REST. Ambos parámetros con `urlencode()`. Type hints: `int\|string $messageId`, `int $chatId`. |
+| **Obtener item individual** (`getTrackerItem()`) | `GET /api/trackers/{id}/items/{itemId}` | API REST. `$itemId` es `int`. |
+| **Auto-detección de prefix** (`resolveFieldPrefix()`, `loadTrackerFields()`) | `GET /api/trackers/{id}/fields` | API REST de solo lectura. No acepta parámetros de usuario. |
+| **Gallery ID** (`getMediaGalleryId()`) | `GET /api/trackers/{id}/fields` (cacheado) | Ídem. |
+| **Sincronizar campos** (`synchronizeTrackerFields()`) | `GET /api/trackers/{id}/fields` + `POST /api/trackers/{id}/fields` | Crea campos faltantes vía API REST. Input validado. |
+| **Versión TikiWiki** (`getVersion()`) | `GET /api/tikiinfo` | Solo lectura, no acepta parámetros. |
 
 #### Configuración (admin) ✅ Seguro
 
@@ -162,10 +171,18 @@ Construye condiciones con `?` y `$bindvars` (trackerlib.php:3333).
 
 1. **No existe `sort_mode`** en ningún endpoint de trackerGram — no hay forma de que ese vector entre
 2. **No se usa `{TRACKERLIST}`** — ni como plugin wiki ni como endpoint
-3. **Valores type-hinted** — `messageExists(int $messageId, ?int $chatId)` fuerza coerción a entero
-4. **Prefix validado** — solo `[a-z0-9]+` (admin lo sanitiza; auto-detección lee de campos TikiWiki que son alfanuméricos por definición)
+3. **Valores type-hinted** — `findItemByMessageId(int|string $messageId, int $chatId)` fuerza coerción a tipos. Todos los IDs son `int`.
+4. **Prefix validado** — solo `[a-z0-9]+`, max 16 chars, debe empezar con letra (doble capa: admin + server-side)
 5. **Token por conexión** — cada conexión tiene su propio token TikiWiki, limitando daño si uno se compromete
-6. **Sin DB con servidor** — cero superficie de ataque del lado de trackerGram. Estado local en JSON, no SQLite (binario, no human-editable, dependencia de ext-sqlite3).
+6. **Sin DB con servidor** — cero superficie de ataque del lado de trackerGram. Estado local en JSON, no SQLite.
+7. **SSRF / DNS rebinding prevention** — `CURLOPT_RESOLVE` fuerza la IP resuelta en todos los calls curl. `resolveHostToIp()` soporta IPv4 e IPv6. `validateConnectionData()` reporta IP privada.
+8. **SSL verification forzada** — `CURLOPT_SSL_VERIFYPEER=true` + `CURLOPT_SSL_VERIFYHOST=2` en TODOS los 23+ handles curl de TikiWikiClient.
+9. **Lock TOCTOU** — exclusión mutua por `(chatId:messageId)` serializa creación de items entre webhooks concurrentes.
+10. **Rate limiting con flock** — `fopen('c+')` + `flock(LOCK_EX)` en vez de `file_put_contents()` sin lock. GC probabilístico (1% por request) de rate files stale.
+11. **Token masking en admin** — las conexiones se renderizan con tokens truncados (`1234...5678`) en HTML, no expuestos.
+12. **Host header sanitizado** — `generateWebhookUrl()` rechaza hosts con caracteres inválidos. Fallback a `SERVER_NAME`.
+13. **Content-Length check** — api.php rechaza payloads > 1MB (DoS protection).
+14. **Fan-out con try-catch individual** — si una conexión falla, no rompe las demás.
 
 ---
 
@@ -173,32 +190,34 @@ Construye condiciones con `?` y `$bindvars` (trackerlib.php:3333).
 
 Proyección de cada item del roadmap actual sobre el riesgo de SQL injection:
 
-### 🟡 Fase 2: Robustez
+### ✅ Fase 2: Robustez (completada)
 
-| # | Item | ¿Introduce riesgo? | Evaluación |
-|---|------|-------------------|------------|
-| 2 | **Health check en admin** | ❌ No | Solo admin autenticado. Verifica conexión vía API REST/Telegram. |
-| 3 | **Mensajes editados/borrados** | ❌ No | Estrategia definida: archivo inmutable con eventos. Los editados/borrados son **eventos adicionales** (crear items nuevos), no modifican ni consultan items existentes. |
-| 4 | **Verificación post-creación de FG field** | ❌ No | Usa `GET /api/trackers/{id}/fields` (API REST). Ya planeado. |
-| 5 | **Reproducción de mensajes previos a nuevo tracker** | ❌ No | Lee historial de **Telegram** (no TikiWiki) y escribe items nuevos en TikiWiki. Solo escritura. |
+| # | Item | ¿Introduce riesgo? | Estado |
+|---|------|-------------------|--------|
+| 2 | **Health check en admin** | ❌ No | ✅ Implementado. Solo admin autenticado. Verifica conexión vía API REST/Telegram. |
+| 3 | **Mensajes editados/borrados** | ❌ No | ✅ Implementado. `processEditedMessage()` actualiza solo Text+EditedDate+Reactions vía `updateTrackerItem()` (API REST). |
+| 4 | **Verificación post-creación de FG field** | ❌ No | ✅ Implementado. Usa `GET /api/trackers/{id}/fields` (API REST). |
+| 5 | **Reproducción de mensajes previos a nuevo tracker (import)** | ❌ No | ✅ Implementado. Lee historial de **Telegram** (no TikiWiki) y escribe items nuevos en TikiWiki. Solo escritura. |
 
 ### 🟢 Fase 3: Features grandes
 
-| # | Item | ¿Introduce riesgo? | Evaluación |
-|---|------|-------------------|------------|
-| 6 | **Mensajes estructurados con prefijos** | ❌ No | Parser en `MessageMapper` solo. Transforma texto → campos. No consulta TikiWiki. |
-| 7 | **Manejo de errores estandarizado** | ❌ No | Excepciones de dominio. No toca queries. |
-| 8 | **Import CLI asíncrono** | ❌ No | Mismo flujo que import.php pero sin timeout HTTP. Solo escritura. |
+| # | Item | ¿Introduce riesgo? | Estado |
+|---|------|-------------------|--------|
+| 6 | **Mensajes estructurados con prefijos** | ❌ No | ⏳ Pendiente. Parser en `MessageMapper` solo. Transforma texto → campos. No consulta TikiWiki. |
+| 7 | **Manejo de errores estandarizado** | ❌ No | ✅ Implementado. `exceptions.php` con jerarquía `TrackerGramException`. No toca queries. |
+| 8 | **Import CLI asíncrono** | ❌ No | ⏳ Pendiente. Mismo flujo que import.php pero sin timeout HTTP. Solo escritura. |
+| 9 | **Mega-import / chunked** | ❌ No | ✅ Implementado. `import.php` con `handleProcess()` chunked + NDJSON + barra de progreso. Solo escritura. |
+| 10 | **Álbumes atómicos** | ❌ No | ✅ Implementado. Buffer `media_group_album.json` con flock. Solo escritura. |
 
 ### 🔵 Fase 4: Visión
 
 | # | Item | ¿Introduce riesgo? | Evaluación |
 |---|------|-------------------|------------|
-| 9 | **Mini App** (Web App) | ⚠️ **MEDIO** | Si incluye búsqueda/consulta de items donde el usuario de Telegram controle filtros, podría exponerse. Ver recomendaciones abajo. |
-| 10 | **Dashboard de métricas** | ❌ Bajo | Admin-only. Consultas a API REST predefinidas. |
-| 11-16 | Tests, autoloading, transcripción, SQLite, logs, expulsar bot | ❌ No | No tocan queries a TikiWiki. |
+| 11 | **Mini App** (Web App) | ⚠️ **MEDIO** | Si incluye búsqueda/consulta de items donde el usuario de Telegram controle filtros, podría exponerse. Ver recomendaciones en §5. |
+| 12 | **Dashboard de métricas** | ❌ Bajo | Admin-only. Consultas a API REST predefinidas. |
+| 13-18 | Tests, autoloading, transcripción, SQLite, logs, expulsar bot | ❌ No | No tocan queries a TikiWiki. |
 
-### Recomendaciones específicas para la Mini App (Item 9)
+### Recomendaciones específicas para la Mini App (Item 11)
 
 Si la Mini App incluye funcionalidad de **buscar/consultar items** del tracker:
 
@@ -226,7 +245,7 @@ trackerGram **ya cumple** con la regla de oro del informe de seguridad:
 
 | Riesgo | Cuándo preocuparse | Acción preventiva |
 |--------|-------------------|-------------------|
-| Mini App con búsqueda | Si Item 9 agrega consultas desde usuario Telegram | Validar todos los inputs antes de pasarlos a la API REST |
+| Mini App con búsqueda | Si Item 11 agrega consultas desde usuario Telegram | Validar todos los inputs antes de pasarlos a la API REST |
 | Plugin `{TRACKERLIST}` | Si alguien pone un TRACKERLIST en una página wiki pública visible | trackerGram no controla el contenido de TikiWiki — es riesgo del admin de TikiWiki |
 | `list_items()` directo | Si algún futuro refactor toca trackerlib internas | Nunca implementar. Siempre API REST. |
 
@@ -245,4 +264,4 @@ trackerGram **ya cumple** con la regla de oro del informe de seguridad:
 - `lib/wiki-plugins/wikiplugin_trackerlist.php` — parámetro `tr_sort_mode` (línea ~1639)
 - `lib/trackers/Tracker/Query.php` — ORM moderno seguro (línea ~820-862)
 - API REST: `/tiki-ajax_services.php?controller=tracker&action=list_items`
-- Código trackerGram: `TikiWikiClient.php` (funciones `messageExists`, `createTrackerItem`, `loadTrackerFields`)
+- Código trackerGram: `TikiWikiClient.php` (funciones `messageExists`, `findItemByMessageId`, `getTrackerItem`, `createTrackerItem`, `updateTrackerItem`, `appendMediaToTrackerItem`, `loadTrackerFields`, `getMediaGalleryId`, `synchronizeTrackerFields`)
