@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5a8fc9"/>
+      <stop offset="100%" stop-color="#345583"/>
+    </linearGradient>
+  </defs>
+  <!-- Background rounded square -->
+  <rect width="120" height="120" rx="24" fill="url(#bg)"/>
+  
+  <!-- Telegram paper plane (simplified) -->
+  <g transform="translate(52, 30)" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Paper plane body -->
+    <path d="M 2 36 L 14 18 L 2 36 L 20 30 L 2 36 L 10 42 L 14 18" />
+  </g>
+  
+  <!-- Arrow connecting to tracker (right side) -->
+  <g transform="translate(60, 48)" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="3" stroke-linecap="round">
+    <line x1="0" y1="0" x2="24" y2="0" />
+    <polyline points="18,-5 24,0 18,5" fill="rgba(255,255,255,0.7)" stroke="none"/>
+  </g>
+  
+  <!-- Tracker / table icon (TikiWiki side) -->
+  <g transform="translate(74, 52)" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="0" y="0" width="28" height="28" rx="4" />
+    <line x1="0" y1="10" x2="28" y2="10" />
+    <line x1="0" y1="18" x2="28" y2="18" />
+    <line x1="14" y1="0" x2="14" y2="28" />
+  </g>
+</svg>
