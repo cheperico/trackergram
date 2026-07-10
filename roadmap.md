@@ -135,15 +135,18 @@
 
 ### 🔵 Fase 4: Refactor + Deuda Técnica (largo plazo)
 
-#### 🟣 Alternativas en Evaluación — Recolección Estructurada
+#### 🟣 Recolección Estructurada — Decisión Tomada
 
-Todavía sin decisión final. Se están evaluando 3 enfoques (no necesariamente excluyentes) para permitir carga estructurada de datos al tracker:
+✅ **Decisión (08/07/2026)**: Se elige **TikiPickIt (enfoque G)** como solución principal de recolección offline. PWA standalone que conecta directo a TikiWiki API.
 
-| Alternativa | Esfuerzo | Documento | Cómo funciona |
-|-------------|----------|-----------|---------------|
-| **Mini App** (Telegram Web App) | 5+ sesiones | `design/008-estrategia-recoleccion-estructurada.md` | Formulario web embebido en Telegram, desde un botón inline |
-| **PWA offline** | ~4 sesiones (F1+F2+F3) | `design/008-estrategia-recoleccion-estructurada.md` | App web offline-first que sincroniza al volver en línea |
-| **Mensajes estructurados con prefijos** | 2-3 sesiones | — | Parser en MessageMapper: `GPS user coord`, `#tag texto` — sin UI nueva |
+| Alternativa | Decisión | Fundamento |
+|-------------|----------|------------|
+| **TikiPickIt (PWA offline)** ⭐ | ✅ Elegido | TikiWiki ya tiene API REST, Bearer auth, schema de campos. Dev effort: ~2-3 sesiones. |
+| **Mini App** (Telegram Web App) | ❌ Descartado | Offline poco confiable en WebView. Superado por TikiPickIt. |
+| **Mensajes estructurados con prefijos (D)** | 🟡 Complementario | Sigue siendo opción válida para flujo Telegram-only. No requiere UI nueva. |
+| **`/gather` (inline keyboard)** | ❌ Descartado | No funciona offline (callback_query no se encola). Código a eliminar. |
+
+**Detalle completo**: `design/008-estrategia-recoleccion-estructurada.md`
 
 #### Resto de Fase 4
 
@@ -243,12 +246,12 @@ Los documentos en `design/` contienen exploraciones detalladas de features que e
 | `design/004-trabajo-sobre-existentes.md` | F1+F2 ✅, F3 ⏳ | Reply, edit, delete sobre mensajes existentes |
 | `design/005-crear-tracker-en-conexion.md` | ⏳ Pendiente | Crear tracker integrado en modal de conexión |
 | `design/006-mtproto-pyrogram.md` | Exploración | MTProto/Pyrogram como alternativa a Bot API |
-| `design/008-estrategia-recoleccion-estructurada.md` | 🟢 Activo | Estrategia de recolección estructurada (consolida 002 y 007) |
+| `design/008-estrategia-recoleccion-estructurada.md` | 🟢 Activo | Estrategia + diseño TikiPickIt (consolida 002, 007 y 010) |
 | `design/009-permisos-por-tracker-tikiwiki.md` | ✅ Diseño completo ⏳ Pendiente | Restringir trackerGram a trackers específicos vía permisos TikiWiki |
 | `design/999-a-tener-en-cuenta.md` | Referencia | Seguridad TikiWiki: SQL injection conocido en `list_items()` |
 
-> 📌 Los documentos `002-MiniApp.md`, `003-arquitectura-multi.md` y `007-pwa-offline-formularios.md` fueron **archivados** en `design/archived/` (implementados o consolidados en otros docs). Se mantienen como referencia histórica.
+> 📌 Los documentos `002-MiniApp.md`, `003-arquitectura-multi.md`, `007-pwa-offline-formularios.md` y `010-tikipickit-pwa-recoleccion.md` fueron **archivados** en `design/archived/` (implementados o consolidados en otros docs). Se mantienen como referencia histórica.
 
 Los reportes históricos en `reports/` se conservan como referencia de investigaciones pasadas. Los items accionables ya están consolidados en este documento.
 
-> **Última actualización**: 08/07/2026 — Archivados 002, 003, 007 en design/archived/. Agregados 008, 009, 999 a tabla activa.
+> **Última actualización**: 08/07/2026 — Decisión recolección: TikiPickIt elegido. Mini App y /gather descartados. 010 archivado. 008 consolida 002+007+010.

@@ -3,7 +3,7 @@
 > **Documento unificado** — Consolida y reemplaza los documentos `002-MiniApp.md`, `007-pwa-offline-formularios.md` y `010-tikipickit-pwa-recoleccion.md`.
 > Los originales se mantienen como referencia histórica.
 >
-> **Última actualización**: 09/07/2026
+> **Última actualización**: 08/07/2026
 > **Tags**: recolección, formularios, offline, gather, pwa, miniapp, tikipickit, tracker
 
 ---
@@ -867,11 +867,11 @@ Si TikiPickIt se sirve desde el mismo dominio que TikiWiki (ej: `wiki.chela.org.
 | 08/07/2026 | Confirmar: `/gather` NO funciona offline | Telegram no encola callback_query |
 | 08/07/2026 | Análisis de permisos: set mínimo cubre lectura de schemas | No se necesitan permisos adicionales |
 | 08/07/2026 | Unificar documentos 002 + 007 en 008 | Centralizar decisiones y prerrequisitos |
-| 09/07/2026 | Descubrir infraestructura PWA existente de TikiWiki | SW, cola offline, OAuth2, SyncController, modifiedSince |
-| 09/07/2026 | **Elegir enfoque G (TikiPickIt) como solución principal** | TikiWiki ya tiene API + auth + schema. Dev effort: ~2-3 sesiones |
-| 09/07/2026 | TikiPickIt es standalone, no vía trackerGram | trackerGram no necesita ser proxy de API |
-| 09/07/2026 | Diseño primario de navegación: Dashboard + Pills | Mejor balance vista general / cambio rápido |
-| 09/07/2026 | Unificar 008 + 010 en un solo documento | Estrategia y diseño son parte del mismo proceso |
+| 08/07/2026 | Descubrir infraestructura PWA existente de TikiWiki | SW, cola offline, OAuth2, SyncController, modifiedSince |
+| 08/07/2026 | **Elegir enfoque G (TikiPickIt) como solución principal** | TikiWiki ya tiene API + auth + schema. Dev effort: ~2-3 sesiones |
+| 08/07/2026 | TikiPickIt es standalone, no vía trackerGram | trackerGram no necesita ser proxy de API |
+| 08/07/2026 | Diseño primario de navegación: Dashboard + Pills | Mejor balance vista general / cambio rápido |
+| 08/07/2026 | Unificar 008 + 010 en un solo documento | Estrategia y diseño son parte del mismo proceso |
 
 ---
 
@@ -891,9 +891,9 @@ Si TikiPickIt se sirve desde el mismo dominio que TikiWiki (ej: `wiki.chela.org.
 - ⏳ **Conflictos**: ¿Qué pasa si dos usuarios crean items offline y sincronizan? TikiWiki asigna itemId autoincremental, no debería haber conflicto en create. ¿Y en update?
 - ⏳ **Estado real del PWA de TikiWiki**: ¿Está activo en wiki.chela.org.ar? ¿Hay que habilitar `pwa_feature`?
 
-### Telegram offline
+### Telegram offline / `/gather`
 
-- ⏳ **Offline `/gather`**: ¿Adaptar a ReplyKeyboard para que funcione offline? ReplyKeyboard envía texto normal que Telegram sí encola. Trade-off: perderíamos botones inline.
+- ❌ **`/gather` descartado**. La aproximación de formulario guiado con inline keyboards no se va a continuar. El código prototype debe eliminarse (ver §12 paso 6). La recolección estructurada sigue por TikiPickIt (enfoque G) o mensaje único Telegram (enfoque D).
 
 ### Ediciones y límites
 
@@ -911,6 +911,7 @@ Si TikiPickIt se sirve desde el mismo dominio que TikiWiki (ej: `wiki.chela.org.
 3. ✅ **Elegir enfoque: TikiPickIt (G)** como solución principal de recolección offline
 4. ⏳ **Decidir**: TikiPickIt + mensaje único Telegram (D) como complemento, o solo TikiPickIt
 5. ⏳ Estudiar PWA existente de TikiWiki: estado real de `pwa_feature` en wiki.chela.org.ar
+6. 🔜 **Eliminar `/gather` del código**: remover `WebhookHandler::handleGather()`, `processCallbackQuery()`, `handleCollectResponse()`, `buildNormalizedMessageFromSession()`, y `CollectSessionManager.php` completo. El callback_query handler en `api.php` (chat_id extraction) se mantiene por si se necesita en el futuro, pero el resto del flujo gather se borra.
 
 ### Fase 1 — MVP (1 sesión)
 
@@ -946,7 +947,7 @@ Si TikiPickIt se sirve desde el mismo dominio que TikiWiki (ej: `wiki.chela.org.
 
 - `002-MiniApp.md` — Exploración original de Mini App (10/06/2026, consolidado en 008)
 - `007-pwa-offline-formularios.md` — Diseño original de PWA (04/07/2026, consolidado en 008)
-- `010-tikipickit-pwa-recoleccion.md` — Diseño detallado de TikiPickIt (09/07/2026, consolidado en 008)
+- `010-tikipickit-pwa-recoleccion.md` — Diseño detallado de TikiPickIt (08/07/2026, consolidado en 008)
 - `999-a-tener-en-cuenta.md` — Seguridad en consultas a TikiWiki (vulnerabilidad SQLi)
 
 ### Archivos de TikiWiki relevantes
@@ -967,3 +968,27 @@ Si TikiPickIt se sirve desde el mismo dominio que TikiWiki (ej: `wiki.chela.org.
 - [MDN: IndexedDB API](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API)
 - [W3C: Badging API](https://w3c.github.io/badging/)
 - [Telegram Bot API](https://core.telegram.org/bots/api)
+
+---
+
+## 14. Changelog del código
+
+### 09/07/2026 — Code review fixes aplicados
+
+Tras code review completo de `app.js` + `sw.js`, se corrigieron los siguientes issues:
+
+| ID | Severidad | Descripción | Fix |
+|----|-----------|-------------|-----|
+| C1 | 🔴 Crítico | XSS en `renderWhitelist()` — `t.name` sin escapar | Agregado `esc(t.name)` |
+| C2 | 🔴 Crítico | SW devolvía falso éxito en POST offline sin encolar (data loss) | SW ignora POST; app.js maneja fallo natural → queueItem |
+| C3 | 🔴 Crítico | GPS con lat/lng invertidos (TikiWiki espera lon,lat,zoom) | Swap a `lng + ',' + lat + ',15'` |
+| C4 | 🟡 Alto | Fechas tipo `f`/`D`/`j` no convertidas a timestamp UNIX | Conversión en `submitForm()` antes de enviar |
+| B1 | 🟡 Medio | `syncAll()` sin mutex — ejecución concurrente posible | Flag `_syncing` bloquea múltiples sync simultáneos |
+| B3 | 🟡 Medio | `dbPut` en `queueItem()` sin `.catch()` | `.catch()` con `console.error` agregado |
+| B5 | 🟡 Medio | `apiFetch()` sin timeout — colgado si servidor no responde | `AbortController` con timeout default 30s |
+| B6 | 🟢 Bajo | Dead code: `case 'D'` en dropdown (inalcanzable, es Date) | Eliminado `case 'D':` de la sección dropdown |
+| B7 | 🟢 Bajo | Conexión IndexedDB no cacheada — reabría en cada operación | Cache en `_db` con lazy init |
+
+**No corregidos (aceptados como deuda técnica MVP)**:
+- **B2**: Files perdidos en resync (limitación de diseño — toast informativo)
+- **B4**: Token en localStorage (warning visual, mejora futura con OAuth2)

@@ -1,0 +1,65 @@
+# TikiPickIt — .htaccess
+# Seguridad y caché para servir correctamente la PWA.
+
+<IfModule mod_headers.c>
+  # ─── Security Headers ───
+  # CSP: restringe fuentes de contenido. 'unsafe-inline' para CSS porque va inline en index.html
+  Header set Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https:; img-src 'self' data:; frame-ancestors 'none'"
+
+  # Clickjacking protection
+  Header set X-Frame-Options "DENY"
+
+  # No MIME type sniffing
+  Header set X-Content-Type-Options "nosniff"
+
+  # Control de referrer
+  Header set Referrer-Policy "strict-origin-when-cross-origin"
+
+  # HSTS: forzar HTTPS en el navegador (1 año + subdominios)
+  Header set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+  # Restringir APIs del browser solo a lo necesario
+  Header set Permissions-Policy "geolocation=(self), camera=(self)"
+
+  # ─── Cache-Control ───
+  # Service Worker: NUNCA cachear (el browser checkea actualizaciones)
+  <Files "sw.js">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </Files>
+
+  # Manifest: cache corto
+  <Files "manifest.json">
+    Header set Cache-Control "public, max-age=3600"
+  </Files>
+
+  # Assets estáticos (app.js, index.html) — cache razonable
+  <FilesMatch "\.(html|js|css)$">
+    Header set Cache-Control "public, max-age=86400"
+  </FilesMatch>
+
+  # SVG/PNG/icons — cache largo (no cambian)
+  <FilesMatch "\.(svg|png|ico)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+</IfModule>
+
+# ─── MIME types correctos ───
+AddType application/json .json
+AddType image/svg+xml .svg
+AddType text/javascript .js
+AddType text/css .css
+
+# ─── Seguridad: deny a archivos sensibles ───
+<FilesMatch "\.(env|md|lock|log)$">
+  Require all denied
+</FilesMatch>
+
+# ─── Forzar HTTPS ───
+RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# ─── Character set ───
+AddDefaultCharset UTF-8
