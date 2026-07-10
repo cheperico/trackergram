@@ -18,6 +18,10 @@ PWA standalone para **carga de datos offline-first** en trackers de TikiWiki. Se
 
 **Estado**: MVP funcional en desarrollo activo.
 
+> 📋 **Roadmap/Issues exclusivo de TikiPickIt**: `tikipickit/roadmap.md`
+> Consular antes de arrancar cualquier feature nueva. Contiene items pendientes priorizados,
+> decisiones de diseño y el estado de observaciones de code review.
+
 ---
 
 ## 2. Decisiones Arquitectónicas

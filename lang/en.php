@@ -15,6 +15,8 @@ return [
     'nav.lang_es'            => 'ES',
     'nav.lang_en'            => 'EN',
     'nav.lang_aria'          => 'Switch language to',
+    'nav.lang_name_es'       => 'Spanish',
+    'nav.lang_name_en'       => 'English',
     'nav.lang_tooltip'       => 'Language',
 
     // ── Tabs ──

@@ -43,6 +43,9 @@ header button{background:none;border:none;color:#eee;font-size:1.3rem;cursor:poi
 .btn-success{background:var(--green);color:#fff}
 .btn-danger{background:var(--red);color:#fff}
 .btn-small{padding:6px 14px;width:auto;font-size:.85rem}
+/* ─── Loading spinner ─── */
+.spinner{width:36px;height:36px;border:3px solid #0f3460;border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto}
+@keyframes spin{to{transform:rotate(360deg)}}
 /* ─── Settings ─── */
 #view-settings{max-width:480px;margin:0 auto}
 #view-settings h2{margin-bottom:16px}
@@ -72,7 +75,7 @@ header button{background:none;border:none;color:#eee;font-size:1.3rem;cursor:poi
 .sync-bar{
   display:flex;align-items:center;justify-content:space-between;
   padding:10px 0;margin-bottom:12px;font-size:.85rem;color:var(--text-muted);
-  border-bottom:1px solid #0f3460
+  border-bottom:1px solid #0f3460;flex-wrap:wrap;gap:6px
 }
 .sync-bar .count{font-weight:600;color:#eee}
 .tracker-grid{display:flex;flex-direction:column;gap:10px}
@@ -115,6 +118,16 @@ header button{background:none;border:none;color:#eee;font-size:1.3rem;cursor:poi
 .tracker-form .file-input .file-name{font-size:.8rem;color:var(--text-muted);margin-top:4px}
 .form-actions{display:flex;gap:10px;margin-top:20px}
 .form-actions .btn{flex:1}
+/* ─── Errors view ─── */
+.error-item{
+  background:var(--bg-card);border-radius:10px;padding:12px;margin-bottom:8px;
+  border-left:3px solid var(--red)
+}
+.error-item .e-tracker{font-weight:600;font-size:.9rem}
+.error-item .e-msg{font-size:.8rem;color:var(--red);margin:4px 0}
+.error-item .e-meta{font-size:.75rem;color:var(--text-muted)}
+.error-item .e-actions{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+.error-item .e-actions .btn{padding:4px 12px;font-size:.75rem;width:auto}
 /* ─── Toast ─── */
 .toast{
   position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:12px 24px;
@@ -143,6 +156,14 @@ header button{background:none;border:none;color:#eee;font-size:1.3rem;cursor:poi
   <h1>📋 TikiPickIt <span class="badge hidden" id="header-badge">0</span></h1>
   <button id="btn-settings" title="Configuración">⚙️</button>
 </header>
+
+<!-- ─── VIEW: LOADING ─── -->
+<section id="view-loading" class="view active">
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh">
+    <div class="spinner"></div>
+    <p style="margin-top:16px;color:var(--text-muted)">Cargando...</p>
+  </div>
+</section>
 
 <!-- ─── VIEW: SETTINGS ─── -->
 <section id="view-settings" class="view">
@@ -211,7 +232,10 @@ header button{background:none;border:none;color:#eee;font-size:1.3rem;cursor:poi
 <section id="view-dashboard" class="view">
   <div class="sync-bar">
     <span>📦 <span class="count" id="d-total-pending">0</span> pendientes</span>
-    <span id="d-sync-status" style="font-size:.8rem">● <span id="d-sync-text">Sin sincronizar</span></span>
+    <span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <span id="d-sync-status" style="font-size:.8rem">● <span id="d-sync-text">Sin sincronizar</span></span>
+      <button class="btn btn-small btn-danger" id="d-show-errors" style="display:none;padding:3px 10px;font-size:.75rem">❌ Errores</button>
+    </span>
   </div>
   <div id="d-trackers" class="tracker-grid"></div>
   <div id="d-empty" class="empty-state hidden">
@@ -225,6 +249,16 @@ header button{background:none;border:none;color:#eee;font-size:1.3rem;cursor:poi
 <section id="view-form" class="view">
   <div class="form-header" id="f-header"></div>
   <div id="f-form" class="tracker-form"></div>
+</section>
+
+<!-- ─── VIEW: ERRORS ─── -->
+<section id="view-errors" class="view">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+    <h2>❌ Errores de sincronización</h2>
+    <button class="btn btn-small btn-primary" id="e-retry-all">🔄 Reintentar todos</button>
+  </div>
+  <div id="e-list"></div>
+  <p class="text-center mt-8"><a href="#" id="e-back" style="color:var(--text-muted);font-size:.85rem">← Volver al dashboard</a></p>
 </section>
 
 <!-- ─── TOAST ─── -->

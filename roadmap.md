@@ -169,6 +169,10 @@
 | **F4-6** | **Internacionalización: mensajes de error de borde** | 30 min | Traducir ~10 strings de validación en admin_handlers.php y detect_helper.php (ej: "El field prefix debe comenzar con una letra", "Error al sincronizar tracker", etc.). Prioridad baja — son condiciones raras que el admin casi nunca ve. |
 | **F4-7** | **Cache local de messageIds para deduplicación sin API** | 2 sesiones | Reemplazar `messageExists()` (HTTP GET a TikiWiki) con un archivo JSON local que mapee `(chatId, messageId) → itemId`, como ya se hace con `reply_cache.json`. **Elimina 1 HTTP call por mensaje (~500ms ahorrados por request)**. Incluye poda, LOCK_EX y GC. Además desacopla trackerGram del blocker de permisos de TikiWiki (el endpoint `action_list_items` requiere `admin_trackers` global). |
 | **F4-8** | **Batch de imports: múltiples items en un POST** | 2-3 sesiones | Para imports grandes, agrupar N items en una sola llamada a `POST /api/trackers/{id}/items` para reducir overhead HTTP. Especialmente útil para la importación histórica. |
+| **F4-9** | **Migrar glob() a DirectoryIterator en worker.php** | 30 min | `worker.php:67` usa `glob()` para listar eventos pendientes. `api.php` ya migró rate GC a `DirectoryIterator` (memoria constante). worker.php debería seguir el mismo patrón. También aplica a `cleanupDoneFiles()` línea 229. |
+| **F4-10** | **Versionado de assets estáticos (CSS/JS)** | 30 min | `admin.css`, `admin.js`, `admin_import.js` se cargan sin hash versionado. Si cambian, navegadores pueden servir versión cacheada. Agregar query string `?v=` con hash del archivo o timestamp del deploy. |
+| **F4-11** | **Consistencia en manejo de errores de handlers admin** | 1 sesión | Algunos handlers POST en `admin_handlers.php` responden con `echo json_encode(...)` + `exit` (AJAX), otros setean `$errorMessage` y continúan a renderizar HTML. Estandarizar: todos los handlers POST devuelven `{success: bool, error?: string}` + HTTP status code. Conveniente para el frontend JS. |
+| **F4-12** | **Reforzar validación de $_POST en admin_handlers.php** | 1 sesión | Aunque los campos se sanitizan con `trim()`, `(int)`, `preg_replace()`, algunos (bot_token, tiki_api_token, webhook_secret, tiki_api_url) solo reciben `trim()`. Agregar validación de formato (regex para tokens/URLs) para detectar typos temprano. No es vulnerabilidad (se almacenan en setup.json bloqueado por .htaccess), pero mejora experiencia de usuario. |
 
 ### ⚪ Fase 5: Pendientes de reevaluación (muy baja prioridad)
 
@@ -256,4 +260,4 @@ Los documentos en `design/` contienen exploraciones detalladas de features que e
 
 Los reportes históricos en `reports/` se conservan como referencia de investigaciones pasadas. Los items accionables ya están consolidados en este documento.
 
-> **Última actualización**: 08/07/2026 — Decisión recolección: TikiPickIt elegido. Mini App y /gather descartados. 010 archivado. 008 consolida 002+007+010.
+> **Última actualización**: 10/07/2026 — Code review externo revisado: 4 items documentados como F4-9 a F4-12 (glob en worker, versionado assets, errores consistentes, validación $_POST).

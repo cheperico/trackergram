@@ -37,9 +37,11 @@ const OAUTH = {
 /* ─── DOM refs ─── */
 const $ = id => document.getElementById(id);
 const views = {
+  loading: $('view-loading'),
   settings: $('view-settings'),
   dashboard: $('view-dashboard'),
-  form: $('view-form')
+  form: $('view-form'),
+  errors: $('view-errors')
 };
 const toastEl = $('toast');
 
@@ -132,7 +134,8 @@ function oauth2BuildAuthorizeUrl() {
   // CSPRNG state — 128 bits via crypto.getRandomValues
   const array = new Uint32Array(4);
   crypto.getRandomValues(array);
-  const state = btoa(Array.from(array).join('') + '_' + Date.now());
+  const raw = Array.from(array).join('') + '_' + Date.now();
+  const state = btoa(raw);
   sessionStorage.setItem('tp_oauth_state', state);
   const params = new URLSearchParams({
     response_type: 'code',
@@ -375,6 +378,22 @@ function _apiFetch(path, options, timeoutMs) {
   });
 }
 
+/* ─── Retry with exponential back-off ─── */
+function withRetry(fn, maxRetries, baseDelay) {
+  maxRetries = maxRetries || 3;
+  baseDelay = baseDelay || 500;
+  let attempt = 0;
+  function tryCall() {
+    return fn().catch(err => {
+      attempt++;
+      if (attempt >= maxRetries) throw err;
+      const delay = baseDelay * Math.pow(2, attempt - 1) + Math.random() * baseDelay * 0.5;
+      return new Promise(r => setTimeout(r, delay)).then(tryCall);
+    });
+  }
+  return tryCall();
+}
+
 function getTrackers() {
   return apiFetch('trackers').then(data => data.data || data.trackers || []);
 }
@@ -553,6 +572,7 @@ function initDashboard() {
   switchView('dashboard');
   renderDashboard();
   updatePendingCount();
+  updateErrorsBtn();
   if (STATE.autoSchemas && STATE.trackers.length) {
     const ids = STATE.trackers.map(t => t.trackerId).filter(id => !STATE.schemas[id]);
     if (ids.length) loadSchemas(ids);
@@ -850,7 +870,8 @@ function saveItem(trackerId, data, files, fields) {
   }
 
   Promise.all(filePromises)
-    .then(() => createItem(trackerId, payload))
+    // Retry createItem up to 3 times with exponential back-off
+    .then(() => withRetry(() => createItem(trackerId, payload)))
     .then(result => {
       toast('✅ Item creado en tracker #' + trackerId, 'success');
       resetForm();
@@ -905,6 +926,9 @@ function syncAll() {
   if (now - _lastSyncTime < 3000) { toast('⏳ Esperá unos segundos antes de sincronizar de nuevo', 'info'); return; }
   _lastSyncTime = now;
 
+  // Sort queue by createdAt (oldest first) — T3
+  STATE.queue.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+
   _syncing = true;
   toast('🔄 Sincronizando ' + STATE.queue.length + ' items...', 'info');
 
@@ -916,6 +940,8 @@ function syncAll() {
       STATE.queue = [];
       updatePendingCount();
       renderDashboard();
+      gcIndexedDB();  // cleanup after successful sync
+      updateErrorsBtn();
       toast('✅ Sincronización completa', 'success');
       return;
     }
@@ -964,7 +990,8 @@ function processItem(item) {
     // Still try to create the item without files
   }
 
-  return createItem(item.trackerId, payload).then(result => {
+  // Retry createItem up to 3 times with exponential back-off — T2
+  return withRetry(() => createItem(item.trackerId, payload)).then(result => {
     return dbPut('synclog', {
       ...item,
       syncedAt: Date.now(),
@@ -978,6 +1005,10 @@ function processItem(item) {
    8. NAVIGATION
    ================================================================== */
 function switchView(name) {
+  // Hide loading view on first switch
+  const loading = $('view-loading');
+  if (loading) loading.classList.remove('active');
+
   STATE.currentView = name;
   Object.keys(views).forEach(k => views[k].classList.toggle('active', k === name));
   // Header
@@ -989,6 +1020,8 @@ function switchView(name) {
     updatePendingCount();
   } else if (name === 'form') {
     header.querySelector('h1').textContent = '📝 Nuevo registro';
+  } else if (name === 'errors') {
+    header.querySelector('h1').textContent = '❌ Errores';
   }
 }
 
@@ -1022,7 +1055,140 @@ function getGPS(btn) {
 }
 
 /* ==================================================================
-   10. TOAST
+   10. ERROR VIEW — T1
+   ================================================================== */
+function showErrors() {
+  switchView('errors');
+  loadSynclog().then(entries => {
+    renderErrors(entries || []);
+  });
+}
+
+function loadSynclog() {
+  return dbGetAll('synclog');
+}
+
+function renderErrors(entries) {
+  const container = $('e-list');
+  const failed = (entries || []).filter(e => e.status === 'failed').reverse(); // newest first
+
+  if (!failed.length) {
+    container.innerHTML = '<div class="empty-state"><div class="big">✅</div><p>No hay errores registrados.</p></div>';
+    return;
+  }
+
+  container.innerHTML = failed.map(e => {
+    const tracker = STATE.trackers.find(t => t.trackerId === e.trackerId);
+    const name = tracker ? tracker.name : 'Tracker #' + e.trackerId;
+    const date = e.syncedAt ? new Date(e.syncedAt).toLocaleString() : (e.createdAt ? new Date(e.createdAt).toLocaleString() : '—');
+    return `
+      <div class="error-item" data-id="${e.id}">
+        <div class="e-tracker">${esc(name)}</div>
+        <div class="e-msg">❌ ${esc(e.error || 'Error desconocido')}</div>
+        <div class="e-meta">${date} · intentos: ${e.retries}</div>
+        <div class="e-actions">
+          <button class="btn btn-small btn-primary" onclick="retryErrorItem(${e.id})">🔄 Reintentar</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function retryErrorItem(id) {
+  loadSynclog().then(entries => {
+    const entry = (entries || []).find(e => e.id === id);
+    if (!entry) { toast('❌ Item no encontrado', 'error'); return; }
+
+    dbDelete('synclog', id).then(() => {
+      const newItem = {
+        trackerId: entry.trackerId,
+        data: entry.data || {},
+        files: entry.files || {},
+        createdAt: Date.now(),
+        retries: 0,
+        error: null
+      };
+      STATE.queue.push(newItem);
+      dbPut('queue', newItem).then(() => {
+        toast('📦 Item movido a la cola de sincronización', 'info');
+        updatePendingCount();
+        updateErrorsBtn();
+        showErrors(); // refresh view
+        if (STATE.online) syncAll();
+      });
+    });
+  });
+}
+
+function retryAllErrors() {
+  loadSynclog().then(entries => {
+    const failed = (entries || []).filter(e => e.status === 'failed');
+    if (!failed.length) { toast('✅ No hay errores para reintentar', 'info'); return; }
+
+    let moved = 0;
+    Promise.all(failed.map(entry => {
+      return dbDelete('synclog', entry.id).then(() => {
+        const newItem = {
+          trackerId: entry.trackerId,
+          data: entry.data || {},
+          files: entry.files || {},
+          createdAt: Date.now(),
+          retries: 0,
+          error: null
+        };
+        STATE.queue.push(newItem);
+        return dbPut('queue', newItem);
+      }).then(() => { moved++; });
+    })).then(() => {
+      toast('📦 ' + moved + ' items movidos a la cola', 'info');
+      updatePendingCount();
+      updateErrorsBtn();
+      showErrors(); // refresh view
+      if (STATE.online) syncAll();
+    });
+  });
+}
+
+function updateErrorsBtn() {
+  loadSynclog().then(entries => {
+    const failed = (entries || []).filter(e => e.status === 'failed').length;
+    const btn = $('d-show-errors');
+    if (failed > 0) {
+      btn.textContent = '❌ ' + failed + ' error' + (failed > 1 ? 'es' : '');
+      btn.style.display = '';
+    } else {
+      btn.style.display = 'none';
+    }
+  });
+}
+
+/* ==================================================================
+   11. GC (Garbage Collection) — T4
+   ================================================================== */
+function gcIndexedDB() {
+  const NOW = Date.now();
+  const MONTH = 30 * 24 * 3600 * 1000;
+  const WEEK = 7 * 24 * 3600 * 1000;
+
+  dbGetAll('synclog').then(entries => {
+    (entries || []).forEach(entry => {
+      if (entry.syncedAt && (NOW - entry.syncedAt) > MONTH) {
+        dbDelete('synclog', entry.id);
+      }
+    });
+  });
+
+  dbGetAll('queue').then(entries => {
+    (entries || []).forEach(entry => {
+      if (entry.createdAt && (NOW - entry.createdAt) > WEEK && entry.retries >= 3) {
+        dbDelete('queue', entry.id);
+      }
+    });
+  });
+}
+
+/* ==================================================================
+   12. TOAST
    ================================================================== */
 function toast(msg, type) {
   toastEl.textContent = msg;
@@ -1032,7 +1198,7 @@ function toast(msg, type) {
 }
 
 /* ==================================================================
-   11. UTILITIES
+   13. UTILITIES
    ================================================================== */
 function esc(str) {
   if (typeof str !== 'string') return String(str || '');
@@ -1068,7 +1234,7 @@ function parseDropdownOptions(optStr) {
 }
 
 /* ==================================================================
-   12. INIT
+   14. INIT
    ================================================================== */
 function init() {
   // Register SW
@@ -1088,6 +1254,9 @@ function init() {
     toast('📶 Sin conexión — los datos se guardarán localmente', 'info');
     updatePendingCount();
   });
+
+  // GC on startup — clean stale data before anything else
+  gcIndexedDB();
 
   // Load base URL
   STATE.url = localStorage.getItem('tp_url') || '';
@@ -1144,6 +1313,7 @@ function init() {
         initDashboard();
       }
       if (STATE.queue.length > 0 && STATE.online) syncAll();
+      updateErrorsBtn();
     });
   }).catch(err => {
     console.error('Init error:', err);
@@ -1202,5 +1372,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   $('s-oauth-login').addEventListener('click', oauth2Login);
   $('s-oauth-logout').addEventListener('click', oauth2Logout);
+  // T1 — Error view events
+  $('d-show-errors').addEventListener('click', showErrors);
+  $('e-retry-all').addEventListener('click', retryAllErrors);
+  $('e-back').addEventListener('click', () => switchView('dashboard'));
   init();
 });

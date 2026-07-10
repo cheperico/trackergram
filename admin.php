@@ -501,9 +501,9 @@ if (isset($_GET['edit'])) {
     </a>
     <div class="navbar-actions">
         <div class="lang-switch">
-            <a href="?lang=es<?php echo $langQueryString; ?>" class="<?php echo $langCode === 'es' ? 'active' : ''; ?>" aria-label="Español">ES</a>
+            <a href="?lang=es<?php echo $langQueryString; ?>" class="<?php echo $langCode === 'es' ? 'active' : ''; ?>" aria-label="<?php echo __('nav.lang_aria') . ' ' . __('nav.lang_name_es'); ?>">ES</a>
             <span class="sep">|</span>
-            <a href="?lang=en<?php echo $langQueryString; ?>" class="<?php echo $langCode === 'en' ? 'active' : ''; ?>" aria-label="English">EN</a>
+            <a href="?lang=en<?php echo $langQueryString; ?>" class="<?php echo $langCode === 'en' ? 'active' : ''; ?>" aria-label="<?php echo __('nav.lang_aria') . ' ' . __('nav.lang_name_en'); ?>">EN</a>
         </div>
         <a href="?action=logout" aria-label="<?php echo __('nav.logout'); ?>"><?php echo __('nav.logout'); ?></a>
     </div>
