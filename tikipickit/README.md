@@ -4,8 +4,6 @@
 
 TikiPickIt te permite crear items en trackers de TikiWiki directamente desde el teléfono o la computadora, sin conexión a internet si es necesario. Los datos se guardan localmente y se sincronizan automáticamente cuando hay conectividad.
 
-> Complementa a [trackerGram](https://github.com/cheperico/trackergram): mientras trackerGram importa mensajes de Telegram a TikiWiki, TikiPickIt es una herramienta de **carga directa** para relevamientos de campo, recolección estructurada y cualquier escenario donde necesités capturar datos sin intermediarios.
-
 ---
 
 ## Cómo funciona
