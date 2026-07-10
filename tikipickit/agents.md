@@ -87,6 +87,12 @@ JavaScript vanilla (ES6+), CSS vanilla, sin dependencias externas. IndexedDB nat
 | `icons/icon-192.svg` | Icono vectorial 192x192 | — |
 | `icons/icon-512.svg` | Icono vectorial 512x512 | — |
 | `roadmap.md` | Issues y roadmap exclusivo de TikiPickIt | ~220 |
+| `README.md` | Documentación de usuario (markdown) | 242 |
+| `README.html` | Misma documentación en HTML (servida al browser) | — |
+
+> ⚠️ **README dual**: `README.md` es la fuente de verdad para la documentación de usuario.
+> `README.html` es una conversión a HTML del mismo contenido (se sirve al navegador).
+> **Siempre que se modifique `README.md`, hay que actualizar `README.html` también.**
 
 ### Orden recomendado de lectura
 

@@ -1420,7 +1420,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   $('h-readme').addEventListener('click', e => {
     e.preventDefault();
-    window.open('https://github.com/cheperico/trackergram/blob/main/tikipickit/README.md', '_blank');
+    window.open('README.html', '_blank');
   });
   $('btn-settings').addEventListener('click', showSettings);
   $('s-test').addEventListener('click', testConnectionHandler);
