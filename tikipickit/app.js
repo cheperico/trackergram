@@ -429,9 +429,12 @@ function saveSettings() {
     return;
   }
 
-  // Manual token
+  // Manual token: only update if user typed something new (field is blank by design)
   const manualToken = $('s-token').value.trim();
-  if (!STATE.oauthMode && manualToken) STATE.token = manualToken;
+  if (!STATE.oauthMode) {
+    if (manualToken) STATE.token = manualToken;
+    // if empty, keep existing STATE.token (don't overwrite)
+  }
 
   // OAuth2 config
   OAUTH.clientId = $('s-oauth-cid').value.trim();
@@ -517,7 +520,9 @@ function resetSettings() {
   sessionStorage.removeItem('tp_oauth_state');
   dbClear('prefs'); dbClear('trackers'); dbClear('schemas'); dbClear('queue');
   dbClear('synclog'); dbClear('trackerMeta');
-  $('s-url').value = ''; $('s-token').value = '';
+  $('s-url').value = ''; $('s-token').value = ''; $('s-token').placeholder = 'tu-token-api';
+  const tokenStatus = $('s-token-status');
+  if (tokenStatus) { tokenStatus.className = 'token-status'; tokenStatus.textContent = ''; }
   $('s-oauth-cid').value = ''; $('s-oauth-secret').value = '';
   $('s-oauth-status').classList.add('hidden');
   $('s-status').classList.add('hidden');
@@ -1101,10 +1106,9 @@ function init() {
       return;
     }
 
-    // Load manual token fallback if not OAuth2
+    // Load manual token fallback if not OAuth2 (never put actual token in DOM)
     if (!STATE.oauthMode) {
       STATE.token = localStorage.getItem('tp_token') || '';
-      $('s-token').value = STATE.token;
     }
 
     // If no credentials at all, show settings
@@ -1156,6 +1160,19 @@ function initSettings() {
   // Set redirect URI demo
   const redirectDemo = $('s-oauth-redirect-demo');
   if (redirectDemo) redirectDemo.textContent = window.location.origin + window.location.pathname;
+
+  // Manual token: show masked placeholder if already configured, never expose in value
+  const tokenInput = $('s-token');
+  const tokenStatus = $('s-token-status');
+  if (STATE.token && !STATE.oauthMode) {
+    tokenInput.value = '';
+    tokenInput.placeholder = '••••••••••••••••••••••••';
+    if (tokenStatus) { tokenStatus.className = 'token-status ok'; tokenStatus.textContent = '✓ Token configurado'; }
+  } else {
+    tokenInput.placeholder = 'tu-token-api';
+    if (tokenStatus) { tokenStatus.className = 'token-status'; tokenStatus.textContent = ''; }
+  }
+
   // Show OAuth2 status
   const oauthStatus = $('s-oauth-status');
   if (STATE.oauthMode) {

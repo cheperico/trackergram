@@ -56,6 +56,8 @@ header button{background:none;border:none;color:#eee;font-size:1.3rem;cursor:poi
 .toggle-pw{position:relative}
 .toggle-pw input{padding-right:40px}
 .toggle-pw .eye{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1rem}
+.token-status{font-size:.75rem;margin-top:2px}
+.token-status.ok{color:var(--green)}
 .conn-status{margin:8px 0;padding:10px;border-radius:8px;font-size:.85rem;text-align:center}
 .conn-status.ok{background:rgba(46,204,113,.15);color:var(--green);border:1px solid rgba(46,204,113,.3)}
 .conn-status.err{background:rgba(231,76,60,.15);color:var(--red);border:1px solid rgba(231,76,60,.3)}
@@ -158,6 +160,7 @@ header button{background:none;border:none;color:#eee;font-size:1.3rem;cursor:poi
     <label for="s-token">Token manual <span style="font-size:.75rem;color:var(--text-muted)">(alternativa a OAuth2)</span></label>
     <input type="password" id="s-token" placeholder="tu-token-api" autocomplete="off">
     <button class="eye" id="s-token-eye" aria-label="Mostrar/ocultar token">👁</button>
+    <div id="s-token-status" class="token-status"></div>
   </div>
 
   <!-- OAuth2 -->
