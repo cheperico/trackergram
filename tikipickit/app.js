@@ -21,9 +21,13 @@ const STATE = {
   hiddenTrackerIds: new Set(),
   autoSchemas: true,
   startView: 'dashboard',
+  syncDelay: 3000,   // ms between syncAll calls
   online: navigator.onLine,
   oauthMode: false  // true: OAuth2 flow, false: manual token
 };
+
+/* ─── Constants ─── */
+const MANUAL_TOKEN_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
 
 /* ─── OAuth2 State ─── */
 const OAUTH = {
@@ -136,7 +140,10 @@ function oauth2BuildAuthorizeUrl() {
   crypto.getRandomValues(array);
   const raw = Array.from(array).join('') + '_' + Date.now();
   const state = btoa(raw);
-  sessionStorage.setItem('tp_oauth_state', state);
+  sessionStorage.setItem('tp_oauth_state', JSON.stringify({
+    state: state,
+    expiresAt: Date.now() + 3 * 60 * 1000  // 3 min expiry
+  }));
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: OAUTH.clientId,
@@ -177,11 +184,21 @@ function oauth2HandleCallback() {
     return true;
   }
 
-  // Validate state (CSRF)
-  const savedState = sessionStorage.getItem('tp_oauth_state');
+  // Validate state (CSRF) + check expiry (3 min)
+  const savedRaw = sessionStorage.getItem('tp_oauth_state');
   sessionStorage.removeItem('tp_oauth_state');
-  if (!savedState || state !== savedState) {
+  if (!savedRaw) {
+    toast('❌ OAuth2: no se encontró estado de autenticación. Iniciá sesión de nuevo.', 'error');
+    return true;
+  }
+  let saved;
+  try { saved = JSON.parse(savedRaw); } catch (_) { saved = null; }
+  if (!saved || !saved.state || state !== saved.state) {
     toast('❌ OAuth2: state mismatch — posible CSRF', 'error');
+    return true;
+  }
+  if (Date.now() > saved.expiresAt) {
+    toast('❌ OAuth2: la solicitud expiró (límite 3 min). Iniciá sesión de nuevo.', 'error');
     return true;
   }
 
@@ -441,6 +458,7 @@ function saveSettings() {
   STATE.url = $('s-url').value.trim();
   STATE.autoSchemas = $('s-auto-schemas').checked;
   STATE.startView = $('s-start').value;
+  STATE.syncDelay = Math.max(1000, parseInt($('s-sync-delay').value, 10) * 1000 || 3000);
 
   // Validate URL
   if (!isValidTikiUrl(STATE.url)) {
@@ -451,7 +469,10 @@ function saveSettings() {
   // Manual token: only update if user typed something new (field is blank by design)
   const manualToken = $('s-token').value.trim();
   if (!STATE.oauthMode) {
-    if (manualToken) STATE.token = manualToken;
+    if (manualToken) {
+      STATE.token = manualToken;
+      localStorage.setItem('tp_token_created', Date.now()); // reset TTL clock
+    }
     // if empty, keep existing STATE.token (don't overwrite)
   }
 
@@ -470,6 +491,7 @@ function saveSettings() {
   Promise.all([
     savePref('autoSchemas', STATE.autoSchemas),
     savePref('startView', STATE.startView),
+    savePref('syncDelay', STATE.syncDelay),
     savePref('hiddenTrackerIds', [...STATE.hiddenTrackerIds]),
     savePref('lastTrackerId', STATE.lastTrackerId),
     savePref('oauthClientId', OAUTH.clientId),
@@ -535,7 +557,7 @@ function resetSettings() {
   STATE.url = ''; STATE.token = ''; STATE.trackers = []; STATE.schemas = {};
   STATE.oauthMode = false;
   OAUTH.clientId = ''; OAUTH.clientSecret = ''; OAUTH.refreshToken = ''; OAUTH.expiresAt = 0;
-  localStorage.removeItem('tp_url'); localStorage.removeItem('tp_token');
+  localStorage.removeItem('tp_url'); localStorage.removeItem('tp_token'); localStorage.removeItem('tp_token_created');
   sessionStorage.removeItem('tp_oauth_state');
   dbClear('prefs'); dbClear('trackers'); dbClear('schemas'); dbClear('queue');
   dbClear('synclog'); dbClear('trackerMeta');
@@ -590,9 +612,17 @@ function renderDashboard() {
   }
   empty.classList.add('hidden');
   container.innerHTML = visible.map(t => {
-    const pending = STATE.queue.filter(q => q.trackerId === t.trackerId).length;
+    const trackerItems = STATE.queue.filter(q => q.trackerId === t.trackerId);
+    const pending = trackerItems.length;
+    const retries = trackerItems.filter(q => q.retries > 0).length;
     const cls = pending === 0 ? 'pending-0' : pending < 10 ? 'pending-low' : 'pending-high';
-    const label = pending === 0 ? '✓ Sincronizado' : pending + ' pendiente' + (pending > 1 ? 's' : '');
+    let label;
+    if (pending === 0) {
+      label = '✓ Sincronizado';
+    } else {
+      label = pending + ' pendiente' + (pending > 1 ? 's' : '');
+      if (retries > 0) label += ' (' + retries + ' reint' + (retries > 1 ? 'os' : 'o') + ')';
+    }
     const emoji = guessEmoji(t.name);
     return `
       <div class="tracker-card" data-id="${t.trackerId}" onclick="openForm(${t.trackerId})">
@@ -921,9 +951,9 @@ function syncAll() {
   if (_syncing) { toast('🔄 Ya sincronizando...', 'info'); return; }
   if (!STATE.queue.length) { toast('✓ Todo sincronizado', 'success'); return; }
   if (!STATE.online) { toast('⚠️ Sin conexión. Se reintentará automáticamente.', 'info'); return; }
-  // Rate limit: max 1 sync every 3 seconds
+  // Rate limit: max 1 sync every N ms (configurable in settings)
   const now = Date.now();
-  if (now - _lastSyncTime < 3000) { toast('⏳ Esperá unos segundos antes de sincronizar de nuevo', 'info'); return; }
+  if (now - _lastSyncTime < STATE.syncDelay) { toast('⏳ Esperá antes de sincronizar de nuevo', 'info'); return; }
   _lastSyncTime = now;
 
   // Sort queue by createdAt (oldest first) — T3
@@ -1207,6 +1237,12 @@ function esc(str) {
   return d.innerHTML;
 }
 
+function isManualTokenExpired() {
+  const created = localStorage.getItem('tp_token_created');
+  if (!created) return false; // migration: no timestamp, keep working
+  return Date.now() - Number(created) > MANUAL_TOKEN_TTL;
+}
+
 function isValidTikiUrl(str) {
   try {
     const u = new URL(str);
@@ -1278,6 +1314,13 @@ function init() {
     // Load manual token fallback if not OAuth2 (never put actual token in DOM)
     if (!STATE.oauthMode) {
       STATE.token = localStorage.getItem('tp_token') || '';
+      // Check TTL expiry (7 days)
+      if (STATE.token && isManualTokenExpired()) {
+        STATE.token = '';
+        localStorage.removeItem('tp_token');
+        localStorage.removeItem('tp_token_created');
+        toast('🔑 Token manual expiró (7 días). Ingresá uno nuevo.', 'info');
+      }
     }
 
     // If no credentials at all, show settings
@@ -1291,12 +1334,14 @@ function init() {
     return Promise.all([
       loadPref('autoSchemas', true),
       loadPref('startView', 'dashboard'),
+      loadPref('syncDelay', 3000),
       loadPref('hiddenTrackerIds', []),
       loadPref('lastTrackerId', null),
       dbGetAll('schemas')
-    ]).then(([autoSchemas, startView, hiddenIds, lastTrackerId, schemas]) => {
+    ]).then(([autoSchemas, startView, syncDelay, hiddenIds, lastTrackerId, schemas]) => {
       STATE.autoSchemas = autoSchemas;
       STATE.startView = startView;
+      STATE.syncDelay = syncDelay;
       STATE.lastTrackerId = lastTrackerId;
       STATE.hiddenTrackerIds = new Set(hiddenIds || []);
       schemas.forEach(s => { STATE.schemas[s.trackerId] = s.fields; });
@@ -1325,6 +1370,7 @@ function initSettings() {
   switchView('settings');
   $('s-auto-schemas').checked = STATE.autoSchemas;
   $('s-start').value = STATE.startView;
+  $('s-sync-delay').value = Math.round(STATE.syncDelay / 1000);
   $('s-oauth-cid').value = OAUTH.clientId;
   $('s-oauth-secret').value = OAUTH.clientSecret;
   // Set redirect URI demo

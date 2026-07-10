@@ -525,6 +525,11 @@ if (isset($_GET['edit'])) {
     <div class="alert alert-error" role="alert" aria-live="assertive"><?php echo escapeHtml($errorMessage); ?></div>
 <?php endif; ?>
 
+<!-- Main heading -->
+<div class="admin-header">
+    <h1 class="admin-title"><?php echo __('admin.title'); ?></h1>
+</div>
+
 <?php if ($activeTab === 'webhook'): ?>
 
 <!-- ===== TAB: WEBHOOK ===== -->

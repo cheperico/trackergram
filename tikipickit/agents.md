@@ -78,13 +78,15 @@ JavaScript vanilla (ES6+), CSS vanilla, sin dependencias externas. IndexedDB nat
 ## 3. Estructura de Archivos
 
 | Archivo | Rol | Líneas |
-|---|---|---|
-| `index.html` | SPA: 3 vistas (settings, dashboard, form) + toast + CSS inline | 200 |
-| `app.js` | Toda la lógica: IndexedDB, API calls, settings, dashboard, renderer de forms, envío, cola offline, sync, GPS, init | 865 |
-| `sw.js` | Service Worker: cache-first para assets, network-first para GET API, ignora POST | 84 |
-| `manifest.json` | Web App Manifest para instalación PWA | 23 |
+|---|---|---|---|
+| `index.html` | SPA: 5 vistas (loading, settings, dashboard, form, errors) + toast + CSS inline | ~270 |
+| `app.js` | Toda la lógica: IndexedDB, API calls, settings, dashboard, renderer de forms, envío, cola offline, sync, GPS, OAuth2, init | ~1400 |
+| `sw.js` | Service Worker: cache-first para assets, network-first para GET API, ignora POST | 87 |
+| `manifest.json` | Web App Manifest para instalación PWA | 21 |
 | `.htaccess` | Apache: cache headers, HTTPS redirect, seguridad | 44 |
-| `icons/icon-192.svg` | Icono vectorial del app | — |
+| `icons/icon-192.svg` | Icono vectorial 192x192 | — |
+| `icons/icon-512.svg` | Icono vectorial 512x512 | — |
+| `roadmap.md` | Issues y roadmap exclusivo de TikiPickIt | ~220 |
 
 ### Orden recomendado de lectura
 
@@ -200,8 +202,19 @@ Base: `tikipickit` (v1)
 ### Bugs conocidos
 - **B2 (aceptado)**: Files perdidos en resync offline — el objeto `File` del browser no se serializa a IndexedDB. Al sincronizar, los campos FG se guardan sin archivo. Toast informativo mostrado.
 
+### Funcionalidades implementadas recientemente
+- **Vista de errores (T1)**: Vista con synclog visible, botones "Reintentar" individual y "Reintentar todos"
+- **Back-off exponencial (T2)**: `withRetry()` wrapper con 500ms base + jitter, usado en saveItem y processItem
+- **Orden FIFO (T3)**: Cola ordenada por createdAt antes de procesar
+- **GC IndexedDB (T4)**: Limpieza automática de synclog >30 días y queue stale >7 días
+- **Loading spinner (T5)**: Vista de carga visible mientras init() resuelve trackers y schemas
+- **OAuth2 state expiry (T6)**: State anti-CSRF con expiración de 3 minutos
+- **Rate limit configurable (T8)**: Intervalo entre syncs configurable desde settings (1-60s, default 3s)
+- **Retries visibles (T9)**: Badge muestra cantidad de reintentos fallidos
+- **Token manual con expiración (7 días)**: El token manual se borra solo tras 7 días. Constante `MANUAL_TOKEN_TTL` en app.js. Timestamp `tp_token_created` en localStorage.
+
 ### Bugs corregidos
-- **B4 (corregido vía OAuth2)**: Token en `localStorage` en texto plano. Con OAuth2 los tokens se guardan en IndexedDB (prefs) con expiry de 1 hora y refresh automático. El token manual sigue siendo opcional para usuarios que prefieran no configurar OAuth2.
+- **B4 (corregido vía OAuth2)**: Token en `localStorage` en texto plano. Con OAuth2 los tokens se guardan en IndexedDB (prefs) con expiry de 1 hora y refresh automático. El token manual sigue siendo opcional y ahora expira a los 7 días.
 
 ### Limitaciones MVP
 - No hay edición offline de items existentes (solo creación)
@@ -212,9 +225,10 @@ Base: `tikipickit` (v1)
 
 ### No implementado aún (futuro)
 - Sincronización bidireccional (vía `SyncController` de TikiWiki + `modifiedSince`)
-- Store de blobs de archivos en IndexedDB
+- Store de blobs de archivos en IndexedDB (T10)
 - Pills de navegación rápida entre trackers (más de 3 recientes → dropdown)
 - Export offline de datos
+- Tests automatizados (T11)
 
 ---
 
@@ -276,6 +290,22 @@ Base: `tikipickit` (v1)
 ---
 
 ## 9. Historial de Cambios
+
+### 10/07/2026 — Features alta prioridad + media (T1-T9)
+
+| ID | Tipo | Descripción | Archivo |
+|----|------|-------------|---------|
+| T1 | 🆕 Feature | Vista de errores con synclog + reintentar items individual/todos | `app.js`, `index.html` |
+| T2 | 🚀 Mejora | Back-off exponencial en retry de API calls (withRetry) | `app.js` |
+| T3 | 🚀 Mejora | Cola ordenada por createdAt (FIFO) | `app.js` |
+| T4 | 🚀 Mejora | GC de IndexedDB (synclog >30d, queue stale >7d) | `app.js` |
+| T5 | 🚀 Mejora | Loading spinner durante init() | `index.html`, `app.js` |
+| T6 | 🛡️ Seguridad | OAuth2 state con expiry de 3 min en sessionStorage | `app.js` |
+| T7 | 🐛 Fix | PNG icons faltantes reemplazados por SVGs en manifest | `manifest.json`, `icons/` |
+| T8 | 🚀 Mejora | Rate limit configurable (1-60s, default 3s) | `index.html`, `app.js` |
+| T9 | 🚀 Mejora | Retries visibles en badge del dashboard | `app.js` |
+| — | 🛡️ Seguridad | Token manual con expiración de 7 días (tp_token_created) | `app.js` |
+| — | 📋 Doc | Creado roadmap.md exclusivo de TikiPickIt | `roadmap.md` |
 
 ### 09/07/2026 — Security hardening (v4)
 
@@ -355,7 +385,7 @@ TikiPickIt sigue los mismos estándares que trackerGram. Las siguientes protecci
 
 1. **URL validation**: `isValidTikiUrl()` exige `https:` (o `localhost`/`127.0.0.1` para desarrollo).
 2. **Error sanitization**: `_apiFetch()` nunca muestra el cuerpo de la respuesta HTTP al usuario. Usa mensajes genéricos por código de estado.
-3. **Rate limiting**: `syncAll()` no se ejecuta más de una vez cada 3 segundos.
+3. **Rate limiting**: `syncAll()` no se ejecuta más de una vez cada N ms (default 3000, configurable desde settings).
 4. **SW scope**: SW solo intercepta requests al mismo origen (`isOwnOrigin()`). No intercepta POST/PUT/DELETE.
 5. **CSP**: `default-src 'self'`, `connect-src 'self' https:`, `frame-ancestors 'none'`, `script-src 'self'`.
 6. **HSTS**: 1 año + subdominios.

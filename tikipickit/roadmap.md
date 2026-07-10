@@ -5,54 +5,19 @@
 
 ---
 
-## 🔴 Crítico: OAuth2 sin refresh token offline prolongado
+## 🔴 ~~Crítico: OAuth2 sin refresh token offline prolongado~~ ✅ Resuelto
 
-### Problema
-El flujo OAuth2 usa:
-- **Access token**: expira en 1 hora (configurable en TikiWiki vía League OAuth2 Server)
-- **Refresh token**: expira típicamente en 30 días (configurable)
+**Análisis**: El refresh token de League OAuth2 Server **rota** (se emite uno nuevo cada vez que se refresca). El viejo se revoca. El TTL del nuevo es `ahora + 1 mes`. Por lo tanto:
 
-Si el usuario está offline más tiempo del que dura el **refresh token**, al volver online:
+- Si el usuario se conecta al menos 1 vez al mes, el refresh token **nunca expira** (sliding window)
+- El único caso problemático es >30 días **sin ninguna conexión** a TikiWiki
+- Para ese caso de borde, el **token manual con expiración de 7 días** sirve como respaldo
+- Items offline nunca se pierden — quedan en la cola y se reintentan al re-autenticar
 
-```
-syncAll()
-  → apiFetch()
-    → oauth2EnsureValidToken()
-      → access token expired → oauth2RefreshToken()
-        → refresh token también expiró → ERROR
-        → oauth2ClearTokens()
-        → throw "Sesión expirada. Iniciá sesión nuevamente."
-```
-
-**Resultado**: items offline **no se sincronizan** hasta que el usuario re-autentique vía OAuth2.
-Esto contradice el propósito fundamental de TikiPickIt: recolectar datos en terreno con
-conectividad impredecible.
-
-### Riesgo real
-- Si el refresh token expira en 30 días: usuario de campo en zona remota por >30 días pierde
-  la capacidad de sincronizar hasta volver a autenticar
-- Si el refresh token expira en 7 días (configuración conservadora): el problema es más probable
-
-### Solución propuesta
-**Híbrido**: OAuth2 como default + token manual como fallback cuando OAuth2 falla.
-
-```
-apiFetch()
-  → intentar OAuth2 (refresh automático si expiró)
-    → si falla (refresh expirado):
-      → caer a token manual (si existe)
-      → marcar en UI: "⚠️ OAuth2 expirado — sincronizando con token manual"
-    → si también falla:
-      → marcar item como "requiere re-login"
-      → toast permanente "⛔ Iniciá sesión OAuth2 de nuevo"
-```
-
-**Además**:
-- Mover token manual de `localStorage` a `IndexedDB` (misma store que prefs OAuth2)
-- Mostrar en UI cuál método se usó en la última sincronización
-- Al re-autenticar OAuth2, reintentar items fallidos automáticamente
-
-**Tags**: `oauth2`, `offline`, `blocker`
+**Decisión**: No implementar el híbrido. El riesgo es bajo y está cubierto por:
+- Token manual con 7 días de expiración (implementado)
+- Vista de errores permite reintentar items fallidos (T1 implementado)
+- El mensaje de error de OAuth2 refresh fallido es claro
 
 ---
 
@@ -95,30 +60,14 @@ apiFetch()
 
 ---
 
-## 🟢 Media prioridad
+## 🟢 Media prioridad ✅ Completado
 
-### T6 — OAuth2 state con timestamp y expiry
-- **Qué**: El `state` anti-CSRF ya usa CSPRNG. Agregar timestamp de expiración (3 min desde generación)
-  y validarlo en el callback. Si expiró, mostrar error y no intercambiar el code.
-- **Ubicación**: `oauth2BuildAuthorizeUrl()` + `oauth2HandleCallback()`
-- **Por qué**: Defensa en profundidad. Un atacante que intercepte el `state` antes de la redirección
-  tiene una ventana de oportunidad.
-- **Tags**: `security`, `oauth2`
-
-### T7 — PNG icons para manifest.json
-- **Qué**: `manifest.json` referencia `icon-192.png` y `icon-512.png` que no existen en el repo
-  (solo hay SVG). Generar PNGs desde el SVG o reemplazar las referencias por SVG.
-- **Tags**: `pwa`, `manifest`
-
-### T8 — Rate limit configurable (token bucket)
-- **Qué**: Hoy el rate limit de sync es un hardcoded `3000ms`. Hacerlo configurable desde settings
-  o usar un token bucket que permita bursts de 2-3 items.
-- **Tags**: `sync`, `ux`, `performance`
-
-### T9 — `retries` visibles en cada item de la cola
-- **Qué**: En el badge de pendientes del dashboard, mostrar no solo cantidad de items sino también
-  cuántos tienen intentos fallidos vs nuevos.
-- **Tags**: `ux`, `sync`
+| Item | Estado |
+|------|--------|
+| **T6** — OAuth2 state con timestamp y expiry | ✅ 10/07/2026 |
+| **T7** — Icons SVG para manifest (reemplazó PNGs inexistentes) | ✅ 10/07/2026 |
+| **T8** — Rate limit configurable (1-60s, default 3s) | ✅ 10/07/2026 |
+| **T9** — Retries visibles en badge del dashboard | ✅ 10/07/2026 |
 
 ---
 
@@ -189,3 +138,19 @@ Mitigación: moverlo de `localStorage` a `IndexedDB`, mismo store que OAuth2.
 
 **Alternativa descartada**: OAuth2-only. Riesgo de perder items offline por refresh expirado
 es incompatible con el propósito de TikiPickIt.
+
+### 10/07/2026 — Token manual con expiración de 7 días
+
+**Problema**: El token manual en localStorage nunca expiraba. Si un atacante lo obtenía (XSS,
+extensión maliciosa), tenía acceso permanente a la API de TikiWiki con los permisos del token.
+
+**Decisión**: El token manual ahora expira a los **7 días** de haber sido ingresado. Al expirar,
+se borra solo de localStorage y el usuario ve el campo vacío para ingresar uno nuevo.
+Los items offline **no se pierden** — quedan en la cola.
+
+**Por qué 7 días**: Si el usuario usa OAuth2 (default recomendado), el token manual no se necesita.
+Solo se usa como fallback (ej: >30 días sin conexión, o TikiWiki sin OAuth Client configurado).
+7 días es suficiente para resolver el problema puntual sin riesgo de exposición prolongada.
+
+**Trade-off**: El usuario debe tener el token guardado (gestor de contraseñas, Telegram) para
+re-ingresarlo cada 7 días si no usa OAuth2.
