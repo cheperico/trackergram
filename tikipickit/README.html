@@ -7,6 +7,7 @@
 <style>
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,sans-serif;background:#1a1a2e;color:#eee;line-height:1.6;padding:20px;max-width:800px;margin:0 auto}
   a{color:#e94560}
+  a:hover{opacity:.8}
   h1,h2,h3{color:#e94560;margin:24px 0 12px}
   h1{border-bottom:1px solid #0f3460;padding-bottom:8px}
   h2{border-bottom:1px solid #0f3460;padding-bottom:6px}
@@ -20,6 +21,22 @@
   li{margin-bottom:4px}
   blockquote{background:#16213e;padding:12px;border-left:3px solid #e94560;margin:12px 0;border-radius:0 8px 8px 0}
   .back{margin-top:24px;padding-top:16px;border-top:1px solid #0f3460;text-align:center}
+  /* TOC */
+  .toc{background:#16213e;border-radius:8px;padding:16px 20px;margin:16px 0}
+  .toc-title{font-weight:600;margin-bottom:8px;color:#e94560}
+  .toc ul{list-style:none;padding:0;margin:0}
+  .toc li{padding:2px 0}
+  .toc .l2{padding-left:16px;font-size:.9rem}
+  .toc .l3{padding-left:32px;font-size:.85rem}
+  .toc a{color:#8899aa;text-decoration:none}
+  .toc a:hover{color:#e94560}
+  /* Back to index */
+  .toctop{text-align:right;font-size:.8rem;margin-top:8px}
+  .toctop a{color:#8899aa;text-decoration:none}
+  .toctop a:hover{color:#e94560}
+  .toctop::before{content:'↑ '}
+  /* Heading anchors */
+  h2[id],h3[id],h4[id]{scroll-margin-top:16px}
 </style>
 </head>
 <body>
@@ -30,7 +47,44 @@
 
 <hr>
 
-<h2>Cómo funciona</h2>
+<div class="toc">
+  <div class="toc-title">📑 Índice</div>
+  <ul>
+    <li><a href="#como-funciona">Cómo funciona</a></li>
+    <li><a href="#instalacion">Instalación</a>
+      <ul>
+        <li class="l2"><a href="#requisitos">Requisitos</a></li>
+        <li class="l2"><a href="#pasos">Pasos</a></li>
+        <li class="l2"><a href="#token-manual">Token manual (rápido)</a></li>
+        <li class="l2"><a href="#oauth2">OAuth2 (recomendado)</a></li>
+        <li class="l2"><a href="#instalacion-pwa">Instalación PWA</a></li>
+      </ul>
+    </li>
+    <li><a href="#uso">Uso</a>
+      <ul>
+        <li class="l2"><a href="#configuracion-inicial">Configuración inicial</a></li>
+        <li class="l2"><a href="#dashboard">Dashboard</a></li>
+        <li class="l2"><a href="#formulario-de-carga">Formulario de carga</a></li>
+        <li class="l2"><a href="#sincronizacion">Sincronización</a></li>
+      </ul>
+    </li>
+    <li><a href="#tipos-de-campo-soportados">Tipos de campo soportados</a></li>
+    <li><a href="#limitaciones">Limitaciones (MVP)</a></li>
+    <li><a href="#seguridad">Seguridad</a></li>
+    <li><a href="#arquitectura">Arquitectura</a></li>
+    <li><a href="#preguntas-frecuentes">Preguntas frecuentes</a></li>
+    <li><a href="#desarrollo">Desarrollo</a>
+      <ul>
+        <li class="l2"><a href="#archivos-principales">Archivos principales</a></li>
+      </ul>
+    </li>
+    <li><a href="#licencia">Licencia</a></li>
+  </ul>
+</div>
+
+<hr>
+
+<h2 id="como-funciona">Cómo funciona</h2>
 <ol>
 <li><strong>Conectás</strong> tu TikiWiki ingresando URL y un Bearer token de API</li>
 <li><strong>Seleccionás</strong> el tracker donde querés cargar datos</li>
@@ -38,48 +92,52 @@
 <li><strong>Guardás</strong> — si hay internet, se crea el item en TikiWiki al instante. Si no, se encola localmente.</li>
 <li><strong>Sincronizás</strong> después tocando "Sincronizar" o automáticamente al reconectar.</li>
 </ol>
+<div class="toctop"><a href="#">Volver al índice</a></div>
 
 <hr>
 
-<h2>Instalación</h2>
-<h3>Requisitos</h3>
+<h2 id="instalacion">Instalación</h2>
+
+<h3 id="requisitos">Requisitos</h3>
 <ul>
 <li>Un servidor web con Apache (o cualquier servidor que sirva archivos estáticos)</li>
 <li>PHP <strong>no es necesario</strong>: TikiPickIt es 100% frontend</li>
 <li>Un sitio TikiWiki (v24+) con API habilitada y un token de API generado</li>
 </ul>
 
-<h3>Pasos</h3>
+<h3 id="pasos">Pasos</h3>
 <ol>
 <li><strong>Copiar la carpeta <code>tikipickit/</code></strong> a tu servidor web</li>
 <li><strong>Asegurar HTTPS</strong>: TikiPickIt necesita HTTPS para funcionar como PWA, para OAuth2 y para acceder al GPS del dispositivo.</li>
 <li><strong>Configurar CORS en TikiWiki</strong> (si TikiPickIt está en un dominio distinto a TikiWiki): desde el panel de admin de TikiWiki, habilitar CORS para el dominio donde instalaste TikiPickIt.</li>
 </ol>
 
-<h4>Opción A: Token manual (rápido)</h4>
+<h4 id="token-manual">Opción A: Token manual (rápido)</h4>
 <ol start="4">
 <li><strong>Generar un token de API</strong> en tu TikiWiki: Admin → API Tokens → Crear nuevo token. El token necesita permisos: <code>tiki_p_admin_trackers</code> + <code>tiki_p_create_tracker_items</code> + <code>tiki_p_upload_files</code> (mínimo).</li>
 <li><strong>Abrir</strong> <code>https://tudominio.com/tikipickit/</code> en el navegador e ingresar URL + token.</li>
 </ol>
 
-<h4>Opción B: OAuth2 (recomendado — tokens rotativos, más seguro)</h4>
+<h4 id="oauth2">Opción B: OAuth2 (recomendado — tokens rotativos, más seguro)</h4>
 <ol start="4">
 <li><strong>Crear un OAuth Client</strong> en tu TikiWiki: Admin → OAuth Server → Crear Client. Nombre: <code>TikiPickIt</code>. Redirect URI: La URL exacta donde esté instalado TikiPickIt</li>
 <li><strong>Abrir</strong> la URL de TikiPickIt e ingresar: URL de TikiWiki + Client ID + Client Secret. Tocar <strong>"Iniciar sesión con TikiWiki"</strong> → te redirige a TikiWiki para login + consentimiento. Al volver, los tokens se guardan automáticamente con refresh periódico.</li>
 </ol>
 
-<h3>Instalación como PWA (recomendado en móvil)</h3>
+<h3 id="instalacion-pwa">Instalación como PWA (recomendado en móvil)</h3>
 <ol>
 <li>Abrí TikiPickIt en Chrome/Edge/Safari</li>
 <li>En Android: "Agregar a pantalla de inicio" (menú ⋮ → Install app)</li>
 <li>En iOS: Compartir → "Agregar a pantalla de inicio"</li>
 <li>Se abre como una app nativa, sin la barra del navegador.</li>
 </ol>
+<div class="toctop"><a href="#">Volver al índice</a></div>
 
 <hr>
 
-<h2>Uso</h2>
-<h3>1. Configuración inicial</h3>
+<h2 id="uso">Uso</h2>
+
+<h3 id="configuracion-inicial">1. Configuración inicial</h3>
 <p>Al abrir TikiPickIt por primera vez, ves la pantalla de configuración:</p>
 <ul>
 <li><strong>URL de TikiWiki</strong>: <code>https://wiki.tudominio.org</code></li>
@@ -88,10 +146,10 @@
 </ul>
 <p>En <strong>Preferencias</strong> podés elegir si iniciar en el dashboard o en el último tracker usado, activar/desactivar descarga automática de schemas, y ocultar trackers que no necesitás.</p>
 
-<h3>2. Dashboard</h3>
+<h3 id="dashboard">2. Dashboard</h3>
 <p>Muestra todos los trackers disponibles con nombre, cantidad de campos, estado de sincronización y emoji identificatorio.</p>
 
-<h3>3. Formulario de carga</h3>
+<h3 id="formulario-de-carga">3. Formulario de carga</h3>
 <p>Cada tracker muestra un formulario dinámico con los campos definidos en TikiWiki:</p>
 <table>
 <tr><th>Tipo de campo</th><th>Cómo se ingresa</th></tr>
@@ -107,17 +165,18 @@
 <tr><td>Enlace a item</td><td>ID numérico de otro item del tracker referenciado</td></tr>
 </table>
 
-<h3>4. Sincronización</h3>
+<h3 id="sincronizacion">4. Sincronización</h3>
 <ul>
 <li>El badge en el header muestra la cantidad de items pendientes</li>
 <li>Tocá "Sincronizar" para enviar todos los items pendientes</li>
 <li>La sincronización es automática al reconectar si hay items en cola</li>
 <li>Cada item se reintenta hasta 3 veces antes de pasar a la bitácora de errores</li>
 </ul>
+<div class="toctop"><a href="#">Volver al índice</a></div>
 
 <hr>
 
-<h2>Tipos de campo de TikiWiki soportados</h2>
+<h2 id="tipos-de-campo-soportados">Tipos de campo de TikiWiki soportados</h2>
 <table>
 <tr><th>Código</th><th>Tipo</th><th>Soporte</th></tr>
 <tr><td><code>t</code></td><td>Text</td><td>✅</td></tr>
@@ -133,10 +192,11 @@
 <tr><td><code>r</code></td><td>Item Link</td><td>✅</td></tr>
 <tr><td><code>M</code></td><td>Multilingual</td><td>✅ (como texto)</td></tr>
 </table>
+<div class="toctop"><a href="#">Volver al índice</a></div>
 
 <hr>
 
-<h2>Limitaciones conocidas (MVP)</h2>
+<h2 id="limitaciones">Limitaciones conocidas (MVP)</h2>
 <table>
 <tr><th>Limitación</th><th>Detalle</th></tr>
 <tr><td><strong>Archivos en modo offline</strong></td><td>Los archivos adjuntos no se pueden re-subir al sincronizar. El objeto File no se persiste en IndexedDB.</td></tr>
@@ -145,10 +205,11 @@
 <tr><td><strong>Sin sincronización bidireccional</strong></td><td>No detecta cambios hechos por otros usuarios en TikiWiki.</td></tr>
 <tr><td><strong>Sin tests automatizados</strong></td><td>Validación manual requerida antes de usar en producción.</td></tr>
 </table>
+<div class="toctop"><a href="#">Volver al índice</a></div>
 
 <hr>
 
-<h2>Seguridad</h2>
+<h2 id="seguridad">Seguridad</h2>
 <table>
 <tr><th>Medida</th><th>Detalle</th></tr>
 <tr><td><strong>CSP</strong></td><td>Content-Security-Policy restringe scripts, conexiones y framing</td></tr>
@@ -163,8 +224,11 @@
 <tr><td><strong>SW scope</strong></td><td>Service Worker solo intercepta requests al mismo origen</td></tr>
 <tr><td><strong>Permissions-Policy</strong></td><td>Solo geolocation y camera permitidas</td></tr>
 </table>
+<div class="toctop"><a href="#">Volver al índice</a></div>
 
-<h2>Arquitectura</h2>
+<hr>
+
+<h2 id="arquitectura">Arquitectura</h2>
 <pre>
 ┌──────────────┐     HTTPS      ┌──────────────┐
 │  TikiPickIt   │ ────────────→  │  TikiWiki    │
@@ -180,10 +244,12 @@
 <li><strong>Service Worker</strong>: cache de assets y respuestas API GET</li>
 <li><strong>Sin PHP, sin base de datos, sin framework</strong>: 100% frontend estático</li>
 </ul>
+<div class="toctop"><a href="#">Volver al índice</a></div>
 
 <hr>
 
-<h2>Preguntas frecuentes</h2>
+<h2 id="preguntas-frecuentes">Preguntas frecuentes</h2>
+
 <h3>¿Necesito PHP o una base de datos?</h3>
 <p>No. TikiPickIt es HTML + JavaScript + CSS. Solo necesita un servidor web que sirva archivos estáticos.</p>
 
@@ -199,10 +265,11 @@
 
 <h3>¿Qué navegadores soporta?</h3>
 <p>Chrome, Firefox, Safari y Edge en sus versiones modernas (últimos 2 años). Para PWA, Android Chrome o iOS Safari.</p>
+<div class="toctop"><a href="#">Volver al índice</a></div>
 
 <hr>
 
-<h2>Desarrollo</h2>
+<h2 id="desarrollo">Desarrollo</h2>
 <pre>
 # No hay build step. Editá los archivos directamente.
 # Serví localmente con cualquier servidor estático:
@@ -212,7 +279,7 @@ python -m http.server 8080
 npx serve .
 </pre>
 
-<h3>Archivos principales</h3>
+<h3 id="archivos-principales">Archivos principales</h3>
 <table>
 <tr><th>Archivo</th><th>Qué hace</th></tr>
 <tr><td><code>index.html</code></td><td>Estructura de la SPA + estilos CSS</td></tr>
@@ -222,10 +289,11 @@ npx serve .
 <tr><td><code>.htaccess</code></td><td>Configuración Apache (cache, HTTPS)</td></tr>
 <tr><td><code>agents.md</code></td><td>Contexto para asistentes de IA</td></tr>
 </table>
+<div class="toctop"><a href="#">Volver al índice</a></div>
 
 <hr>
 
-<h2>Licencia</h2>
+<h2 id="licencia">Licencia</h2>
 <p>MIT — Parte del ecosistema <a href="https://github.com/cheperico/trackergram">trackerGram</a>.</p>
 
 <p class="back"><a href=".">← Volver a TikiPickIt</a></p>

@@ -6,6 +6,32 @@ TikiPickIt te permite crear items en trackers de TikiWiki directamente desde el 
 
 ---
 
+## Índice
+
+- [Cómo funciona](#cómo-funciona)
+- [Instalación](#instalación)
+  - [Requisitos](#requisitos)
+  - [Pasos](#pasos)
+  - [Token manual (rápido)](#opción-a-token-manual-rápido)
+  - [OAuth2 (recomendado)](#opción-b-oauth2-recomendado--tokens-rotativos-más-seguro)
+  - [Instalación PWA](#instalación-como-pwa-recomendado-en-móvil)
+- [Uso](#uso)
+  - [Configuración inicial](#1-configuración-inicial)
+  - [Dashboard](#2-dashboard)
+  - [Formulario de carga](#3-formulario-de-carga)
+  - [Sincronización](#4-sincronización)
+- [Tipos de campo soportados](#tipos-de-campo-de-tikiwiki-soportados)
+- [Limitaciones (MVP)](#limitaciones-conocidas-mvp)
+- [Seguridad](#seguridad)
+- [Arquitectura](#arquitectura)
+- [Preguntas frecuentes](#preguntas-frecuentes)
+- [Desarrollo](#desarrollo)
+  - [Archivos principales](#archivos-principales)
+  - [Documentos de diseño](#documentos-de-diseño)
+- [Licencia](#licencia)
+
+---
+
 ## Cómo funciona
 
 1. **Conectás** tu TikiWiki ingresando URL y un Bearer token de API

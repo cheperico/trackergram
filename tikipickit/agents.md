@@ -93,6 +93,9 @@ JavaScript vanilla (ES6+), CSS vanilla, sin dependencias externas. IndexedDB nat
 > ⚠️ **README dual**: `README.md` es la fuente de verdad para la documentación de usuario.
 > `README.html` es una conversión a HTML del mismo contenido (se sirve al navegador).
 > **Siempre que se modifique `README.md`, hay que actualizar `README.html` también.**
+> Ambos archivos tienen un **índice** al inicio con links a cada sección.
+> Al agregar, quitar o renombrar una sección, actualizar el índice en AMBOS archivos.
+> En `README.html` cada sección tiene además un link "↑ Volver al índice" al final.
 
 ### Orden recomendado de lectura
 
