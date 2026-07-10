@@ -1,11 +1,12 @@
-/* TikiPickIt — Service Worker v3 (security hardened) */
-const CACHE = 'tikipickit-v1';
+/* TikiPickIt — Service Worker v4 (help view) */
+const CACHE = 'tikipickit-v4';
 const PRECACHE = [
   '/tikipickit/',
   '/tikipickit/index.html',
   '/tikipickit/app.js',
   '/tikipickit/manifest.json',
-  '/tikipickit/icons/icon-192.svg'
+  '/tikipickit/icons/icon-192.svg',
+  '/tikipickit/icons/icon-512.svg'
 ];
 
 self.addEventListener('install', e => {
