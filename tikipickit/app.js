@@ -45,7 +45,8 @@ const views = {
   settings: $('view-settings'),
   dashboard: $('view-dashboard'),
   form: $('view-form'),
-  errors: $('view-errors')
+  errors: $('view-errors'),
+  help: $('view-help')
 };
 const toastEl = $('toast');
 
@@ -1052,6 +1053,8 @@ function switchView(name) {
     header.querySelector('h1').textContent = '📝 Nuevo registro';
   } else if (name === 'errors') {
     header.querySelector('h1').textContent = '❌ Errores';
+  } else if (name === 'help') {
+    header.querySelector('h1').textContent = '❓ Ayuda';
   }
 }
 
@@ -1408,6 +1411,13 @@ function initSettings() {
 
 /* ─── Event bindings ─── */
 document.addEventListener('DOMContentLoaded', () => {
+  $('btn-help').addEventListener('click', () => switchView('help'));
+  $('h-go-settings').addEventListener('click', () => switchView('settings'));
+  $('h-go-dashboard').addEventListener('click', () => switchView('dashboard'));
+  $('h-go-errors').addEventListener('click', showErrors);
+  $('h-back').addEventListener('click', () => {
+    switchView(STATE.currentView === 'help' ? 'dashboard' : STATE.currentView);
+  });
   $('btn-settings').addEventListener('click', showSettings);
   $('s-test').addEventListener('click', testConnectionHandler);
   $('s-save').addEventListener('click', saveSettings);

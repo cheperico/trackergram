@@ -83,6 +83,17 @@ header button{background:none;border:none;color:#eee;font-size:1.3rem;cursor:poi
   background:var(--bg-card);border-radius:12px;padding:16px;cursor:pointer;
   display:flex;align-items:center;gap:14px;transition:transform .15s;border:1px solid transparent
 }
+/* ─── Help view ─── */
+#view-help{max-width:600px;margin:0 auto;font-size:.9rem;line-height:1.6}
+#view-help h2{margin-bottom:16px}
+#view-help h3{font-size:1rem;margin:20px 0 8px;color:var(--accent)}
+#view-help p{margin-bottom:8px}
+#view-help code{background:var(--bg-input);padding:1px 6px;border-radius:4px;font-size:.8rem;word-break:break-all}
+#view-help ul{padding-left:20px;margin-bottom:12px}
+#view-help li{margin-bottom:4px}
+#view-help hr{border:none;border-top:1px solid #0f3460;margin:16px 0}
+#view-help .help-section{background:var(--bg-card);border-radius:10px;padding:14px;margin-bottom:12px
+}
 .tracker-card:hover{transform:translateX(4px);border-color:var(--accent)}
 .tracker-card .emoji{font-size:1.8rem;flex-shrink:0}
 .tracker-card .info{flex:1;min-width:0}
@@ -154,7 +165,10 @@ header button{background:none;border:none;color:#eee;font-size:1.3rem;cursor:poi
 
 <header id="app-header">
   <h1>📋 TikiPickIt <span class="badge hidden" id="header-badge">0</span></h1>
-  <button id="btn-settings" title="Configuración">⚙️</button>
+  <nav style="display:flex;gap:4px;align-items:center">
+    <button id="btn-help" title="Ayuda">❓</button>
+    <button id="btn-settings" title="Configuración">⚙️</button>
+  </nav>
 </header>
 
 <!-- ─── VIEW: LOADING ─── -->
@@ -263,6 +277,51 @@ header button{background:none;border:none;color:#eee;font-size:1.3rem;cursor:poi
   </div>
   <div id="e-list"></div>
   <p class="text-center mt-8"><a href="#" id="e-back" style="color:var(--text-muted);font-size:.85rem">← Volver al dashboard</a></p>
+</section>
+
+<!-- ─── VIEW: HELP ─── -->
+<section id="view-help" class="view">
+  <h2>❓ Ayuda</h2>
+
+  <div class="help-section">
+    <h3>🔧 ¿Qué es TikiPickIt?</h3>
+    <p>Aplicación web progresiva (PWA) para cargar datos en trackers de TikiWiki directamente desde el navegador o el celular, con o sin conexión a internet.</p>
+  </div>
+
+  <div class="help-section">
+    <h3>🔑 Primeros pasos</h3>
+    <ol style="padding-left:20px;margin-bottom:0">
+      <li><strong>Configurar conexión</strong> — En <a href="#" id="h-go-settings">⚙️ Configuración</a> poné la URL de tu TikiWiki (ej: <code>https://wiki.ejemplo.org</code>).</li>
+      <li><strong>Autenticarte</strong> — Usá <strong>OAuth2</strong> (recomendado, con "Iniciar sesión con TikiWiki") o un <strong>Token manual</strong> desde tu perfil de TikiWiki (Admin → API Tokens).</li>
+      <li><strong>Seleccionar trackers</strong> — Elegí qué trackers se muestran en tu dashboard desde la sección "Trackers visibles".</li>
+      <li><strong>Cargar datos</strong> — Tocá una tarjeta de tracker, completá el formulario y guardá.</li>
+    </ol>
+  </div>
+
+  <div class="help-section">
+    <h3>📶 Sin conexión</h3>
+    <p>TikiPickIt guarda los datos <strong>localmente</strong> aunque no tengas internet. Al recuperar la conexión, los datos se sincronizan automáticamente con TikiWiki.</p>
+    <p>Los items pendientes aparecen con una cuenta en el badge del header y en el dashboard. Podés sincronizar manualmente desde <a href="#" id="h-go-dashboard">📋 el dashboard</a>.</p>
+  </div>
+
+  <div class="help-section">
+    <h3>⚠️ Errores y reintentos</h3>
+    <p>Si un item falla al sincronizar, pasa a la <a href="#" id="h-go-errors">❌ vista de errores</a>. Podés reintentarlo individualmente o todos juntos.</p>
+    <p>Cuando hay más de 3 reintentos fallidos, el item se descarta para no bloquear la cola.</p>
+  </div>
+
+  <div class="help-section">
+    <h3>🔐 Seguridad</h3>
+    <p>Los tokens OAuth2 se guardan en IndexedDB (cifrado del navegador). El token manual expira a los 7 días por seguridad. Siempre usá <strong>HTTPS</strong> para conectarte a TikiWiki.</p>
+  </div>
+
+  <div class="help-section">
+    <h3>📱 Instalación PWA</h3>
+    <p>En Android (Chrome): menú ⋮ → "Instalar aplicación". En iOS (Safari): botón Compartir → "Agregar a pantalla de inicio".</p>
+  </div>
+
+  <hr>
+  <p class="text-center"><a href="#" id="h-back" style="color:var(--text-muted);font-size:.85rem">← Volver</a></p>
 </section>
 
 <!-- ─── TOAST ─── -->
