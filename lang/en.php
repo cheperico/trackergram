@@ -10,6 +10,8 @@ return [
     'nav.brand'              => 'trackerGram',
     'nav.admin'              => 'Admin',
     'nav.logout'             => 'Log out',
+    'nav.help'               => 'Documentation',
+    'nav.help_aria'          => 'Open trackerGram documentation',
     'nav.home_aria'          => 'Back to home (Webhook tab)',
     'nav.logout_aria'        => 'Log out of admin',
     'nav.lang_es'            => 'ES',
@@ -18,6 +20,7 @@ return [
     'nav.lang_name_es'       => 'Spanish',
     'nav.lang_name_en'       => 'English',
     'nav.lang_tooltip'       => 'Language',
+    'admin.title'            => 'Admin Panel',
 
     // ── Tabs ──
     'tabs.aria'              => 'Admin sections',

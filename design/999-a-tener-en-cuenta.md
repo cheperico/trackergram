@@ -1,16 +1,20 @@
-# 999 — A Tener en Cuenta: Seguridad en Consultas a TikiWiki
+# 999 — A Tener en Cuenta: Seguridad en trackerGram ↔ TikiWiki
 
-> **Contexto**: Análisis de seguridad realizado sobre TikiWiki 27.5 (trackerlib.php).
+> **Contexto**: Análisis de seguridad realizado sobre TikiWiki 27.5 (trackerlib.php) + superficie de ataque trackerGram.
 > **Fecha**: Junio 2026
 > **Última revisión**: Julio 2026 (v0.6.2)
 > **Aplica a**: trackerGram — puente Telegram → TikiWiki
-> **Propósito**: Documentar vulnerabilidades conocidas del lado de TikiWiki que afectan las decisiones de diseño de trackerGram.
+> **Propósito**: Documentar vulnerabilidades conocidas de TikiWiki + vectores de inyección que trackerGram podría introducir al escribir datos de Telegram en TikiWiki.
 
 ---
 
 ## Resumen
 
-TikiWiki es **seguro para escribir** (crear/actualizar items) pero tiene una **vulnerabilidad de SQL injection confirmada en el camino de lectura** (listado de items). trackerGram debe diseñarse para **solo usar la API REST** de TikiWiki y **nunca pasar parámetros crudos de Telegram a funciones internas de listado**.
+Dos riesgos distintos:
+
+1. **SQL injection en TikiWiki** (vulnerabilidad confirmada en `list_items()`). trackerGram se protege usando solo API REST y nunca llama a funciones internas de listado.
+
+2. **Inyección de código malicioso a través de los valores de campos del tracker**. Los mensajes de Telegram (texto, captions, nombres de usuario) se guardan LITERALMENTE en TikiWiki. Si TikiWiki renderiza esos valores sin escaparlos (template Smarty, vista HTML, exportación), código como `<script>alert(1)</script>` podría ejecutarse en el navegador de quien vea el tracker. trackerGram debe asegurarse de que el contenido que escribe no pueda ser interpretado como código ejecutable.
 
 ---
 
@@ -89,7 +93,71 @@ Construye condiciones con `?` y `$bindvars` (trackerlib.php:3333).
 
 ---
 
-## 5. Implicaciones para trackerGram
+## 5. Inyección de Código vía Valores de Campos del Tracker
+
+### El problema
+
+trackerGram toma contenido de mensajes de Telegram y lo guarda en campos del tracker de TikiWiki. Ese contenido puede incluir texto arbitrario, incluyendo HTML malicioso:
+
+```
+Mensaje en Telegram:  <script>alert('XSS')</script>
+Se guarda en tracker:  <script>alert('XSS')</script>  (literal)
+```
+
+Si TikiWiki renderiza ese valor sin escaparlo en alguna vista (tracker list, item view, export, email notification, RSS feed), el script se ejecuta.
+
+### ¿Quién debe escapar?
+
+| Capa | Responsable | Status en TikiWiki |
+|------|-------------|-------------------|
+| API REST (escritura) | **No debe escapar** | Recibe datos crudos, los guarda con bind vars |
+| Vista Smarty (lectura) | **Debe escapar** | Templates usan `{$field.value|escape}` o similar |
+| trackerGram `toWikiFields()` | ⚠️ **Defensa en profundidad** | No debe confiar ciegamente en que TikiWiki escape siempre |
+
+### Telegram: texto plano, sin HTML
+
+La Telegram Bot API envía mensajes como texto plano. El formato (negrita, itálica, links) se representa como `entities[]` separado del texto:
+
+```json
+{
+  "text": "Hola <b>mundo</b>",
+  "entities": [
+    {"type": "bold", "offset": 5, "length": 5}
+  ]
+}
+```
+
+El texto `"Hola <b>mundo</b>"` NO es HTML — son caracteres literales `<`, `b`, `>`. Si alguien escribe `<script>` en Telegram, es texto plano que trackerGram guarda textualmente. `strip_tags()` no pierde información legítima porque Telegram **nunca envía HTML como formato**.
+
+### Mitigación: `strip_tags()` en escritura
+
+Aplicar `strip_tags()` a todo texto de usuario ANTES de enviarlo a TikiWiki elimina cualquier etiqueta HTML:
+
+| Campo | Contenido | strip_tags |
+|-------|-----------|------------|
+| `Text` | Mensaje de Telegram | ✅ Seguro — Telegram es texto plano |
+| `MediaCaption` | Descripción de archivo | ✅ Seguro |
+| `DisplayName` / `FirstName` / `LastName` | Nombre de usuario | ✅ Seguro |
+| `ChatTitle` / `TopicTitle` | Nombre del grupo/tema | ✅ Seguro (controlado por admin del grupo, pero defensa en profundidad) |
+| `Username` | @username | ✅ Seguro |
+| `Reactions` | Reacciones formateadas (salida controlada por trackerGram) | ✅ Seguro |
+| `Location` | Coordenadas GPS | ✅ Número, sin HTML |
+
+**`strip_tags()` vs `htmlspecialchars()`**: `strip_tags()` remueve etiquetas HTML del input antes de guardarlo. `htmlspecialchars()` convierte caracteres especiales a entidades HTML. En la capa de API, `htmlspecialchars()` está contraindicado porque convierte `"` en `&quot;` que se guarda literalmente. `strip_tags()` es seguro porque Telegram no tiene HTML legítimo que preservar.
+
+### Defensa actual
+
+Por el momento trackerGram **no aplica `strip_tags()`** y confía en que TikiWiki escape correctamente en sus templates Smarty. Esta sección documenta la recomendación de implementar `strip_tags()` como defensa en profundidad.
+
+### Mecanismos adicionales
+
+1. **NUNCA renderizar valores de campos del tracker como HTML en el admin de trackerGram** — usar `safeRender()` con `textContent` (✅ ya implementado, fix XSS previo).
+2. **Content-Security-Policy** en `.htaccess` (✅ ya implementado, CSP header).
+3. **Validar que TikiWiki escape en todos los templates** (responsabilidad del admin de TikiWiki).
+
+---
+
+## 6. Implicaciones para trackerGram
 
 ### Riesgo por operación
 
@@ -127,11 +195,13 @@ Construye condiciones con `?` y `$bindvars` (trackerlib.php:3333).
 
 ---
 
-## 6. Evaluación contra trackerGram Actual (v0.6.2)
+## 7. Evaluación contra trackerGram Actual (v0.6.2)
 
 ### Resumen
 
-**trackerGram ya es seguro frente a esta vulnerabilidad.** El código actual usa la API REST de TikiWiki para TODAS las operaciones, tanto de lectura como de escritura. Nunca llama a `list_items()` internamente ni usa el plugin `{TRACKERLIST}`.
+**trackerGram ya es seguro frente a SQL injection en TikiWiki.** El código actual usa la API REST de TikiWiki para TODAS las operaciones, tanto de lectura como de escritura. Nunca llama a `list_items()` internamente ni usa el plugin `{TRACKERLIST}`.
+
+**Pendiente**: defensa en profundidad contra inyección de código vía valores de campos (XSS). Actualmente trackerGram confía en que TikiWiki escape correctamente en sus vistas. Ver §5.
 
 ### Análisis operación por operación
 
@@ -186,7 +256,7 @@ Construye condiciones con `?` y `$bindvars` (trackerlib.php:3333).
 
 ---
 
-## 7. Evaluación contra el Roadmap
+## 8. Evaluación contra el Roadmap
 
 Proyección de cada item del roadmap actual sobre el riesgo de SQL injection:
 
@@ -213,7 +283,7 @@ Proyección de cada item del roadmap actual sobre el riesgo de SQL injection:
 
 | # | Item | ¿Introduce riesgo? | Evaluación |
 |---|------|-------------------|------------|
-| 11 | **Mini App** (Web App) | ⚠️ **MEDIO** | Si incluye búsqueda/consulta de items donde el usuario de Telegram controle filtros, podría exponerse. Ver recomendaciones en §5. |
+| 11 | **Mini App** (Web App) | ⚠️ **MEDIO** | Si incluye búsqueda/consulta de items donde el usuario de Telegram controle filtros, podría exponerse. Ver recomendaciones en §6. |
 | 12 | **Dashboard de métricas** | ❌ Bajo | Admin-only. Consultas a API REST predefinidas. |
 | 13-18 | Tests, autoloading, transcripción, SQLite, logs, expulsar bot | ❌ No | No tocan queries a TikiWiki. |
 
@@ -229,7 +299,7 @@ Si la Mini App incluye funcionalidad de **buscar/consultar items** del tracker:
 
 ---
 
-## 8. Conclusión para trackerGram
+## 9. Conclusión para trackerGram
 
 ### Estado actual: ✅ bajo control
 
@@ -245,6 +315,7 @@ trackerGram **ya cumple** con la regla de oro del informe de seguridad:
 
 | Riesgo | Cuándo preocuparse | Acción preventiva |
 |--------|-------------------|-------------------|
+| XSS via valores de campos | Si TikiWiki no escapa en todos sus templates (custom Smarty, export, notificaciones) | `strip_tags()` en trackerGram antes de enviar a TikiWiki (ver §5) |
 | Mini App con búsqueda | Si Item 11 agrega consultas desde usuario Telegram | Validar todos los inputs antes de pasarlos a la API REST |
 | Plugin `{TRACKERLIST}` | Si alguien pone un TRACKERLIST en una página wiki pública visible | trackerGram no controla el contenido de TikiWiki — es riesgo del admin de TikiWiki |
 | `list_items()` directo | Si algún futuro refactor toca trackerlib internas | Nunca implementar. Siempre API REST. |
@@ -255,6 +326,7 @@ trackerGram **ya cumple** con la regla de oro del informe de seguridad:
 - [ ] ¿La feature recibe input del usuario de Telegram? → Validar tipo + sanitizar
 - [ ] ¿La feature construye URLs de API con datos variables? → Usar `http_build_query()` o concatenación con valores validados
 - [ ] ¿La feature expone algún endpoint nuevo? → Revisar que no acepte `sort_mode`, `filterfield` sin validar
+- [ ] ¿La feature guarda texto de usuario en campos del tracker? → Aplicar `strip_tags()` antes de enviar
 
 ---
 

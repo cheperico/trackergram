@@ -505,6 +505,13 @@ if (isset($_GET['edit'])) {
             <span class="sep">|</span>
             <a href="?lang=en<?php echo $langQueryString; ?>" class="<?php echo $langCode === 'en' ? 'active' : ''; ?>" aria-label="<?php echo __('nav.lang_aria') . ' ' . __('nav.lang_name_en'); ?>">EN</a>
         </div>
+        <a href="https://github.com/cheperico/trackergram" target="_blank" class="nav-help" rel="noopener" aria-label="<?php echo __('nav.help_aria'); ?>" title="<?php echo __('nav.help'); ?>">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+        </a>
         <a href="?action=logout" aria-label="<?php echo __('nav.logout'); ?>"><?php echo __('nav.logout'); ?></a>
     </div>
 </nav>
@@ -1134,6 +1141,12 @@ foreach ($detections as $det) {
 </div>
 
 </div><!-- /container -->
+
+<!-- Footer -->
+<footer class="admin-footer">
+    <span>trackerGram <?php echo TRACKERGRAM_VERSION; ?> &middot;</span>
+    <a href="https://github.com/cheperico/trackergram" target="_blank" rel="noopener" aria-label="<?php echo __('nav.help_aria'); ?>"><?php echo __('nav.help'); ?></a>
+</footer>
 
 <script src="admin.js"></script>
 </body>

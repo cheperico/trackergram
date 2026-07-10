@@ -541,6 +541,7 @@ ASYNC_PROCESSING=false
 - **No duplicar lógica de parsing entre webhook e import** — Ambos convergen en `MessageMapper::toWikiFields()` vía `NormalizedMessage`. Webhook usa `fromWebhook()`, import usa `fromExport()`.
 - **No depender del modo legado** — El modo legacy (constantes en `.env`) fue eliminado. Todas las conexiones se configuran desde el panel admin y se persisten en `setup.json`. `api.php` rechaza con 403 si no hay conexión en `setup.json`.
 - **No usar `htmlspecialchars()` en `toWikiFields()`** — Los datos se envían a la API de TikiWiki via `http_build_query()` (form-urlencoded). Aplicar `htmlspecialchars()` convierte `"` en `&quot;` y esos HTML entities se guardan LITERALMENTE en el tracker. El escape HTML es responsabilidad de la capa de vista (Smarty), no de la API.
+- **Siempre aplicar `strip_tags()` a texto de usuario antes de enviarlo a TikiWiki** — Los mensajes de Telegram son texto plano (el formato viaja como `entities[]`, no como HTML). `strip_tags()` elimina cualquier etiqueta HTML (`<script>`, `<img onerror=...>`, etc.) que un usuario malintencionado pueda escribir. No hay pérdida de información legítima porque Telegram **nunca envía HTML como formato**. Esto aplica a: `Text`, `MediaCaption`, `DisplayName`, `FirstName`, `LastName`, `ChatTitle`, `TopicTitle`, `Username`, `Reactions`. No aplicar a campos numéricos (`Location`, `MediaSize`, etc.). Ver `design/999-a-tener-en-cuenta.md §5`.
 
 ### Telegram
 

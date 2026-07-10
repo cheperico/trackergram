@@ -625,41 +625,42 @@ class MessageMapper
     /**
      * Transformar NormalizedMessage a campos para TikiWiki API
      * Devuelve array fields[permName] listo para http_build_query
+     *
+     * Los mensajes de Telegram son texto plano (el formato viaja como entities[]).
+     * strip_tags() elimina cualquier etiqueta HTML sin perder información legítima.
+     * No usar htmlspecialchars() — http_build_query URL-encodea automáticamente,
+     * y htmlspecialchars() guardaría &quot; literalmente en el tracker.
      */
     public function toWikiFields(NormalizedMessage $msg): array
     {
         $p = $this->fieldPrefix;
 
-        // NOTA: NO usar htmlspecialchars() aquí. Los datos se envían via form-urlencoded
-        // (http_build_query los URL-encodea automáticamente). TikiWiki almacena el valor
-        // decodificado y la capa de vista (Smarty) se encarga del escape HTML al mostrar.
-        // Si aplicamos htmlspecialchars(), las comillas se guardan literalmente como &quot;.
         $fields = [
             "fields[{$p}TelegramMessageId]" => $msg->messageId,
             "fields[{$p}ChatId]" => $msg->chatId,
-            "fields[{$p}ChatTitle]" => $msg->chatTitle,
+            "fields[{$p}ChatTitle]" => strip_tags($msg->chatTitle),
             "fields[{$p}TopicId]" => $msg->topicId,
-            "fields[{$p}TopicTitle]" => $msg->topicTitle,
+            "fields[{$p}TopicTitle]" => strip_tags($msg->topicTitle),
             "fields[{$p}UserId]" => $msg->userId,
-            "fields[{$p}Username]" => $msg->username,
-            "fields[{$p}FirstName]" => $msg->firstName,
-            "fields[{$p}LastName]" => $msg->lastName,
-            "fields[{$p}DisplayName]" => $msg->displayName,
+            "fields[{$p}Username]" => strip_tags($msg->username),
+            "fields[{$p}FirstName]" => strip_tags($msg->firstName),
+            "fields[{$p}LastName]" => strip_tags($msg->lastName),
+            "fields[{$p}DisplayName]" => strip_tags($msg->displayName),
             "fields[{$p}MessageType]" => $msg->messageType,
-            "fields[{$p}Text]" => $msg->text,
+            "fields[{$p}Text]" => strip_tags($msg->text),
             "fields[{$p}Location]" => $msg->location,
             "fields[{$p}MediaType]" => $msg->mediaType,
             "fields[{$p}MediaSize]" => $msg->mediaSize,
             "fields[{$p}MediaWidth]" => $msg->width,
             "fields[{$p}MediaHeight]" => $msg->height,
             "fields[{$p}MediaDuration]" => $msg->duration,
-            "fields[{$p}MediaCaption]" => $msg->mediaCaption,
+            "fields[{$p}MediaCaption]" => strip_tags($msg->mediaCaption),
             "fields[{$p}MessageDate]" => $msg->date,
             "fields[{$p}MediaGroupId]" => $msg->mediaGroupId,
             "fields[{$p}EditedDate]" => $msg->editedDate,
-            "fields[{$p}ReplyToId]" => $msg->replyToId,
-            "fields[{$p}Reactions]" => $msg->reactions,
-            "fields[{$p}Hashtags]" => $msg->hashtags,
+            "fields[{$p}ReplyToId]" => strip_tags($msg->replyToId),
+            "fields[{$p}Reactions]" => strip_tags($msg->reactions),
+            "fields[{$p}Hashtags]" => strip_tags($msg->hashtags),
             "fields[{$p}FileUniqueId]" => $msg->fileUniqueId,
         ];
 
@@ -685,11 +686,11 @@ class MessageMapper
     {
         $p = $this->fieldPrefix;
         $fields = [
-            "fields[{$p}Text]" => $msg->text,
+            "fields[{$p}Text]" => strip_tags($msg->text),
             "fields[{$p}EditedDate]" => $msg->editedDate,
         ];
         if ($msg->reactions !== '') {
-            $fields["fields[{$p}Reactions]"] = $msg->reactions;
+            $fields["fields[{$p}Reactions]"] = strip_tags($msg->reactions);
         }
         return $fields;
     }

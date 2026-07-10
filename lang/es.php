@@ -10,6 +10,8 @@ return [
     'nav.brand'              => 'trackerGram',
     'nav.admin'              => 'Admin',
     'nav.logout'             => 'Cerrar sesion',
+    'nav.help'               => 'Documentación',
+    'nav.help_aria'          => 'Abrir documentación de trackerGram',
     'nav.home_aria'          => 'Volver al inicio (pestaña Webhook)',
     'nav.logout_aria'        => 'Cerrar sesión de administrador',
     'nav.lang_es'            => 'ES',
@@ -17,7 +19,7 @@ return [
     'nav.lang_aria'          => 'Cambiar idioma a',
     'nav.lang_name_es'       => 'Español',
     'nav.lang_name_en'       => 'Inglés',
-    'nav.lang_tooltip'       => 'Idioma',
+    'admin.title' => 'Panel de Administración',
 
     // ── Tabs ──
     'tabs.aria'              => 'Secciones de administración',

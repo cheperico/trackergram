@@ -152,7 +152,22 @@ Items del code review que ya estaban implementados en sesiones previas (verifica
 - **WebhookHandler::gcDedupLocks()**: Nueva función de GC probabilístico (~1% por `processUpdate()`) que limpia archivos `*.lock` en `TEMP_DIR/dedup_locks/` con más de 1 hora de antigüedad. Si PHP crashea entre la creación del lock file y su `unlink()`, el archivo queda huérfano. Este GC evita su acumulación.
 - **WebhookHandler::processUpdate()**: Llama a `gcDedupLocks()` junto con `gcAlbumBuffer()`.
 
+### 🔒 XSS prevention: strip_tags() en campos texto de usuario
+- **MessageMapper::toWikiFields()**: Aplicado `strip_tags()` a todos los campos texto de usuario que van a TikiWiki: `ChatTitle`, `TopicTitle`, `Username`, `FirstName`, `LastName`, `DisplayName`, `Text`, `MediaCaption`, `ReplyToId`, `Reactions`, `Hashtags`.
+- **MessageMapper::toWikiFieldsEdit()**: Aplicado `strip_tags()` a `Text` y `Reactions`.
+- **AGENTS.md**: Nueva regla "Siempre aplicar `strip_tags()` a texto de usuario antes de enviarlo a TikiWiki".
+- **design/999-a-tener-en-cuenta.md**: Actualizado §5 sobre inyección de código vía valores de campos.
+
+### 🌐 Admin UI: Help icon + footer
+- **admin.php**: Agregado icono de ayuda (❓) en navbar que enlaza a GitHub.
+- **admin.php**: Agregado footer con versión de trackerGram y link a GitHub.
+- **admin.css**: Estilos para `.nav-help`, `.admin-header`, `.admin-title`, `.admin-footer`.
+- **lang/en.php**: Agregadas claves `nav.help`, `nav.help_aria`, `admin.title`.
+- **lang/es.php**: Agregadas claves `nav.help`, `nav.help_aria`, `admin.title`.
+
 ---
+
+## v0.5.14
 
 ## v0.5.14
 

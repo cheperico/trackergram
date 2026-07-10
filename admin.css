@@ -56,6 +56,9 @@ input:focus, select:focus, textarea:focus {
 .navbar { background: var(--primary); color: white; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 56px; box-shadow: var(--shadow-lg); position: sticky; top: 0; z-index: 100; }
 .navbar-actions { display: flex; align-items: center; gap: 12px; }
 .navbar a { color: white; text-decoration: none; font-size: 0.9em; padding: 6px 12px; border-radius: 6px; transition: background 0.2s; }
+.nav-help { display: inline-flex; align-items: center; padding: 6px 8px !important; border-radius: 50% !important; opacity: 0.7; }
+.nav-help:hover { opacity: 1; background: rgba(255,255,255,0.12); }
+.nav-help:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .navbar a:hover { background: rgba(255,255,255,0.15); }
 .navbar a:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 /* navbar-brand debe ir DESPUÉS de .navbar a para no ser pisado (misma especificidad) */
@@ -87,6 +90,9 @@ a.navbar-brand span { opacity: 0.85; font-weight: 400; }
 
 /* Section cards */
 .section { background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 20px; overflow: hidden; border: 1px solid var(--border); }
+.admin-header { padding: 20px 0 12px 0; }
+.admin-title { font-size: 1.6em; font-weight: 700; color: var(--text); margin: 0; }
+
 .section-header { padding: 16px 20px; font-weight: 600; font-size: 1.05em; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
 .section-content { padding: 20px; }
 
@@ -134,6 +140,11 @@ select:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
 .btn-warning { background: #f39c12; color: white; }
 .btn-warning:hover { background: #d68910; }
 .btn-warning:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+.admin-footer { text-align: center; padding: 24px 0 12px 0; font-size: 0.8em; color: var(--text-secondary); }
+.admin-footer a { color: var(--primary); text-decoration: none; }
+.admin-footer a:hover { text-decoration: underline; }
+.admin-footer a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
 
 .icon-btn { padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 0.9em; transition: background 0.2s; }
 .icon-btn:hover { background: #e4e6e9; }
