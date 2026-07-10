@@ -1418,6 +1418,10 @@ document.addEventListener('DOMContentLoaded', () => {
   $('h-back').addEventListener('click', () => {
     switchView(STATE.currentView === 'help' ? 'dashboard' : STATE.currentView);
   });
+  $('h-readme').addEventListener('click', e => {
+    e.preventDefault();
+    window.open('https://github.com/cheperico/trackergram/blob/main/tikipickit/README.md', '_blank');
+  });
   $('btn-settings').addEventListener('click', showSettings);
   $('s-test').addEventListener('click', testConnectionHandler);
   $('s-save').addEventListener('click', saveSettings);
