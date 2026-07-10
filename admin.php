@@ -497,22 +497,6 @@ if (isset($_GET['edit'])) {
 <!-- Navbar -->
 <nav class="navbar" aria-label="<?php echo __('nav.aria'); ?>">
     <a href="admin.php" class="navbar-brand" aria-label="<?php echo __('nav.home_aria'); ?>">
-        <svg width="22" height="22" viewBox="0 0 120 120" style="margin-right:6px;vertical-align:middle;flex-shrink:0;" aria-hidden="true">
-            <rect width="120" height="120" rx="24" fill="rgba(255,255,255,0.2)"/>
-            <g fill="none" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M 30 72 L 46 44 L 30 72 L 56 62 L 30 72 L 42 82 L 46 44"/>
-            </g>
-            <g fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="6" stroke-linecap="round">
-                <line x1="62" y1="56" x2="82" y2="56"/>
-                <polyline points="76,50 82,56 76,62" fill="rgba(255,255,255,0.6)" stroke="none"/>
-            </g>
-            <g fill="none" stroke="white" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="82" y="42" width="28" height="28" rx="5"/>
-                <line x1="82" y1="52" x2="110" y2="52"/>
-                <line x1="82" y1="62" x2="110" y2="62"/>
-                <line x1="96" y1="42" x2="96" y2="70"/>
-            </g>
-        </svg>
         trackerGram <span>Admin <span style="font-weight:400;font-size:0.65em;opacity:0.6;margin-left:4px;"><?php echo TRACKERGRAM_VERSION; ?></span></span>
     </a>
     <div class="navbar-actions">
