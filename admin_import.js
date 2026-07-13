@@ -144,7 +144,9 @@ function startImport() {
         
         var lines = [
             'Mensajes importados: ' + result.imported,
-            'Errores: ' + result.skipped,
+            'Actualizados (edit): ' + result.updated,
+            'Saltados (ya existian): ' + result.skipped,
+            'Fallados: ' + result.failed,
             'Archivos subidos: ' + result.media_processed,
             'Topics encontrados: ' + result.topics
         ];
@@ -173,7 +175,7 @@ function startImport() {
 function processChunks(extractId, total, chatTitle, topicsFound) {
     var offset = 0;
     var batchSize = 10;
-    var accumulated = { imported: 0, skipped: 0, media_processed: 0, topics: topicsFound || 0 };
+    var accumulated = { imported: 0, updated: 0, skipped: 0, failed: 0, media_processed: 0, topics: topicsFound || 0 };
     
     function nextChunk() {
         return new Promise(function(resolve, reject) {
@@ -216,7 +218,9 @@ function processChunks(extractId, total, chatTitle, topicsFound) {
                 if (result.error) throw new Error(result.error);
                 
                 accumulated.imported += result.imported || 0;
+                accumulated.updated += result.updated || 0;
                 accumulated.skipped += result.skipped || 0;
+                accumulated.failed += result.failed || 0;
                 accumulated.media_processed += result.media_processed || 0;
                 offset = result.offset || offset;
                 
