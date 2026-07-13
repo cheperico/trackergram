@@ -687,6 +687,7 @@ class TikiWikiClient
             . "?filter[fields][{$prefix}TelegramMessageId]=" . urlencode((string) $messageId)
             . "&filter[fields][{$prefix}ChatId]=" . urlencode((string) $chatId)
             . "&maxRecords=1";
+        log_message("TikiWikiClient findItemByMessageId URL (sin token): {$url}");
 
         for ($attempt = 0; $attempt < RETRY_MAX_ATTEMPTS; $attempt++) {
             $ch = $this->createCurlHandle();
