@@ -2,7 +2,7 @@
 /**
  * trackerGram - Panel de Administración
  * 
- * Tres pestañas: Webhook (CRUD de conexiones), Importar (backfill ZIP) y Crear Tracker
+ * Tres pestañas: Webhook (CRUD de conexiones), Importar (ZIP) y Crear Tracker
  * Cada conexión vincula un bot de Telegram con un tracker de TikiWiki.
  */
 

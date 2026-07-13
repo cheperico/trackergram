@@ -137,8 +137,8 @@ return [
     'detected.times'         => 'veces',
 
     // ── Import tab ──
-    'import.title'           => 'Importar conversaciones (backfill)',
-    'import.description'     => 'Importa un archivo ZIP exportado de Telegram para poblar un tracker con mensajes anteriores a la llegada del bot.',
+    'import.title'           => 'Importar conversaciones',
+    'import.description'     => 'Importa un archivo ZIP exportado de Telegram para poblar un tracker.',
     'import.connection_label' => 'Usar conexion existente (opcional)',
     'import.connection_default' => '— Ingresar manual —',
     'import.tiki_url'        => 'Tiki API URL',

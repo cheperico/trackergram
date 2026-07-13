@@ -138,8 +138,8 @@ return [
     'detected.times'         => 'times',
 
     // ── Import tab ──
-    'import.title'           => 'Import conversations (backfill)',
-    'import.description'     => 'Import a ZIP file exported from Telegram to populate a tracker with messages from before the bot joined.',
+    'import.title'           => 'Import conversations',
+    'import.description'     => 'Import a ZIP file exported from Telegram to populate a tracker.',
     'import.connection_label' => 'Use existing connection (optional)',
     'import.connection_default' => '— Enter manually —',
     'import.tiki_url'        => 'Tiki API URL',

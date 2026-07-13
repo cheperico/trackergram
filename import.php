@@ -827,7 +827,7 @@ function handleProcess(): void
                         ?? '';
                     if ($storedEdited !== $edited) {
                         $shouldUpdate = true;
-                        log_message("trackerGram import: message_id={$messageIdInt} editado ({$storedEdited} → {$edited}), actualizando");
+                        log_message("trackerGram import: message_id={$messageIdStr} editado ({$storedEdited} → {$edited}), actualizando");
                     }
                 }
             }
@@ -848,7 +848,7 @@ function handleProcess(): void
                         ?? '';
                     if ($storedType === 'other' && str_contains($storedText, 'no capturada en tiempo real')) {
                         $shouldUpdate = true;
-                        log_message("trackerGram import: poll message_id={$messageIdInt} enriquecido con datos del export");
+                        log_message("trackerGram import: poll message_id={$messageIdStr} enriquecido con datos del export");
                     }
                 }
             }
@@ -870,7 +870,7 @@ function handleProcess(): void
                     if (!empty($fillFields)) {
                         if ($activeTikiClient->updateTrackerItem((int) $trackerId, $existingItemId, $fillFields)) {
                             $updated++;
-                            log_message("trackerGram import: message_id={$messageIdInt} campos rellenados: " . implode(', ', array_keys($fillFields)));
+                            log_message("trackerGram import: message_id={$messageIdStr} campos rellenados: " . implode(', ', array_keys($fillFields)));
                         } else {
                             $failed++;
                         }
@@ -1343,7 +1343,7 @@ function handleFull(): void
                         ?? '';
                     if ($storedEdited !== $edited) {
                         $shouldUpdate = true;
-                        log_message("trackerGram import: message_id={$messageIdInt} editado ({$storedEdited} → {$edited}), actualizando");
+                        log_message("trackerGram import: message_id={$messageIdStr} editado ({$storedEdited} → {$edited}), actualizando");
                     }
                 }
             }
@@ -1363,7 +1363,7 @@ function handleFull(): void
                         ?? '';
                     if ($storedType === 'other' && str_contains($storedText, 'no capturada en tiempo real')) {
                         $shouldUpdate = true;
-                        log_message("trackerGram import: poll message_id={$messageIdInt} enriquecido con datos del export");
+                        log_message("trackerGram import: poll message_id={$messageIdStr} enriquecido con datos del export");
                     }
                 }
             }
@@ -1385,7 +1385,7 @@ function handleFull(): void
                     if (!empty($fillFields)) {
                         if ($activeTikiClient->updateTrackerItem((int) $trackerId, $existingItemId, $fillFields)) {
                             $updated++;
-                            log_message("trackerGram import: message_id={$messageIdInt} campos rellenados: " . implode(', ', array_keys($fillFields)));
+                            log_message("trackerGram import: message_id={$messageIdStr} campos rellenados: " . implode(', ', array_keys($fillFields)));
                         } else {
                             $failed++;
                         }
