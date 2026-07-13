@@ -102,7 +102,9 @@
 
 ### 🔴 Fase 1: Lo que más duele ahora (días)
 
-*(Todos los items de Fase 1 completados ✅)*
+| # | Item | Esfuerzo | Estado |
+|---|------|----------|--------|
+| 1 | **BUG-007 — Topic chaining roto en import** | 1 sesión | ⏳ Pendiente — Ver BUG-007 en Bugs Conocidos más abajo. |
 
 ### 🟡 Fase 2: Robustez (1-2 semanas)
 
@@ -218,6 +220,7 @@ Items que no justifican implementación hoy pero se documentan por si el context
 | BUG-004 | **Hashtags corruptos con emojis** — `extractHashtags()` usa `substr()` con offset UTF-16 de Telegram. Si hay emojis antes del hashtag, el offset se desalinea y extrae texto corrupto. Código: MessageMapper.php:43. Code Review: Data Flow #1. | ✅ Fix listo para implementar (F3-1). |
 | BUG-005 | **Race condition en álbumes** — `loadMediaGroupCaptions()` suelta `LOCK_SH` antes de que `saveMediaGroupCaptions()` adquiera `LOCK_EX`. Álbumes de 5+ fotos pierden captions. Código: WebhookHandler.php:769-788. Code Review: Data Flow #3. | ✅ **Resuelto** — `withMediaGroupCaptionsLock()` usa `fopen('c+')` + `flock(LOCK_EX)` sostenido para todo el ciclo read-modify-write. |
 | BUG-006 | **Race condition en topics** — `getTopicName()` sin lock de lectura; escrituras con TOCTOU. Mismo bug que BUG-005. Código: WebhookHandler.php:47-53,253,305,311. Code Review: Data Flow #4. | ✅ **Resuelto** — `withTopicNamesLock()` usa `fopen('c+')` + `flock(LOCK_EX)` sostenido. |
+| **BUG-007** 🔴 | **Topic chaining roto en import** — Cuando un mensaje en un topic/foro responde a OTRO mensaje (no al topic_creation), su `topicId` queda vacío porque `reply_to_message_id` apunta al mensaje respondido, no al topic_creation. El export de Telegram Desktop **no incluye `message_thread_id`** (a diferencia de la Bot API). Fix: construir `messageTopicMap` por orden cronológico en `handleExtract()` (rastrear current topic state) y usarlo en `handleProcess()`/`handleFull()` en vez de depender de `reply_to_message_id`. | 🔴 **Pendiente — alta prioridad** |
 
 ## Cosas que NO vamos a hacer (por ahora)
 

@@ -426,7 +426,9 @@ El `result.json` tiene una estructura diferente al webhook:
 | Usuario | `from.id`, `from.first_name` | `from` (string), `from_id` (string) |
 | Fecha | `date` (timestamp) | `date` (string ISO) |
 | Archivos | `file_id` (referencia) | `photo`, `file` (nombres de archivo) |
-| Topics | `message_thread_id` | `reply_to_message_id` → buscar en `topic_created` |
+| Topics | `message_thread_id` | `reply_to_message_id` → buscar en `topic_created` ⚠️ |
+
+> **⚠️ BUG-007 (alta prioridad)**: En el import, `reply_to_message_id` apunta al mensaje respondido, no al topic_creation. Si un mensaje responde a OTRO mensaje dentro del topic (no al topic_creation directamente), su `topicId` queda vacío. Fix pendiente: construir `messageTopicMap` por orden cronológico en `handleExtract()`.
 
 ### Cómo resolvimos las diferencias
 
