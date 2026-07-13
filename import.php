@@ -327,7 +327,7 @@ function handleExtract(): void
     $rawId = $data['id'] ?? 0;
     $chatType = $data['type'] ?? '';
     $chatId = rawChatIdToFinal($rawId, $chatType);
-    log_message("trackerGram import extract: rawId={$rawId}, chatType='{$chatType}', chatId calculado='{$chatId}'");
+    log_message("trackerGram import extract: rawId={$rawId}, chatType='{$chatType}', chatId='{$chatId}'");
 
     // ── Detectar migración grupo→supergrupo en el export ──
     // Cuando un grupo básico migra, el chat_id cambia. El root id del export
@@ -791,7 +791,7 @@ function handleProcess(): void
 
         if ($existingItemId === null && $messageIdInt !== 0 && !empty($oldChatId)) {
             $oldChatIdInt = (int) $oldChatId;
-            log_message("trackerGram import dedup: buscando con oldChatId={$oldChatIdInt}");
+            log_message("trackerGram import dedup: retry con oldChatId={$oldChatIdInt}");
             $existingItemId = $activeTikiClient->findItemByMessageId((int) $trackerId, $messageIdInt, $oldChatIdInt);
             if ($existingItemId !== null) {
                 log_message("trackerGram import: message_id={$messageIdInt} encontrado bajo el chat_id antiguo {$oldChatId} (migrado) — itemId={$existingItemId}");
