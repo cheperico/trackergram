@@ -579,6 +579,25 @@ function handleProcess(): void
     }
     $activeTikiClient = $localTikiClient;
 
+    // ── Construir mapa dedup desde TODOS los items del tracker ──
+    // La API de TikiWiki NO soporta filter[fields], así que no podemos
+    // buscar por (chat_id, message_id) vía API. En vez de eso, obtenemos
+    // todos los items y construimos un mapa en memoria.
+    $dedupMap = []; // "chatId:messageId" => itemId
+    $allItems = $activeTikiClient->getAllTrackerItems((int) $trackerId);
+    foreach ($allItems as $item) {
+        $iChatId = $item['field_' . $fieldPrefix . 'ChatId']
+            ?? $item['fields'][$fieldPrefix . 'ChatId']
+            ?? '';
+        $iMsgId = $item['field_' . $fieldPrefix . 'TelegramMessageId']
+            ?? $item['fields'][$fieldPrefix . 'TelegramMessageId']
+            ?? '';
+        if ($iChatId !== '' && $iMsgId !== '') {
+            $dedupMap[$iChatId . ':' . $iMsgId] = $item['itemId'] ?? null;
+        }
+    }
+    log_message("trackerGram import dedup: mapa construido con " . count($dedupMap) . " entradas para tracker {$trackerId}");
+
     // Cargar file index
     $fileIndexPath = $tempDir . '/fileindex.json';
     $fileIndex = [];
@@ -777,24 +796,22 @@ function handleProcess(): void
 
         $fields = $messageMapper->toWikiFields($normalized);
 
-        // ── Deduplicación (chunked batch): ¿ya existe este mensaje? ──
-        // Soportamos IDs negativos (mensajes pre-migración grupo→supergrupo)
-        $messageIdInt = (int) $normalized->messageId;
-        $dedupChatId = (int) $chatId;
-        log_message("trackerGram import dedup: buscando message_id={$messageIdInt}, chat_id={$dedupChatId} en tracker={$trackerId}");
-        $existingItemId = ($messageIdInt !== 0)
-            ? $activeTikiClient->findItemByMessageId((int) $trackerId, $messageIdInt, $dedupChatId)
+        // ── Deduplicación: ¿ya existe este mensaje? ──
+        // Usamos el mapa en memoria $dedupMap (construido al inicio del batch)
+        // porque la API de TikiWiki NO soporta filter[fields] en GET /api/trackers/{id}.
+        $messageIdStr = $normalized->messageId;
+        $chatIdStr = (string) $chatId;
+        $dedupKey = $chatIdStr . ':' . $messageIdStr;
+        $existingItemId = ($messageIdStr !== '' && $messageIdStr !== '0')
+            ? ($dedupMap[$dedupKey] ?? null)
             : null;
-        if ($existingItemId !== null) {
-            log_message("trackerGram import dedup: ENCONTRADO itemId={$existingItemId} para message_id={$messageIdInt}");
-        }
+        log_message("trackerGram import dedup: key='{$dedupKey}' → " . ($existingItemId ? "itemId={$existingItemId}" : "no encontrado"));
 
-        if ($existingItemId === null && $messageIdInt !== 0 && !empty($oldChatId)) {
-            $oldChatIdInt = (int) $oldChatId;
-            log_message("trackerGram import dedup: retry con oldChatId={$oldChatIdInt}");
-            $existingItemId = $activeTikiClient->findItemByMessageId((int) $trackerId, $messageIdInt, $oldChatIdInt);
+        if ($existingItemId === null && $messageIdStr !== '' && $messageIdStr !== '0' && !empty($oldChatId)) {
+            $oldKey = (string) $oldChatId . ':' . $messageIdStr;
+            $existingItemId = $dedupMap[$oldKey] ?? null;
             if ($existingItemId !== null) {
-                log_message("trackerGram import: message_id={$messageIdInt} encontrado bajo el chat_id antiguo {$oldChatId} (migrado) — itemId={$existingItemId}");
+                log_message("trackerGram import: message_id={$messageIdStr} encontrado bajo el chat_id antiguo {$oldChatId} (migrado) — itemId={$existingItemId}");
             }
         }
 
@@ -1115,6 +1132,21 @@ function handleFull(): void
         }
     }
 
+    // ── Mapa dedup en memoria (same as handleProcess) ──
+    $dedupMap = [];
+    $allItems = $activeTikiClient->getAllTrackerItems((int) $trackerId);
+    foreach ($allItems as $item) {
+        $iChatId = $item['field_' . $fieldPrefix . 'ChatId']
+            ?? $item['fields'][$fieldPrefix . 'ChatId']
+            ?? '';
+        $iMsgId = $item['field_' . $fieldPrefix . 'TelegramMessageId']
+            ?? $item['fields'][$fieldPrefix . 'TelegramMessageId']
+            ?? '';
+        if ($iChatId !== '' && $iMsgId !== '') {
+            $dedupMap[$iChatId . ':' . $iMsgId] = $item['itemId'] ?? null;
+        }
+    }
+
     $galleryId = $activeTikiClient->getMediaGalleryId((int) $trackerId);
     if ($galleryId === null) {
         log_message("trackerGram import (full): NO HAY galleryId para tracker {$trackerId} — no se subirán archivos", true);
@@ -1284,16 +1316,18 @@ function handleFull(): void
         $fields = $messageMapper->toWikiFields($normalized);
 
         // ── Deduplicación (full import): ¿ya existe este mensaje? ──
-        // Soportamos IDs negativos (mensajes pre-migración grupo→supergrupo)
-        $messageIdInt = (int) $normalized->messageId;
-        $existingItemId = ($messageIdInt !== 0)
-            ? $activeTikiClient->findItemByMessageId((int) $trackerId, $messageIdInt, (int) $chatId)
+        $messageIdStr = $normalized->messageId;
+        $chatIdStr = (string) $chatId;
+        $dedupKey = $chatIdStr . ':' . $messageIdStr;
+        $existingItemId = ($messageIdStr !== '' && $messageIdStr !== '0')
+            ? ($dedupMap[$dedupKey] ?? null)
             : null;
 
-        if ($existingItemId === null && $messageIdInt !== 0 && !empty($oldChatId)) {
-            $existingItemId = $activeTikiClient->findItemByMessageId((int) $trackerId, $messageIdInt, (int) $oldChatId);
+        if ($existingItemId === null && $messageIdStr !== '' && $messageIdStr !== '0' && !empty($oldChatId)) {
+            $oldKey = (string) $oldChatId . ':' . $messageIdStr;
+            $existingItemId = $dedupMap[$oldKey] ?? null;
             if ($existingItemId !== null) {
-                log_message("trackerGram import (full): message_id={$messageIdInt} encontrado bajo el chat_id antiguo {$oldChatId} (migrado) — itemId={$existingItemId}");
+                log_message("trackerGram import (full): message_id={$messageIdStr} encontrado bajo el chat_id antiguo {$oldChatId} (migrado) — itemId={$existingItemId}");
             }
         }
 

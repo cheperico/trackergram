@@ -734,6 +734,55 @@ class TikiWikiClient
     }
 
     /**
+     * Obtener TODOS los items del tracker (sin filtros).
+     * Usa la ruta GET /api/trackers/{id} (correcta, sin /items).
+     * La API devuelve clave 'result' (no 'data').
+     * @param int $trackerId ID del tracker
+     * @return array Lista de items, cada uno con itemId y fields
+     */
+    public function getAllTrackerItems(int $trackerId): array
+    {
+        $url = $this->apiUrl . "trackers/" . $trackerId . "?maxRecords=-1";
+
+        for ($attempt = 0; $attempt < RETRY_MAX_ATTEMPTS; $attempt++) {
+            $ch = $this->createCurlHandle();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Authorization: Bearer " . $this->token,
+                "User-Agent: Mozilla/5.0"
+            ]);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            curl_close($ch);
+
+            if ($curlError || $httpCode >= 500) {
+                if ($attempt < RETRY_MAX_ATTEMPTS - 1) {
+                    usleep(RETRY_DELAY_MICROSECONDS * (1 << $attempt));
+                    log_message("TikiWikiClient: getAllTrackerItems retry {$attempt}" . ($curlError ? ": {$curlError}" : " HTTP {$httpCode}"));
+                }
+                continue;
+            }
+
+            if ($httpCode !== 200) {
+                return [];
+            }
+
+            $data = json_decode($response, true);
+            if (!is_array($data)) {
+                return [];
+            }
+
+            return $data['result'] ?? $data['data'] ?? [];
+        }
+
+        return [];
+    }
+
+    /**
      * Obtener un item completo del tracker por su itemId interno.
      * Devuelve el primer item del array 'data' con todos sus field values.
      * @param int $trackerId ID del tracker
@@ -742,7 +791,8 @@ class TikiWikiClient
      */
     public function getTrackerItem(int $trackerId, int $itemId): ?array
     {
-        $url = $this->apiUrl . "trackers/$trackerId/items?itemId=" . urlencode((string) $itemId) . "&maxRecords=1";
+        // Ruta correcta: GET /api/trackers/{trackerId}/items/{itemId} (route: trackeritems-view)
+        $url = $this->apiUrl . "trackers/$trackerId/items/$itemId";
 
         for ($attempt = 0; $attempt < RETRY_MAX_ATTEMPTS; $attempt++) {
             $ch = $this->createCurlHandle();
@@ -778,7 +828,8 @@ class TikiWikiClient
 
             $items = $data['data'] ?? $data['result'] ?? [];
             if (empty($items) || !is_array($items)) {
-                return null;
+                // endpoint /items/{itemId} devuelve el item directamente (no array)
+                return $data;
             }
 
             return reset($items);
