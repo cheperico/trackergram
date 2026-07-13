@@ -397,6 +397,12 @@ class MessageMapper
 
         $result = '';
         foreach ($text as $part) {
+            // Los exports de Telegram pueden tener strings planos mezclados
+            // con objetos entity en el array text.
+            if (is_string($part)) {
+                $result .= $part;
+                continue;
+            }
             $partText = $part['text'] ?? '';
             $partType = $part['type'] ?? 'plain';
 

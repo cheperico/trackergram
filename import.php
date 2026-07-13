@@ -14,12 +14,49 @@ error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE);
 ini_set('memory_limit', '1024M');
 set_time_limit(0);
 
+// Output buffering: captura cualquier output no deseado (whitespace, BOM)
+// para que no se mezcle con la respuesta JSON
+ob_start();
+
 session_start();
+
+/**
+ * Shutdown function: captura errores fatales que el error handler no puede atrapar
+ * (parse errors, undefined classes, out of memory, etc.)
+ * y devuelve JSON en vez del HTML de PHP.
+ */
+function shutdownJsonHandler(): void {
+    $error = error_get_last();
+    if ($error !== null && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR])) {
+        $msg = $error['message'] . ' in ' . $error['file'] . ':' . $error['line'];
+        log_message("import.php: FATAL ERROR — {$msg}", true);
+        // Limpiar cualquier salida previa (HTML parcial)
+        if (ob_get_level() > 0) {
+            ob_clean();
+        }
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['error' => 'Error interno del servidor', 'detail' => $msg]);
+        exit;
+    }
+}
+register_shutdown_function('shutdownJsonHandler');
 
 function handleError($errno, $errstr, $errfile, $errline) {
     log_message("import.php: ERROR $errno - $errstr in $errfile:$errline", true);
+
+    // Los warnings/notices no deberían matar el proceso — solo loguear y continuar
+    $fatalTypes = [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR, E_RECOVERABLE_ERROR];
+    if (!in_array($errno, $fatalTypes, true)) {
+        return false; // dejar que PHP maneje el error según su configuración
+    }
+
+    if (ob_get_level() > 0) {
+        ob_clean();
+    }
     http_response_code(500);
-    echo json_encode(['error' => 'Error interno del servidor']);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['error' => 'Error interno del servidor', 'detail' => "[$errno] $errstr in $errfile:$errline"]);
     exit;
 }
 set_error_handler('handleError');
@@ -56,6 +93,9 @@ if (!isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $cs
 
 require_once 'bootstrap.php';
 
+// Asegurar Content-Type JSON para toda la respuesta
+header('Content-Type: application/json; charset=utf-8');
+
 /**
  * Convertir raw chat_id del export de Telegram al formato final de trackerGram.
  * Supergrupos/channels: prependea -100.
@@ -64,7 +104,8 @@ require_once 'bootstrap.php';
 function rawChatIdToFinal(int|string $rawId, string $chatType): string
 {
     $id = (int) $rawId;
-    if (in_array($chatType, ['private_supergroup', 'private_channel']) && $id > 0) {
+    // Supergrupos y channels (públicos o privados) siempre tienen -100 en Bot API
+    if ($id > 0 && (str_ends_with($chatType, 'supergroup') || str_ends_with($chatType, 'channel'))) {
         return '-100' . $id;
     }
     return (string) $id;
@@ -89,6 +130,23 @@ if ($mode === 'process') {
 }
 
 // ──────────────────────────────────────────────
+// MODO CANCEL: Cancelar importación y limpiar
+// ──────────────────────────────────────────────
+if ($mode === 'cancel') {
+    $extractId = $_POST['extract_id'] ?? '';
+    if ($extractId && preg_match('/^trackergram_import_\d+$/', $extractId)) {
+        $tempDir = TEMP_DIR . '/' . $extractId;
+        if (is_dir($tempDir)) {
+            rrmdir($tempDir);
+        }
+        unset($_SESSION['import_creds_' . $extractId]);
+    }
+    if (ob_get_level() > 0) { ob_clean(); }
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+// ──────────────────────────────────────────────
 // MODO FULL (legacy): Una sola request
 // ──────────────────────────────────────────────
 handleFull();
@@ -103,6 +161,7 @@ exit;
  */
 function handleExtract(): void
 {
+    session_write_close(); // libera lock para que cancel pueda ejecutarse
     $messageMapper = new MessageMapper();
 
     // Credenciales Tiki desde el formulario (multi-conexión)
@@ -427,6 +486,7 @@ function handleExtract(): void
 
     log_message("trackerGram import: Extract OK — {$totalMessages} mensajes, " . count($fileIndex) . " archivos");
 
+    if (ob_get_level() > 0) { ob_clean(); }
     echo json_encode([
         'status' => 'extracted',
         'total' => $totalMessages,
@@ -441,6 +501,7 @@ function handleExtract(): void
  */
 function handleProcess(): void
 {
+    session_write_close(); // libera lock para que cancel pueda ejecutarse
     $messageMapper = new MessageMapper();
 
     $extractId = $_POST['extract_id'] ?? '';
@@ -601,8 +662,9 @@ function handleProcess(): void
                 }
             }
             if ($hasOwnCaption) {
-                if ($msg['photo_caption']) {
-                    $lastPhotoCaption = $msg['photo_caption'];
+                $photoCaption = $msg['photo_caption'] ?? '';
+                if ($photoCaption !== '') {
+                    $lastPhotoCaption = $photoCaption;
                 } elseif (is_string($msg['text'])) {
                     $lastPhotoCaption = $msg['text'];
                 } elseif (is_array($msg['text'])) {
@@ -802,6 +864,8 @@ function handleProcess(): void
                 $failed++;
             }
         }
+        // Contar este mensaje como procesado para respetar el batch size
+        $processed++;
     }
 
     // Determinar si hay más mensajes después de este batch
@@ -816,6 +880,7 @@ function handleProcess(): void
         unset($_SESSION['import_creds_' . $extractId]);
     }
 
+    if (ob_get_level() > 0) { ob_clean(); }
     echo json_encode([
         'success' => true,
         'imported' => $imported,
@@ -833,6 +898,7 @@ function handleProcess(): void
  */
 function handleFull(): void
 {
+    session_write_close(); // libera lock para que cancel pueda ejecutarse
     $messageMapper = new MessageMapper();
 
     // Credenciales Tiki desde el formulario (multi-conexión)
@@ -1096,8 +1162,9 @@ function handleFull(): void
                 }
             }
             if ($hasOwnCaption) {
-                if ($msg['photo_caption']) {
-                    $lastPhotoCaption = $msg['photo_caption'];
+                $photoCaption = $msg['photo_caption'] ?? '';
+                if ($photoCaption !== '') {
+                    $lastPhotoCaption = $photoCaption;
                 } elseif (is_string($msg['text'])) {
                     $lastPhotoCaption = $msg['text'];
                 } elseif (is_array($msg['text'])) {
@@ -1299,6 +1366,7 @@ function handleFull(): void
 
     rrmdir($tempDir);
 
+    if (ob_get_level() > 0) { ob_clean(); }
     echo json_encode([
         'success' => true,
         'imported' => $imported,

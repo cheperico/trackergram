@@ -997,8 +997,9 @@ foreach ($detections as $det) {
                 </div>
             </div>
             
-            <div style="margin-top:16px;">
-                <button type="button" class="btn btn-primary" onclick="startImport()" title="<?php echo __('import.button_title'); ?>"><?php echo __('import.button'); ?></button>
+            <div style="margin-top:16px; display:flex; gap:8px; align-items:center;">
+                <button type="button" id="import-start-btn" class="btn btn-primary" onclick="startImport()" title="<?php echo __('import.button_title'); ?>"><?php echo __('import.button'); ?></button>
+                <button type="button" id="import-cancel-btn" class="btn btn-danger" style="display:none;" onclick="cancelImport()" title="Cancelar importación">Cancelar</button>
             </div>
         </form>
         

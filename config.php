@@ -221,4 +221,3 @@ function resolveHostToIp(string $host): ?string
 
     return null;
 }
-?>
