@@ -161,7 +161,6 @@ exit;
  */
 function handleExtract(): void
 {
-    session_write_close(); // libera lock para que cancel pueda ejecutarse
     $messageMapper = new MessageMapper();
 
     // Credenciales Tiki desde el formulario (multi-conexión)
@@ -451,6 +450,7 @@ function handleExtract(): void
         'tiki_api_token' => $tikiApiToken ?: '',
         'field_prefix' => $fieldPrefix,
     ];
+    session_write_close(); // creds guardadas, liberar lock para cancel
 
     // Indexar archivos multimedia
     $fileIndex = [];
