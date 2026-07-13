@@ -827,8 +827,22 @@ class TikiWikiClient
             }
 
             $items = $data['data'] ?? $data['result'] ?? [];
+
             if (empty($items) || !is_array($items)) {
-                // endpoint /items/{itemId} devuelve el item directamente (no array)
+                // endpoint /items/{itemId} devuelve el item directamente (no array).
+                // El formato de action_view() tiene 'fields' como array indexado:
+                //   fields => [ [permName=>'xxx', value=>'yyy'], ... ]
+                // Lo normalizamos al mismo formato que action_list_items():
+                //   fields => [ permName => value, ... ]
+                if (isset($data['fields']) && is_array($data['fields'])) {
+                    $rekeyed = [];
+                    foreach ($data['fields'] as $f) {
+                        if (isset($f['permName'])) {
+                            $rekeyed[$f['permName']] = $f['value'] ?? '';
+                        }
+                    }
+                    $data['fields'] = $rekeyed;
+                }
                 return $data;
             }
 
