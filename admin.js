@@ -532,8 +532,8 @@ function fillConnectionSlug(selectEl, prefix) {
     var slug = selectEl.value;
     if (!slug) {
         // Limpiar campos si se volvió a "Ingresar manual"
-        var urlInput = document.getElementById(prefix + 'tiki_url');
-        var tokenInput = document.getElementById(prefix + 'tiki_token');
+        var urlInput = document.getElementById(prefix + 'tiki_api_url');
+        var tokenInput = document.getElementById(prefix + 'tiki_api_token');
         var trackerInput = document.getElementById(prefix + 'tracker_id');
         if (urlInput) urlInput.value = '';
         if (tokenInput) tokenInput.value = '';
@@ -555,8 +555,8 @@ function fillConnectionSlug(selectEl, prefix) {
     .then(function(conn) {
         if (conn.error) { alert(conn.error); return; }
         
-        var urlInput = document.getElementById(prefix + 'tiki_url');
-        var tokenInput = document.getElementById(prefix + 'tiki_token');
+        var urlInput = document.getElementById(prefix + 'tiki_api_url');
+        var tokenInput = document.getElementById(prefix + 'tiki_api_token');
         var trackerInput = document.getElementById(prefix + 'tracker_id');
         
         if (urlInput) urlInput.value = conn.tiki_api_url || '';

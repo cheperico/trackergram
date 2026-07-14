@@ -197,6 +197,25 @@ Items del code review que ya estaban implementados en sesiones previas (verifica
 #### 🟢 Fix #7: get_connection devuelve tokens completos vía AJAX
 - **admin.php**: Endpoint `get_connection` ahora agrega headers `Cache-Control: no-store` y `Pragma: no-cache` para evitar que tokens queden en cachés intermedias. Comentario de seguridad documentando el riesgo.
 
+---
+
+### 🏷️ Campos searchable/listable y orden default en creación de tracker
+
+#### 🆕 BUG-008 fix: ensureFieldVisibility()
+- **TikiWikiClient**: Nuevo método `ensureFieldVisibility()` que llama a `action_edit_field` post-creación para setear `isTblVisible`, `isSearchable`, `isPublic`, `visible_in_view/edit/history_mode`. `action_add_field` NO acepta estos parámetros (crea defaults = no visible). Se llama desde `createTracker()` y `synchronizeTrackerFields()`.
+- **TikiWikiClient::updateFgFieldOptions()**: Ahora también incluye flags de visibilidad (visible_in_view/edit/history=1, isTblVisible=1, isSearchable=0 para FG, isPublic=1).
+- **Para trackers existentes**: Editar manualmente cada campo en TikiWiki admin y poner visibilidad en "sí".
+
+#### 🆕 Campos searchable/listable por tipo
+- **TikiWikiClient::getTrackerFieldDefinitions()**: Cada campo ahora define si debe ser `searchable` (aparece en búsquedas) y/o `listable` (visible en listado). Configurados según preferencia del usuario:
+  - **Buscables**: ChatTitle, TopicTitle, DisplayName, Text, MediaCaption, MessageDate, Hashtags
+  - **Listables**: TelegramMessageId, ChatTitle, TopicTitle, DisplayName, Text, MediaCaption, Media (FG), Hashtags
+- **TikiWikiClient::ensureFieldVisibility()**: Ahora acepta `$searchable` y `$listable` booleanos. Los callers pasan los flags desde la definición del campo.
+- **admin.js / admin.php**: Fix de IDs de formulario (`import-tiki_url` → `import-tiki_api_url`, etc.) para que coincidan con los name attributes.
+
+#### 🆕 Orden default: más nuevo primero
+- **TikiWikiClient::createTrackerShell()**: Ahora envía `defaultOrderKey=-2` (ordenar por fecha de creación) y `defaultOrderDir=desc` (descendente, más nuevo primero) al crear el tracker.
+
 ## v0.6.0
 
 ### 🏗️ Desarme de admin.php — Fase B: Handlers externos + fixes post-revision

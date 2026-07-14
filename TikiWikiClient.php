@@ -955,7 +955,7 @@ class TikiWikiClient
             return false;
         }
 
-        // Actualizar las options del field
+        // Actualizar las options del field + visibilidad
         // IMPORTANTE: action_edit_field requiere 'name' en el POST, 
         // sin name el bloque de guardado se salta silenciosamente.
         // La respuesta HTTP 200 muestra options VIEJAS (bug de TikiWiki) - 
@@ -964,6 +964,12 @@ class TikiWikiClient
         $postData = http_build_query([
             'name' => $fieldName,
             'type' => 'FG',
+            'visible_in_view_mode' => 1,
+            'visible_in_edit_mode' => 1,
+            'visible_in_history_mode' => 1,
+            'isTblVisible' => 1,
+            'isSearchable' => 0,
+            'isPublic' => 1,
             'option[galleryId]' => $galleryId,
             'option[count]' => 0,
             'option[excessBehavior]' => $excessBehavior,
@@ -1380,6 +1386,13 @@ class TikiWikiClient
             }
         }
 
+        // 4b. Asegurar visibilidad de cada campo (action_add_field NO setea visibilidad)
+        //     El FG se saltea porque updateFgFieldOptions() ya incluye flags en el paso 5.
+        foreach ($fieldDefs as $fd) {
+            if ($fd['permName'] === $fgPermName) continue;
+            $this->ensureFieldVisibility($trackerId, $fd['permName'], !empty($fd['searchable']), !empty($fd['listable']));
+        }
+
         // 5. Si hay galería, actualizar options del campo FG y verificar
         if ($galleryId !== null) {
             if (! $this->updateFgFieldOptions($trackerId, $galleryId, 'discard', $fgPermName)) {
@@ -1404,6 +1417,8 @@ class TikiWikiClient
             'name' => $name,
             'description' => $description,
             'confirm' => 1,
+            'defaultOrderKey' => -2,  // -2 = ordenar por fecha de creación
+            'defaultOrderDir' => 'desc',  // más nuevo primero
         ];
         // Si hay fieldPrefix, enviarlo para que TikiWiki lo guarde en tiki_tracker_options
         // (nativo de TikiWiki — usado al auto-generar permNames de nuevos campos)
@@ -1442,6 +1457,71 @@ class TikiWikiClient
         }
 
         return null;
+    }
+
+    /**
+     * Asegura que un campo de tracker tenga visibilidad en vista/edición/historial.
+     * action_add_field NO acepta parámetros de visibilidad (crea con defaults = no visible).
+     * Hay que llamar a action_edit_field después de crear el campo para setearlos.
+     *
+     * @param int    $trackerId   ID del tracker
+     * @param string $permName    permName del campo a actualizar
+     * @param bool   $searchable  Si el campo debe aparecer en búsquedas (isSearchable)
+     * @param bool   $listable    Si el campo debe ser visible en listado (isTblVisible)
+     * @return bool true si se actualizó correctamente
+     */
+    private function ensureFieldVisibility(int $trackerId, string $permName, bool $searchable = false, bool $listable = false): bool
+    {
+        $fields = $this->loadTrackerFields($trackerId);
+        $fieldId = null;
+        $fieldName = null;
+        foreach ($fields as $field) {
+            if (($field['permName'] ?? '') === $permName) {
+                $fieldId = $field['fieldId'] ?? $field['id'] ?? null;
+                $fieldName = $field['name'] ?? $permName;
+                break;
+            }
+        }
+
+        if ($fieldId === null) {
+            log_message("TikiWikiClient: ensureFieldVisibility — no se encontró campo '{$permName}' en tracker {$trackerId}", true);
+            return false;
+        }
+
+        $url = $this->apiUrl . "trackers/{$trackerId}/fields/{$fieldId}";
+        $visibleFlags = http_build_query([
+            'name' => $fieldName,
+            'visible_in_view_mode' => 1,
+            'visible_in_edit_mode' => 1,
+            'visible_in_history_mode' => 1,
+            'isTblVisible' => $listable ? 1 : 0,
+            'isSearchable' => $searchable ? 1 : 0,
+            'isPublic' => 1,
+        ]);
+
+        $ch = $this->createCurlHandle();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $visibleFlags);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Authorization: Bearer " . $this->token,
+            "Content-Type: application/x-www-form-urlencoded",
+            "User-Agent: Mozilla/5.0"
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200) {
+            log_message("TikiWikiClient: ensureFieldVisibility '{$permName}' HTTP {$httpCode}", true);
+            return false;
+        }
+
+        log_message("TikiWikiClient: Visibilidad asegurada para campo '{$permName}' en tracker {$trackerId} (tabla=" . ($listable ? '1' : '0') . ', busqueda=' . ($searchable ? '1' : '0') . ')');
+        return true;
     }
 
     /**
@@ -1566,24 +1646,24 @@ class TikiWikiClient
     public function getTrackerFieldDefinitions(string $prefix): array
     {
         return [
-            ['name' => $prefix . 'TelegramMessageId', 'type' => 't', 'permName' => $prefix . 'TelegramMessageId', 'description' => 'ID único del mensaje en Telegram'],
+            ['name' => $prefix . 'TelegramMessageId', 'type' => 't', 'permName' => $prefix . 'TelegramMessageId', 'description' => 'ID único del mensaje en Telegram', 'listable' => true],
             ['name' => $prefix . 'ChatId', 'type' => 't', 'permName' => $prefix . 'ChatId', 'description' => 'ID del chat/grupo en Telegram'],
-            ['name' => $prefix . 'ChatTitle', 'type' => 't', 'permName' => $prefix . 'ChatTitle', 'description' => 'Título del chat o grupo'],
+            ['name' => $prefix . 'ChatTitle', 'type' => 't', 'permName' => $prefix . 'ChatTitle', 'description' => 'Título del chat o grupo', 'searchable' => true, 'listable' => true],
             ['name' => $prefix . 'TopicId', 'type' => 't', 'permName' => $prefix . 'TopicId', 'description' => 'ID del tema o foro (0 si es General)'],
-            ['name' => $prefix . 'TopicTitle', 'type' => 't', 'permName' => $prefix . 'TopicTitle', 'description' => 'Nombre del tema o foro'],
+            ['name' => $prefix . 'TopicTitle', 'type' => 't', 'permName' => $prefix . 'TopicTitle', 'description' => 'Nombre del tema o foro', 'searchable' => true, 'listable' => true],
             ['name' => $prefix . 'UserId', 'type' => 't', 'permName' => $prefix . 'UserId', 'description' => 'ID numérico del usuario que envió el mensaje'],
             ['name' => $prefix . 'Username', 'type' => 't', 'permName' => $prefix . 'Username', 'description' => '@username del usuario en Telegram'],
             ['name' => $prefix . 'FirstName', 'type' => 't', 'permName' => $prefix . 'FirstName', 'description' => 'Nombre del usuario (en import: display name completo)'],
             ['name' => $prefix . 'LastName', 'type' => 't', 'permName' => $prefix . 'LastName', 'description' => 'Apellido del usuario (solo disponible en webhook)'],
-            ['name' => $prefix . 'DisplayName', 'type' => 't', 'permName' => $prefix . 'DisplayName', 'description' => 'Nombre completo para mostrar (unificado webhook e import)'],
+            ['name' => $prefix . 'DisplayName', 'type' => 't', 'permName' => $prefix . 'DisplayName', 'description' => 'Nombre completo para mostrar (unificado webhook e import)', 'searchable' => true, 'listable' => true],
             ['name' => $prefix . 'MessageType', 'type' => 't', 'permName' => $prefix . 'MessageType', 'description' => 'Tipo de mensaje: text, photo, video, audio, document, sticker, voice, system, etc.'],
-            ['name' => $prefix . 'Text', 'type' => 'a', 'permName' => $prefix . 'Text', 'description' => 'Contenido textual del mensaje (incluye captions de media)'],
+            ['name' => $prefix . 'Text', 'type' => 'a', 'permName' => $prefix . 'Text', 'description' => 'Contenido textual del mensaje (incluye captions de media)', 'searchable' => true, 'listable' => true],
             ['name' => $prefix . 'Location', 'type' => 'G', 'permName' => $prefix . 'Location', 'description' => 'Coordenadas GPS del mensaje (formato: lon, lat, zoom)'],
             ['name' => $prefix . 'MediaType', 'type' => 't', 'permName' => $prefix . 'MediaType', 'description' => 'Tipo MIME del archivo adjunto (ej: image/jpeg, video/mp4)'],
             ['name' => $prefix . 'MediaSize', 'type' => 'n', 'permName' => $prefix . 'MediaSize', 'description' => 'Tamaño del archivo adjunto en bytes'],
-            ['name' => $prefix . 'MediaCaption', 'type' => 't', 'permName' => $prefix . 'MediaCaption', 'description' => 'Texto de descripción asociado al archivo multimedia'],
-            ['name' => $prefix . 'MessageDate', 'type' => 'f', 'permName' => $prefix . 'MessageDate', 'description' => 'Fecha/hora del mensaje (timestamp UNIX)'],
-            ['name' => $prefix . 'Media', 'type' => 'FG', 'permName' => $prefix . 'Media', 'description' => 'Archivo multimedia adjunto (referencia a File Gallery de TikiWiki)'],
+            ['name' => $prefix . 'MediaCaption', 'type' => 't', 'permName' => $prefix . 'MediaCaption', 'description' => 'Texto de descripción asociado al archivo multimedia', 'searchable' => true, 'listable' => true],
+            ['name' => $prefix . 'MessageDate', 'type' => 'f', 'permName' => $prefix . 'MessageDate', 'description' => 'Fecha/hora del mensaje (timestamp UNIX)', 'searchable' => true],
+            ['name' => $prefix . 'Media', 'type' => 'FG', 'permName' => $prefix . 'Media', 'description' => 'Archivo multimedia adjunto (referencia a File Gallery de TikiWiki)', 'listable' => true],
             ['name' => $prefix . 'MediaUrl', 'type' => 't', 'permName' => $prefix . 'MediaUrl', 'description' => 'URL pública del archivo multimedia en TikiWiki'],
             ['name' => $prefix . 'FileUniqueId', 'type' => 't', 'permName' => $prefix . 'FileUniqueId', 'description' => 'Identificador universal del archivo en Telegram (file_unique_id, no expira entre bots)'],
             ['name' => $prefix . 'MediaWidth', 'type' => 'n', 'permName' => $prefix . 'MediaWidth', 'description' => 'Ancho de la imagen/video en píxeles'],
@@ -1593,7 +1673,7 @@ class TikiWikiClient
             ['name' => $prefix . 'EditedDate', 'type' => 't', 'permName' => $prefix . 'EditedDate', 'description' => 'Fecha de última edición (timestamp UNIX, vacío si no fue editado)'],
             ['name' => $prefix . 'ReplyToId', 'type' => 't', 'permName' => $prefix . 'ReplyToId', 'description' => 'ID del mensaje al que responde (para conversaciones en hilo)'],
             ['name' => $prefix . 'Reactions', 'type' => 'a', 'permName' => $prefix . 'Reactions', 'description' => 'Reacciones al mensaje formateadas como texto (ej: 👍 3 · ❤️ 1)'],
-            ['name' => $prefix . 'Hashtags', 'type' => 'F', 'permName' => $prefix . 'Hashtags', 'description' => 'Hashtags de Telegram como etiquetas (espacio-separados, sin #)'],
+            ['name' => $prefix . 'Hashtags', 'type' => 'F', 'permName' => $prefix . 'Hashtags', 'description' => 'Hashtags de Telegram como etiquetas (espacio-separados, sin #)', 'searchable' => true, 'listable' => true],
         ];
     }
 
@@ -1632,6 +1712,8 @@ class TikiWikiClient
                 if ($this->createTrackerField($trackerId, $fd['name'], $fd['permName'], $fd['type'], $fd['description'] ?? '')) {
                     $created[] = $fd['permName'];
                     log_message("TikiWikiClient: sync — campo creado '{$fd['permName']}' en tracker {$trackerId}");
+                    // Asegurar visibilidad (action_add_field NO setea visibilidad)
+                    $this->ensureFieldVisibility($trackerId, $fd['permName'], !empty($fd['searchable']), !empty($fd['listable']));
                 } else {
                     log_message("TikiWikiClient: sync — ERROR creando campo '{$fd['permName']}' en tracker {$trackerId}", true);
                 }

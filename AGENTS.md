@@ -41,7 +41,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 | | |
 |---|---|
-| **Versión** | v0.6.2 |
+| **Versión** | v0.6.4 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
 | **Repositorio** | https://github.com/cheperico/trackergram |
@@ -67,6 +67,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 - ✅ Webhook Secret obligatorio (rechaza 500 si vacío)
 - ✅ Cache de topics por chatId:threadId
 - 🔴 **BUG-007**: Topic chaining roto en import — ver `roadmap.md` Bugs Conocidos
+- ✅ **BUG-008 fix aplicado**: `ensureFieldVisibility()` asegura visibilidad de campos al crear tracker/sync. `updateFgFieldOptions()` incluye flags de visibilidad.
 - ✅ Cache de gallery ID por tracker ($mediaGalleryIdCache[$trackerId])
 - ✅ Import chunked (extract + process con NDJSON, barra de progreso)
 - ✅ displayName unificado entre webhook e import

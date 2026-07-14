@@ -973,13 +973,13 @@ foreach ($detections as $det) {
             
             <div class="form-row">
                 <div class="form-group">
-                    <label for="import-tiki_url"><?php echo __('import.tiki_url'); ?></label>
-                    <input type="text" name="tiki_api_url" id="import-tiki_url" required aria-required="true" placeholder="<?php echo __('import.tiki_url_placeholder'); ?>" title="<?php echo __('import.tiki_url_title'); ?>">
+                    <label for="import-tiki_api_url"><?php echo __('import.tiki_url'); ?></label>
+                    <input type="text" name="tiki_api_url" id="import-tiki_api_url" required aria-required="true" placeholder="<?php echo __('import.tiki_url_placeholder'); ?>" title="<?php echo __('import.tiki_url_title'); ?>">
                 </div>
                 <div class="form-group">
-                    <label for="import-tiki_token"><?php echo __('import.tiki_token'); ?></label>
+                    <label for="import-tiki_api_token"><?php echo __('import.tiki_token'); ?></label>
                     <div class="input-wrapper">
-                        <input type="password" name="tiki_api_token" id="import-tiki_token" required aria-required="true" autocomplete="new-password" placeholder="<?php echo __('import.tiki_token_placeholder'); ?>" title="<?php echo __('import.tiki_token_title'); ?>">
+                        <input type="password" name="tiki_api_token" id="import-tiki_api_token" required aria-required="true" autocomplete="new-password" placeholder="<?php echo __('import.tiki_token_placeholder'); ?>" title="<?php echo __('import.tiki_token_title'); ?>">
                         <button type="button" class="icon-btn" onclick="togglePassword(this)" title="<?php echo __('form.show_title'); ?>" aria-label="<?php echo __('form.show_aria'); ?>"><?php echo __('misc.show'); ?></button>
                     </div>
                 </div>
@@ -1061,13 +1061,13 @@ foreach ($detections as $det) {
             
             <div class="form-row">
                 <div class="form-group">
-                    <label for="create-tiki-url"><?php echo __('create.tiki_url'); ?> <span id="create-url-required" style="color:var(--error);">*</span></label>
-                    <input type="text" name="tiki_api_url" id="create-tiki-url" required aria-required="true" placeholder="<?php echo __('create.tiki_url_placeholder'); ?>" value="<?php echo escapeHtml($_POST['tiki_api_url'] ?? ''); ?>" title="<?php echo __('create.tiki_url_title'); ?>">
+                    <label for="create-tiki_api_url"><?php echo __('create.tiki_url'); ?> <span id="create-url-required" style="color:var(--error);">*</span></label>
+                    <input type="text" name="tiki_api_url" id="create-tiki_api_url" required aria-required="true" placeholder="<?php echo __('create.tiki_url_placeholder'); ?>" value="<?php echo escapeHtml($_POST['tiki_api_url'] ?? ''); ?>" title="<?php echo __('create.tiki_url_title'); ?>">
                 </div>
                 <div class="form-group">
-                    <label for="create-tiki-token"><?php echo __('create.tiki_token'); ?> <span id="create-token-required" style="color:var(--error);">*</span></label>
+                    <label for="create-tiki_api_token"><?php echo __('create.tiki_token'); ?> <span id="create-token-required" style="color:var(--error);">*</span></label>
                     <div class="input-wrapper">
-                        <input type="password" name="tiki_api_token" id="create-tiki-token" required aria-required="true" autocomplete="new-password" placeholder="<?php echo __('create.tiki_token_placeholder'); ?>" value="<?php echo escapeHtml($_POST['tiki_api_token'] ?? ''); ?>" title="<?php echo __('create.tiki_token_title'); ?>">
+                        <input type="password" name="tiki_api_token" id="create-tiki_api_token" required aria-required="true" autocomplete="new-password" placeholder="<?php echo __('create.tiki_token_placeholder'); ?>" value="<?php echo escapeHtml($_POST['tiki_api_token'] ?? ''); ?>" title="<?php echo __('create.tiki_token_title'); ?>">
                         <button type="button" class="icon-btn" onclick="togglePassword(this)" title="<?php echo __('form.show_title'); ?>" aria-label="<?php echo __('form.show_aria'); ?>"><?php echo __('misc.show'); ?></button>
                     </div>
                 </div>
