@@ -127,7 +127,7 @@ El tracker usa **28 campos** con permNames que siguen el patrón `{prefix}Telegr
 | `FirstName` | `t` (text) | Nombre (en import: display name completo) |
 | `LastName` | `t` (text) | Apellido (solo webhook) |
 | `DisplayName` | `t` (text) | Nombre completo (unificado) |
-| `MessageType` | `D` (dropdown) | Tipo: text, photo, video, audio, document, sticker, voice, video_note, animation, location, contact, poll, quiz, system, other |
+| `MessageType` | `t` (text) | Tipo: text, photo, video, audio, document, sticker, voice, video_note, animation, location, contact, poll, quiz, system, other |
 | `Text` | `a` (textarea) | Contenido del mensaje (incluye captions) |
 | `MessageDate` | `f` (datetime) | Fecha/hora (timestamp UNIX) |
 | `Media` | `FG` (file gallery) | Archivo multimedia adjunto |
@@ -147,7 +147,7 @@ El tracker usa **28 campos** con permNames que siguen el patrón `{prefix}Telegr
 
 > **Alternativa más fácil**: Usá la pestaña "Crear Tracker" del panel de admin — genera todos los campos automáticamente.
 >
-> Si necesitás la configuración INI completa para importar campos manualmente en TikiWiki, consultá el [Apéndice en TECHNICAL.md](TECHNICAL.md#apéndice-schema-completo-del-tracker-para-trackergram).
+> Si necesitás la configuración INI completa para importar campos manualmente en TikiWiki, consultá el [Apéndice en TECHNICAL.md](TECHNICAL.md#ini-para-importar-campos-manualmente-en-tikiwiki).
 
 ## Visualizaciones Personalizadas
 

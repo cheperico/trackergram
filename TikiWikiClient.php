@@ -592,6 +592,7 @@ class TikiWikiClient
     /**
      * Agregar un fileId al campo FG de un item existente (álbumes).
      * Lee el valor actual del campo Media, concatena el nuevo fileId y actualiza.
+     * También actualiza mediaUrl con todas las URLs separadas por comas.
      * Si el fileId ya existe en el campo, no hace nada (idempotente).
      */
     public function appendMediaToTrackerItem(int $trackerId, int $itemId, string $newFileId): bool
@@ -614,7 +615,22 @@ class TikiWikiClient
         }
 
         $currentIds[] = $newFileId;
-        $fields = ["fields[{$prefix}Media]" => implode(',', $currentIds)];
+
+        // También actualizar mediaUrl con todas las URLs
+        $mediaUrlField = $item['field_' . $prefix . 'MediaUrl']
+            ?? $item['fields'][$prefix . 'MediaUrl']
+            ?? '';
+        $currentUrls = array_filter(explode(',', $mediaUrlField), fn($v) => trim($v) !== '');
+        $baseUrl = $this->getBaseUrl() . '/tiki-download_file.php?fileId=';
+        $newUrl = $baseUrl . $newFileId;
+        if (!in_array($newUrl, $currentUrls)) {
+            $currentUrls[] = $newUrl;
+        }
+
+        $fields = [
+            "fields[{$prefix}Media]" => implode(',', $currentIds),
+            "fields[{$prefix}MediaUrl]" => implode(',', $currentUrls),
+        ];
         $ok = $this->updateTrackerItem($trackerId, $itemId, $fields);
         if ($ok) {
             log_message("TikiWikiClient: appendMedia — fileId {$newFileId} agregado a item {$itemId} (total: " . count($currentIds) . ")");

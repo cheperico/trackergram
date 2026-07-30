@@ -199,6 +199,8 @@ Items del code review que ya estaban implementados en sesiones previas (verifica
 
 ---
 
+## v0.6.4
+
 ### 🏷️ Campos searchable/listable y orden default en creación de tracker
 
 #### 🆕 BUG-008 fix: ensureFieldVisibility()
@@ -215,6 +217,17 @@ Items del code review que ya estaban implementados en sesiones previas (verifica
 
 #### 🆕 Orden default: más nuevo primero
 - **TikiWikiClient::createTrackerShell()**: Ahora envía `defaultOrderKey=-2` (ordenar por fecha de creación) y `defaultOrderDir=desc` (descendente, más nuevo primero) al crear el tracker.
+
+## v0.6.5
+
+### 🐛 BUG-007: Topic chaining roto en import — fix
+
+- **Problema**: En imports de exports ZIP de Telegram Desktop, los mensajes que respondían a OTRO mensaje dentro de un topic (no al topic_creation directamente) quedaban con `topicId` vacío. El código infería el topic desde `reply_to_message_id`, pero este apunta al mensaje respondido, no al topic_creation. El export de Telegram Desktop no incluye `message_thread_id` (a diferencia de la Bot API).
+- **Fix**: Nuevo mapa `messageTopicMap[msg_id] = topic_creation_msg_id` construido cronológicamente durante la extracción (handleExtract). Cada mensaje hereda el topic de su `reply_to_message_id` si existe en el mapa, o se asigna a '0' (General). Este mapa se persiste en `metadata.json` y se usa en `handleProcess()` y `handleFull()` en vez de depender de `reply_to_message_id`.
+- **handleExtract()**: Reemplazado escaneo solo de service messages por escaneo completo de todos los mensajes en orden cronológico. Construye `$messageTopicMap` y lo persiste a metadata.
+- **handleProcess()**: Carga `$messageTopicMap` de metadata. Resuelve topicId desde el mapa en vez de `reply_to_message_id`.
+- **handleFull()**: Construye `$messageTopicMap` junto con `$topics` en el mismo loop cronológico. Usa el mapa para resolver topicId.
+- **Cobertura**: Aplica a ambos flujos de import (chunked y full). Webhook nunca tuvo el problema (usa `message_thread_id` directo de Bot API).
 
 ## v0.6.0
 

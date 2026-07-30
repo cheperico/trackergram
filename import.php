@@ -392,21 +392,48 @@ function handleExtract(): void
     fclose($ndjsonFp);
     unset($data['messages']); // liberar RAM del array de mensajes
 
-    // Resolver topics (recorrer mensajes de servicio)
+    // Resolver topics (recorrer mensajes en orden cronológico)
+    // Construir dos mapas:
+    //   $topics[topic_creation_msg_id] = topic_name
+    //   $messageTopicMap[msg_id] = topic_creation_msg_id (hereda por reply chain)
     $topics = [];
+    $messageTopicMap = [];
     $ndjsonFp = fopen($ndjsonFile, 'r');
     if ($ndjsonFp) {
         while (($line = fgets($ndjsonFp)) !== false) {
             $msg = json_decode($line, true);
             if (!$msg) continue;
-            if (($msg['type'] ?? '') === 'service') {
+            $msgId = (string) ($msg['id'] ?? '');
+            if ($msgId === '') continue;
+            $msgType = $msg['type'] ?? 'message';
+            if ($msgType === 'service') {
                 if (($msg['action'] ?? '') === 'topic_created') {
-                    $topics[$msg['id']] = $msg['title'] ?? 'Topic ' . $msg['id'];
+                    $topics[$msgId] = $msg['title'] ?? 'Topic ' . $msgId;
+                    $messageTopicMap[$msgId] = $msgId;
                 } elseif (($msg['action'] ?? '') === 'topic_edit' && isset($msg['new_title'])) {
-                    $replyTo = $msg['reply_to_message_id'] ?? null;
-                    if ($replyTo && isset($topics[$replyTo])) {
+                    $replyTo = (string) ($msg['reply_to_message_id'] ?? '');
+                    if ($replyTo !== '' && isset($topics[$replyTo])) {
                         $topics[$replyTo] = $msg['new_title'];
                     }
+                    if ($replyTo !== '' && isset($messageTopicMap[$replyTo])) {
+                        $messageTopicMap[$msgId] = $messageTopicMap[$replyTo];
+                    }
+                } else {
+                    // Other service message (pin, member join, etc.) — may be inside a topic
+                    $replyTo = (string) ($msg['reply_to_message_id'] ?? '');
+                    if ($replyTo !== '' && isset($messageTopicMap[$replyTo])) {
+                        $messageTopicMap[$msgId] = $messageTopicMap[$replyTo];
+                    } else {
+                        $messageTopicMap[$msgId] = '0';
+                    }
+                }
+            } else {
+                // Regular message (text, photo, etc.)
+                $replyTo = (string) ($msg['reply_to_message_id'] ?? '');
+                if ($replyTo !== '' && isset($messageTopicMap[$replyTo])) {
+                    $messageTopicMap[$msgId] = $messageTopicMap[$replyTo];
+                } else {
+                    $messageTopicMap[$msgId] = '0';
                 }
             }
         }
@@ -425,6 +452,7 @@ function handleExtract(): void
         'chat_id' => $chatId,
         'chat_title' => $chatTitle,
         'topics' => $topics,
+        'message_topic_map' => $messageTopicMap,
         'tracker_id' => (int) $trackerId,
         'total' => $totalMessages,
         'created' => time(),
@@ -531,6 +559,7 @@ function handleProcess(): void
     $chatTitle = $metadata['chat_title'] ?? 'Unknown';
     $chatId = $metadata['chat_id'] ?? 0;
     $topics = $metadata['topics'] ?? [];
+    $messageTopicMap = $metadata['message_topic_map'] ?? [];
     $total = $metadata['total'] ?? 0;
     $trackerId = $metadata['tracker_id'] ?? 0;
     $oldChatId = $metadata['old_chat_id'] ?? null;
@@ -656,13 +685,16 @@ function handleProcess(): void
             continue;
         }
 
-        // Resolver topic
+        // Resolver topic via messageTopicMap (construido cronológicamente en handleExtract)
         $topicId = '';
         $topicTitle = '';
-        $replyTo = $msg['reply_to_message_id'] ?? '';
-        if ($replyTo && isset($topics[$replyTo])) {
-            $topicId = (string) $replyTo;
-            $topicTitle = $topics[$replyTo];
+        $msgId = $msg['id'] ?? '';
+        if ($msgId !== '' && isset($messageTopicMap[$msgId])) {
+            $topicRef = $messageTopicMap[$msgId];
+            if ($topicRef !== '0' && isset($topics[$topicRef])) {
+                $topicId = (string) $topicRef;
+                $topicTitle = $topics[$topicRef];
+            }
         }
 
         // --- Propagación de caption para álbumes/grupos de fotos ---
@@ -1088,16 +1120,38 @@ function handleFull(): void
     }
     $oldChatId = ($migrated && $rawId > 0) ? '-' . $rawId : null;
 
+    // Construir topic map + messageTopicMap cronológico
     $topics = [];
+    $messageTopicMap = [];
     foreach ($messages as $msg) {
+        $msgId = (string) ($msg['id'] ?? '');
+        if ($msgId === '') continue;
         if (($msg['type'] ?? '') === 'service') {
             if (($msg['action'] ?? '') === 'topic_created') {
-                $topics[$msg['id']] = $msg['title'] ?? 'Topic ' . $msg['id'];
+                $topics[$msgId] = $msg['title'] ?? 'Topic ' . $msgId;
+                $messageTopicMap[$msgId] = $msgId;
             } elseif (($msg['action'] ?? '') === 'topic_edit' && isset($msg['new_title'])) {
-                $replyTo = $msg['reply_to_message_id'] ?? null;
-                if ($replyTo && isset($topics[$replyTo])) {
+                $replyTo = (string) ($msg['reply_to_message_id'] ?? '');
+                if ($replyTo !== '' && isset($topics[$replyTo])) {
                     $topics[$replyTo] = $msg['new_title'];
                 }
+                if ($replyTo !== '' && isset($messageTopicMap[$replyTo])) {
+                    $messageTopicMap[$msgId] = $messageTopicMap[$replyTo];
+                }
+            } else {
+                $replyTo = (string) ($msg['reply_to_message_id'] ?? '');
+                if ($replyTo !== '' && isset($messageTopicMap[$replyTo])) {
+                    $messageTopicMap[$msgId] = $messageTopicMap[$replyTo];
+                } else {
+                    $messageTopicMap[$msgId] = '0';
+                }
+            }
+        } else {
+            $replyTo = (string) ($msg['reply_to_message_id'] ?? '');
+            if ($replyTo !== '' && isset($messageTopicMap[$replyTo])) {
+                $messageTopicMap[$msgId] = $messageTopicMap[$replyTo];
+            } else {
+                $messageTopicMap[$msgId] = '0';
             }
         }
     }
@@ -1149,12 +1203,16 @@ function handleFull(): void
             log_message("trackerGram: Importando mensaje $processedCount de $totalMessages...");
         }
 
+        // Resolver topic via messageTopicMap (construido cronológicamente arriba)
         $topicId = '';
         $topicTitle = '';
-        $replyTo = $msg['reply_to_message_id'] ?? '';
-        if ($replyTo && isset($topics[$replyTo])) {
-            $topicId = $replyTo;
-            $topicTitle = $topics[$replyTo];
+        $msgId = $msg['id'] ?? '';
+        if ($msgId !== '' && isset($messageTopicMap[$msgId])) {
+            $topicRef = $messageTopicMap[$msgId];
+            if ($topicRef !== '0' && isset($topics[$topicRef])) {
+                $topicId = $topicRef;
+                $topicTitle = $topics[$topicRef];
+            }
         }
 
         // --- Propagación de caption para álbumes/grupos de fotos ---

@@ -18,7 +18,7 @@
 
 | | |
 |---|---|
-| **Versión actual** | v0.6.4 |
+| **Versión actual** | v0.6.5 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Instancias activas** | Dev (tracker 26) · Prod (tracker 22) |
 | **Filosofía** | Sin DB con servidor · JSON files para estado local (no SQLite) · PHP puro sin framework · MVP pragmático |
@@ -102,9 +102,11 @@
 
 ### 🔴 Fase 1: Lo que más duele ahora (días)
 
+*(Todos los items de Fase 1 completados ✅)*
+
 | # | Item | Esfuerzo | Estado |
 |---|------|----------|--------|
-| 1 | **BUG-007 — Topic chaining roto en import** | 1 sesión | ⏳ Pendiente — Ver BUG-007 en Bugs Conocidos más abajo. |
+| 1 | **BUG-007 — Topic chaining roto en import** | 1 sesión | ✅ v0.6.5 — Fix con `messageTopicMap` cronológico. |
 
 ### 🟡 Fase 2: Robustez (1-2 semanas)
 
@@ -220,7 +222,7 @@ Items que no justifican implementación hoy pero se documentan por si el context
 | BUG-004 | **Hashtags corruptos con emojis** — `extractHashtags()` usa `substr()` con offset UTF-16 de Telegram. Si hay emojis antes del hashtag, el offset se desalinea y extrae texto corrupto. Código: MessageMapper.php:43. Code Review: Data Flow #1. | ✅ Fix listo para implementar (F3-1). |
 | BUG-005 | **Race condition en álbumes** — `loadMediaGroupCaptions()` suelta `LOCK_SH` antes de que `saveMediaGroupCaptions()` adquiera `LOCK_EX`. Álbumes de 5+ fotos pierden captions. Código: WebhookHandler.php:769-788. Code Review: Data Flow #3. | ✅ **Resuelto** — `withMediaGroupCaptionsLock()` usa `fopen('c+')` + `flock(LOCK_EX)` sostenido para todo el ciclo read-modify-write. |
 | BUG-006 | **Race condition en topics** — `getTopicName()` sin lock de lectura; escrituras con TOCTOU. Mismo bug que BUG-005. Código: WebhookHandler.php:47-53,253,305,311. Code Review: Data Flow #4. | ✅ **Resuelto** — `withTopicNamesLock()` usa `fopen('c+')` + `flock(LOCK_EX)` sostenido. |
-| **BUG-007** 🔴 | **Topic chaining roto en import** — Cuando un mensaje en un topic/foro responde a OTRO mensaje (no al topic_creation), su `topicId` queda vacío porque `reply_to_message_id` apunta al mensaje respondido, no al topic_creation. El export de Telegram Desktop **no incluye `message_thread_id`** (a diferencia de la Bot API). Fix: construir `messageTopicMap` por orden cronológico en `handleExtract()` (rastrear current topic state) y usarlo en `handleProcess()`/`handleFull()` en vez de depender de `reply_to_message_id`. | 🔴 **Pendiente — alta prioridad** |
+| **BUG-007** 🔴 | **Topic chaining roto en import** — Cuando un mensaje en un topic/foro responde a OTRO mensaje (no al topic_creation), su `topicId` quedaba vacío porque `reply_to_message_id` apunta al mensaje respondido, no al topic_creation. El export de Telegram Desktop **no incluye `message_thread_id`** (a diferencia de la Bot API). | ✅ **Arreglado** en v0.6.5 — Fix con `messageTopicMap` cronológico en handleExtract/handleProcess/handleFull. |
 | **BUG-008** 🔴 | **Campos de tracker sin visibilidad al crearse** — `createTrackerField()` usa `action_add_field` que NO acepta parámetros de visibilidad. Todos los campos se crean con visible_in_view/edit/history_mode = "no". El FG field hereda el problema + puede no tener galleryId si `updateFgFieldOptions()` falla. **Fix aplicado**: nuevo método `ensureFieldVisibility()` que llama a `action_edit_field` post-creación. Llamado desde `createTracker()` y `synchronizeTrackerFields()`. `updateFgFieldOptions()` también incluye flags ahora. **Para trackers existentes**: editar manualmente cada campo en TikiWiki admin y poner visibilidad en "sí". | ✅ **Fix aplicado** — Pendiente aplicar a trackers existentes manualmente en TikiWiki |
 
 ## Cosas que NO vamos a hacer (por ahora)
