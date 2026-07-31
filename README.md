@@ -153,12 +153,14 @@ El tracker usa **28 campos** con permNames que siguen el patrón `{prefix}Telegr
 
 Los datos guardados en el tracker se pueden mostrar en TikiWiki de muchas formas. Como cualquier tracker de TikiWiki, podés usar `{TRACKERLIST}` con templates Smarty (`tplwiki`) para crear visualizaciones a medida: feeds tipo chat, timelines, tablas, dashboards, etc.
 
+**Desde v0.7.0**: el panel de admin incluye un botón **"🎨 Visualización"** en cada conexión que genera y sube automáticamente una visualización tipo chat (template Smarty + página wiki con `{TRACKERLIST}`) al TikiWiki. Solo elegís qué campos mostrar y los nombres de las páginas wiki; el resto lo hace trackerGram.
+
 Además, al ser un tracker estándar de TikiWiki, los mensajes son:
 - **Buscables** por cualquier campo
 - **Filtrables** por fecha, usuario, tipo de mensaje, hashtags
 - **Integrables** con otros plugins y funcionalidades de TikiWiki
 
-Las visualizaciones se crean en páginas wiki usando el plugin `{TRACKERLIST}` con un template Smarty que define el HTML de cada mensaje, y se estiliza con CSS inline o plugins de TikiWiki.
+Las visualizaciones se crean en páginas wiki usando el plugin `{TRACKERLIST}` con un template Smarty que define el HTML de cada mensaje, y se estiliza con CSS inline o plugins de TikiWiki. El deploy automático también se puede hacer manualmente (ver `opt/visualizacion-tiki.md`).
 
 ## Problemas Comunes
 

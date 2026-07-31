@@ -628,6 +628,8 @@ if (isset($_GET['edit'])) {
                             <button type="submit" class="btn btn-outline btn-sm" title="<?php echo __('conn.webhook_title'); ?>"><?php echo __('conn.webhook'); ?></button>
                         </form>
                         
+                        <button class="btn btn-outline btn-sm" onclick="openVisualization('<?php echo escapeHtml($slug); ?>')" title="Deployar visualización en TikiWiki">🎨 Visualización</button>
+                        
                         <button class="btn btn-outline btn-sm" onclick="testConnection('<?php echo escapeHtml($slug); ?>', this)" title="<?php echo __('conn.test_title'); ?>"><?php echo __('conn.test'); ?></button>
                         
                         <button class="btn btn-outline btn-sm" onclick="checkPrivacy('<?php echo escapeHtml($slug); ?>', this)" title="<?php echo __('conn.updates_title'); ?>"><?php echo __('conn.updates'); ?></button>
@@ -938,6 +940,58 @@ foreach ($detections as $det) {
                 <button type="submit" class="btn btn-primary" title="<?php echo __('form.save_title'); ?>"><?php echo __('form.save'); ?></button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- Modal: Visualización -->
+<div class="modal-overlay" id="visualization-modal" role="dialog" aria-modal="true" aria-labelledby="viz-title" aria-hidden="true">
+    <div class="modal modal-wide">
+        <div class="modal-header">
+            <span id="viz-title">🎨 Deployar visualización</span>
+            <span id="viz-connection-name" style="font-size:0.85em;color:var(--text-secondary);margin-left:8px;"></span>
+            <button type="button" class="modal-close" onclick="closeModal('visualization-modal')" aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="modal-body" id="viz-body">
+            <div id="viz-loading" style="text-align:center;padding:20px;">Cargando campos del tracker...</div>
+            <div id="viz-content" style="display:none;">
+                <!-- Paso 1: Nombrar páginas -->
+                <div class="viz-section">
+                    <div class="viz-section-title">📄 Nombrar las páginas wiki</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="viz-template-page">Plantilla (template Smarty):</label>
+                            <input type="text" id="viz-template-page" class="viz-input" placeholder="plantillaMiGrupo" title="Solo letras, números y underscore">
+                        </div>
+                        <div class="form-group">
+                            <label for="viz-feed-page">Página de visualización (TRACKERLIST):</label>
+                            <input type="text" id="viz-feed-page" class="viz-input" placeholder="FeedMiGrupo" title="Solo letras, números y underscore">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="viz-max-items">Máx. items por página:</label>
+                            <input type="number" id="viz-max-items" value="50" min="10" max="500" style="width:80px;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Paso 2: Seleccionar campos -->
+                <div class="viz-section">
+                    <div class="viz-section-title">☑️ Seleccionar campos a mostrar</div>
+                    <div id="viz-fields-container">
+                        <!-- Poblado por JS -->
+                    </div>
+                </div>
+
+                <!-- Mensajes de advertencia -->
+                <div id="viz-missing-warning" style="display:none;" class="viz-warning"></div>
+                <div id="viz-result" style="display:none;"></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="closeModal('visualization-modal')">Cancelar</button>
+            <button type="button" id="viz-deploy-btn" class="btn btn-primary" onclick="deployVisualization()" disabled>✅ Deployar</button>
+        </div>
     </div>
 </div>
 

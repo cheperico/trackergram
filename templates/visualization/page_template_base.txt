@@ -1,0 +1,39 @@
+{DIV(class="tg-feed")}
+{HTML()}
+<style>
+.tg-feed { max-width:680px; margin:0 auto; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; font-size:14px; line-height:1.4; }
+.tg-message { background:#fff; border:1px solid #e0e0e0; border-radius:8px; padding:10px 14px; margin-bottom:8px; transition:box-shadow 0.15s; }
+.tg-message:hover { box-shadow:0 1px 4px rgba(0,0,0,0.08); }
+.tg-header { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin-bottom:4px; }
+.tg-name { color:var(--tiki-color-link,#0066cc); font-size:13px; }
+.tg-date { color:#8899a6; font-size:11px; }
+.tg-chat { font-size:11px; color:#8899a6; margin-bottom:4px; }
+.tg-topic { font-size:12px; color:#8899a6; margin-bottom:4px; }
+.tg-text { word-wrap:break-word; white-space:pre-wrap; margin:4px 0; }
+.tg-text a { color:var(--tiki-color-link,#0066cc); text-decoration:underline; }
+.tg-media { margin:6px 0; }
+.tg-media img, .tg-media video { max-width:100%; height:auto; border-radius:6px; }
+.tg-caption { font-size:12px; color:#555; margin-top:2px; }
+.tg-location { margin:4px 0; }
+.tg-edited { font-size:11px; color:#8899a6; font-style:italic; margin-top:2px; }
+.tg-reply-line { background:#f0f2f5; border-radius:6px; padding:4px 8px; margin-bottom:4px; font-size:12px; color:#555; display:flex; align-items:baseline; gap:6px; }
+.tg-reply-ref { color:#0066cc; font-weight:bold; }
+.tg-reply-date { color:#8899a6; font-size:11px; }
+.tg-reply-text { color:#333; }
+.tg-reactions-hr { margin:6px 0; border:0; border-top:1px solid #eee; }
+.tg-reactions { font-size:13px; }
+.tg-hashtags { font-size:12px; color:var(--tiki-color-link,#0066cc); margin-top:2px; }
+.tg-download { font-size:12px; }
+</style>
+{/HTML}
+
+{TRACKERLIST(
+    trackerId="{{TRACKER_ID}}",
+    fields="{{FIELD_IDS}}",
+    sort_mode="{{SORT_FIELD}}_desc",
+    max="{{MAX_ITEMS}}",
+    showpagination="y",
+    status="opc",
+    tplwiki="{{TEMPLATE_PAGE}}"
+) /}
+{DIV}

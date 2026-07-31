@@ -1,0 +1,79 @@
+{* trackerGram — Template base generado automáticamente *}
+{* Version: 1.0 | NO editar manualmente — se sobrescribe al redeployar *}
+
+<div id="item-{$f_itemId}" class="tg-message {{MESSAGE_TYPE_CLASS}}">
+
+  {{#DISPLAY_NAME}}
+  <div class="tg-header">
+    <strong class="tg-name">{{DISPLAY_NAME}}</strong>
+    {{#MESSAGE_DATE}}<span class="tg-date">{{MESSAGE_DATE}}</span>{{/MESSAGE_DATE}}
+  </div>
+  {{/DISPLAY_NAME}}
+
+  {{#CHAT_TITLE}}
+  <div class="tg-chat">{{CHAT_TITLE}}</div>
+  {{/CHAT_TITLE}}
+
+  {{#TOPIC_TITLE}}
+  <div class="tg-topic">💬 {{TOPIC_TITLE}}</div>
+  {{/TOPIC_TITLE}}
+
+  {{#TEXT}}
+  <div class="tg-text">{{TEXT}}</div>
+  {{/TEXT}}
+
+  {{#REPLY_TO_ID}}
+  <div class="tg-reply-line">
+    {if preg_match('/^#(\d+)/', {{REPLY_TO_ID}}, $m)}
+      <span class="tg-reply-ref">↪️ #{$m[1]}</span>
+    {/if}
+    {if preg_match('/ - (\d{4}-\d{2}-\d{2} \d{2}:\d{2})/', {{REPLY_TO_ID}}, $m)}
+      <span class="tg-reply-date"> · {$m[1]}</span>
+    {/if}
+    {if preg_match('/"(.+)"$/', {{REPLY_TO_ID}}, $m)}
+      <span class="tg-reply-text">{$m[1]}</span>
+    {/if}
+  </div>
+  {{/REPLY_TO_ID}}
+
+  {{#MEDIA_URL}}
+  <div class="tg-media">
+    {if {{MESSAGE_TYPE}} === 'photo' || {{MESSAGE_TYPE}} === 'sticker'}
+    <a href="{{MEDIA_URL}}" data-box="shadowbox[tg];type=img"><img src="{{MEDIA_URL}}" alt="" loading="lazy" /></a>
+    {elseif {{MESSAGE_TYPE}} === 'video' || {{MESSAGE_TYPE}} === 'video_note'}
+    {wikiplugin _name="html"}<video src="{{MEDIA_URL}}" controls style="max-width:100%;height:auto">{/wikiplugin}
+    {elseif {{MESSAGE_TYPE}} === 'animation'}
+    {wikiplugin _name="html"}<video src="{{MEDIA_URL}}" autoplay loop muted playsinline style="max-width:100%;height:auto">{/wikiplugin}
+    {elseif {{MESSAGE_TYPE}} === 'audio' || {{MESSAGE_TYPE}} === 'voice'}
+    {wikiplugin _name="mediaplayer" src="{{MEDIA_URL}}" type="{{MEDIA_TYPE}}"}
+    {elseif {{MESSAGE_TYPE}} === 'document'}
+    {if preg_match('#^image/#', {{MEDIA_TYPE}})}
+    <a href="{{MEDIA_URL}}" data-box="shadowbox[tg];type=img"><img src="{{MEDIA_URL}}" alt="" loading="lazy" /></a>
+    {elseif preg_match('#^video/#', {{MEDIA_TYPE}})}
+    {wikiplugin _name="html"}<video src="{{MEDIA_URL}}" controls style="max-width:100%;height:auto">{/wikiplugin}
+    {else}
+    <a href="{{MEDIA_URL}}" target="_blank" class="tg-download">{{MEDIA_TYPE}}</a>
+    {/if}
+    {/if}
+  </div>
+  {{#MEDIA_CAPTION}}<div class="tg-caption"><em>{{MEDIA_CAPTION}}</em></div>{{/MEDIA_CAPTION}}
+  {{/MEDIA_URL}}
+
+  {{#LOCATION}}
+  <div class="tg-location">{wikiplugin _name="map" coords="{{LOCATION}}"}{/wikiplugin}</div>
+  {{/LOCATION}}
+
+  {{#EDITED_DATE}}
+  <div class="tg-edited">✏️ Editado {{EDITED_DATE}}</div>
+  {{/EDITED_DATE}}
+
+  {{#REACTIONS}}
+  <hr class="tg-reactions-hr" />
+  <div class="tg-reactions">{{REACTIONS}}</div>
+  {{/REACTIONS}}
+
+  {{#HASHTAGS}}
+  <div class="tg-hashtags">{{HASHTAGS}}</div>
+  {{/HASHTAGS}}
+
+</div>

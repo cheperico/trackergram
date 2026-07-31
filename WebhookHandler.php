@@ -791,8 +791,11 @@ class WebhookHandler
                     );
                 }
                 if ($foundItemId !== null) {
-                    // Resuelto: guardar referencia al itemId + texto del original
+                    // Resuelto: guardar referencia al itemId + fecha + texto del original
                     $replyRef = '#' . $foundItemId;
+                    if ($msg->replyToDate !== '') {
+                        $replyRef .= ' - ' . date('Y-m-d H:i', (int) $msg->replyToDate);
+                    }
                     if ($msg->replyToText !== '') {
                         $truncated = mb_strlen($msg->replyToText) > 120
                             ? mb_substr($msg->replyToText, 0, 120) . '…'

@@ -43,6 +43,173 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         exit;
     }
     
+    // ── Obtener campos del tracker para visualización (AJAX) ──
+    if ($_POST['action'] === 'get_visualization_fields') {
+        $slug = $_POST['slug'] ?? '';
+        $conn = $configManager->getConnection($slug);
+        if (!$conn) {
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'Conexión no encontrada']);
+            exit;
+        }
+        $trackerId = (int) ($conn['tracker_id'] ?? 0);
+        if (!$trackerId) {
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'Tracker no configurado']);
+            exit;
+        }
+        try {
+            require_once __DIR__ . '/VisualizationDeployer.php';
+            $tikiClient = new TikiWikiClient(
+                apiUrl: $conn['tiki_api_url'],
+                token: $conn['tiki_api_token'],
+                timeout: TIMEOUT_TIKIWIKI_API,
+                uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
+            );
+            $prefix = $conn['field_prefix'] ?? 'telegrammessage';
+            $tikiClient->setFieldPrefix($prefix);
+            $deployer = new VisualizationDeployer($tikiClient);
+            $info = $deployer->getTrackerFieldsInfo($trackerId, $prefix);
+
+            // Cargar preferencias guardadas (si existen)
+            $savedFields = $conn['visualization_fields'] ?? VisualizationDeployer::DEFAULT_SELECTED;
+            $savedTemplatePage = $conn['visualization_template_page'] ?? '';
+            $savedFeedPage = $conn['visualization_feed_page'] ?? '';
+            $savedMaxItems = $conn['visualization_max_items'] ?? 50;
+
+            // Generar nombres default si no hay guardados
+            $slugSafe = preg_replace('/[^a-zA-Z0-9]/', '', $slug) ?: 'tracker';
+            if (empty($savedTemplatePage)) {
+                $savedTemplatePage = 'plantilla' . $slugSafe;
+            }
+            if (empty($savedFeedPage)) {
+                $savedFeedPage = 'Feed' . $slugSafe;
+            }
+
+            header('Content-Type: application/json');
+            echo json_encode([
+                'fields'       => $info['fields'],
+                'prefix'       => $info['prefix'],
+                'saved_fields' => $savedFields,
+                'saved_template_page' => $savedTemplatePage,
+                'saved_feed_page'     => $savedFeedPage,
+                'saved_max_items'     => $savedMaxItems,
+                'defaults'     => VisualizationDeployer::DEFAULT_SELECTED,
+                'categories'   => VisualizationDeployer::FIELD_CATEGORIES,
+            ]);
+        } catch (Exception $e) {
+            header('Content-Type: application/json');
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    // ── Deployar visualización (AJAX) ──
+    if ($_POST['action'] === 'deploy_visualization') {
+        header('Content-Type: application/json');
+        $slug = $_POST['slug'] ?? '';
+        $templatePageName = trim($_POST['template_page'] ?? '');
+        $feedPageName = trim($_POST['feed_page'] ?? '');
+        $selectedFieldsJson = $_POST['selected_fields'] ?? '[]';
+        $maxItems = max(10, min(500, (int) ($_POST['max_items'] ?? 50)));
+
+        // Validaciones básicas
+        if (empty($slug) || empty($templatePageName) || empty($feedPageName)) {
+            echo json_encode(['success' => false, 'error' => 'Faltan parámetros obligatorios']);
+            exit;
+        }
+        if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_]*$/', $templatePageName)) {
+            echo json_encode(['success' => false, 'error' => 'Nombre de plantilla inválido. Solo letras, números y underscore, debe empezar con letra.']);
+            exit;
+        }
+        if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_]*$/', $feedPageName)) {
+            echo json_encode(['success' => false, 'error' => 'Nombre de página inválido. Solo letras, números y underscore, debe empezar con letra.']);
+            exit;
+        }
+
+        $selectedFields = json_decode($selectedFieldsJson, true);
+        if (!is_array($selectedFields)) {
+            echo json_encode(['success' => false, 'error' => 'selected_fields debe ser un array JSON']);
+            exit;
+        }
+
+        $conn = $configManager->getConnection($slug);
+        if (!$conn) {
+            echo json_encode(['success' => false, 'error' => 'Conexión no encontrada']);
+            exit;
+        }
+
+        try {
+            require_once __DIR__ . '/VisualizationDeployer.php';
+            $tikiClient = new TikiWikiClient(
+                apiUrl: $conn['tiki_api_url'],
+                token: $conn['tiki_api_token'],
+                timeout: TIMEOUT_TIKIWIKI_API,
+                uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
+            );
+            $prefix = $conn['field_prefix'] ?? 'telegrammessage';
+            $tikiClient->setFieldPrefix($prefix);
+            $deployer = new VisualizationDeployer($tikiClient);
+
+            $trackerId = (int) ($conn['tracker_id'] ?? 0);
+            if (!$trackerId) {
+                echo json_encode(['success' => false, 'error' => 'Tracker no configurado en esta conexión']);
+                exit;
+            }
+
+            // 1. Resolver fieldIds: fieldMap (todos los existentes) + selected (bloques visibles)
+            $resolved = $deployer->resolveFieldIds($trackerId, $prefix, $selectedFields);
+            $fieldMap = $resolved['fieldMap'];
+            $selected = $resolved['selected'];
+            $missing = $resolved['missing'];
+
+            if (empty($fieldMap)) {
+                echo json_encode(['success' => false, 'error' => 'Ningún campo seleccionado existe en el tracker. Verificar field prefix.']);
+                exit;
+            }
+            if (empty($selected)) {
+                echo json_encode(['success' => false, 'error' => 'Ninguno de los campos seleccionados existe en el tracker. Verificar field prefix o seleccionar otros campos.']);
+                exit;
+            }
+
+            // 2. Compilar template
+            $templateBase = $deployer->loadTemplateBase();
+            $compiledTemplate = $deployer->compileTemplate($templateBase, $fieldMap, $selected);
+
+            // 3. Compilar feed page (usar MessageDate como sort field si está disponible)
+            //    Deduplicar fieldIds (ej: MESSAGE_TYPE y MESSAGE_TYPE_CLASS → mismo campo)
+            $sortFieldId = $fieldMap['MESSAGE_DATE'] ?? '';
+            $feedContent = $deployer->compileFeedPage(
+                $trackerId,
+                array_values(array_unique($fieldMap)),
+                $templatePageName,
+                $sortFieldId,
+                $maxItems
+            );
+
+            // 4. Deployar páginas
+            $deployResult = $deployer->deployPages($compiledTemplate, $feedContent, $templatePageName, $feedPageName);
+
+            // 5. Persistir preferencias
+            $configManager->updateConnectionFields($slug, [
+                'visualization_fields'       => $selectedFields,
+                'visualization_template_page' => $templatePageName,
+                'visualization_feed_page'     => $feedPageName,
+                'visualization_max_items'     => $maxItems,
+            ]);
+
+            echo json_encode([
+                'success'       => $deployResult['success'],
+                'results'       => $deployResult['results'],
+                'missing'       => array_keys($missing),
+                'resolved_count'=> count($selected),
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     switch ($_POST['action']) {
         
         // ── Cambiar contraseña ──

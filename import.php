@@ -398,6 +398,11 @@ function handleExtract(): void
     //   $messageTopicMap[msg_id] = topic_creation_msg_id (hereda por reply chain)
     $topics = [];
     $messageTopicMap = [];
+    $albumGroups = []; // array de arrays: [ [msgId1, msgId2, ...], ... ] (grupos consecutivos misma persona)
+    $lastPhotoId = null;
+    $lastPhotoSender = '';
+    $lastPhotoTime = 0;
+    $currentAlbum = null;
     $ndjsonFp = fopen($ndjsonFile, 'r');
     if ($ndjsonFp) {
         while (($line = fgets($ndjsonFp)) !== false) {
@@ -406,6 +411,34 @@ function handleExtract(): void
             $msgId = (string) ($msg['id'] ?? '');
             if ($msgId === '') continue;
             $msgType = $msg['type'] ?? 'message';
+            // — Album group detection: consecutive photos from same sender within ≤1s —
+            if (!empty($msg['photo']) && $msgType === 'message') {
+                $sender = $msg['from_id'] ?? $msg['from'] ?? '';
+                $time = $msg['date_unixtime'] ?? 0;
+                $isConsecutive = ($lastPhotoId !== null && $sender === $lastPhotoSender && abs($time - $lastPhotoTime) <= 1);
+                if ($isConsecutive) {
+                    // Mismo grupo
+                    $currentAlbum[] = $msgId;
+                } else {
+                    // Nuevo grupo potencial
+                    if ($currentAlbum !== null && count($currentAlbum) >= 2) {
+                        $albumGroups[] = $currentAlbum;
+                    }
+                    $currentAlbum = [$msgId];
+                }
+                $lastPhotoId = $msgId;
+                $lastPhotoSender = $sender;
+                $lastPhotoTime = $time;
+            } else {
+                // Mensaje no foto → cerrar grupo pendiente
+                if ($currentAlbum !== null && count($currentAlbum) >= 2) {
+                    $albumGroups[] = $currentAlbum;
+                }
+                $currentAlbum = null;
+                $lastPhotoId = null;
+                $lastPhotoSender = '';
+                $lastPhotoTime = 0;
+            }
             if ($msgType === 'service') {
                 if (($msg['action'] ?? '') === 'topic_created') {
                     $topics[$msgId] = $msg['title'] ?? 'Topic ' . $msgId;
@@ -439,6 +472,10 @@ function handleExtract(): void
         }
         fclose($ndjsonFp);
     }
+    // Final flush: cerrar último grupo si el export termina con fotos consecutivas
+    if ($currentAlbum !== null && count($currentAlbum) >= 2) {
+        $albumGroups[] = $currentAlbum;
+    }
     unset($data); // liberar resto de RAM
 
     // Determinar qué cliente Tiki usar (local obligatorio)
@@ -453,6 +490,7 @@ function handleExtract(): void
         'chat_title' => $chatTitle,
         'topics' => $topics,
         'message_topic_map' => $messageTopicMap,
+        'album_groups' => $albumGroups,
         'tracker_id' => (int) $trackerId,
         'total' => $totalMessages,
         'created' => time(),
@@ -560,6 +598,7 @@ function handleProcess(): void
     $chatId = $metadata['chat_id'] ?? 0;
     $topics = $metadata['topics'] ?? [];
     $messageTopicMap = $metadata['message_topic_map'] ?? [];
+    $albumGroups = $metadata['album_groups'] ?? [];
     $total = $metadata['total'] ?? 0;
     $trackerId = $metadata['tracker_id'] ?? 0;
     $oldChatId = $metadata['old_chat_id'] ?? null;
@@ -627,6 +666,25 @@ function handleProcess(): void
     }
     log_message("trackerGram import dedup: mapa construido con " . count($dedupMap) . " entradas para tracker {$trackerId}");
 
+    // Determinar qué álbumes ya están completamente importados (re-import safety)
+    $albumImported = []; // firstMsgId → true si el grupo ya se importó completo
+    foreach ($albumGroups as $msgIds) {
+        if (empty($msgIds)) continue;
+        $firstMsgId = (string) $msgIds[0];
+        $firstKey = $chatId . ':' . $firstMsgId;
+        if (isset($dedupMap[$firstKey])) {
+            $albumImported[$firstMsgId] = true;
+        }
+    }
+    // Indice rápido: msgId → firstMsgId del grupo al que pertenece
+    $msgToAlbumGroup = []; // msgId → firstMsgId
+    foreach ($albumGroups as $msgIds) {
+        $firstMsgId = (string) $msgIds[0];
+        foreach ($msgIds as $mid) {
+            $msgToAlbumGroup[(string)$mid] = $firstMsgId;
+        }
+    }
+
     // Cargar file index
     $fileIndexPath = $tempDir . '/fileindex.json';
     $fileIndex = [];
@@ -661,10 +719,17 @@ function handleProcess(): void
     if ($galleryId === null) {
         log_message("trackerGram import: NO HAY galleryId para tracker {$trackerId} — no se subirán archivos", true);
     }
+    // Album state: persiste firstMsgId→itemId entre batches (chunked import)
+    $albumStateFile = $tempDir . '/album_state.json';
+    $albumFirstItem = [];
+    if (file_exists($albumStateFile)) {
+        $albumFirstItem = json_decode(file_get_contents($albumStateFile), true) ?? [];
+    }
     $imported = 0;
     $updated = 0;
     $skipped = 0;
     $failed = 0;
+    $albumAppended = 0;
     $mediaProcessed = 0;
     $processed = 0;
 
@@ -797,6 +862,54 @@ function handleProcess(): void
 
         // ── Solo para mensajes NUEVOS desde acá ──
 
+        // ── Álbum: detectar por fotos consecutivas mismo sender ≤1s ──
+        $albumFirst = $msgToAlbumGroup[$messageIdStr] ?? null;
+        if ($albumFirst !== null && $albumFirst !== $messageIdStr) {
+            // Foto subsiguiente de álbum (no es la primera)
+            if (isset($albumImported[$albumFirst])) {
+                // Álbum ya importado en sesión anterior (re-import safety)
+                $skipped++;
+                $processed++;
+                continue;
+            }
+            $itemId = $albumFirstItem[$albumFirst] ?? null;
+            if ($itemId !== null) {
+                // Subir media y appendear al item existente
+                $albumUploadedIds = [];
+                if ($msgType === 'message') {
+                    $fileName = '';
+                    $filePath = '';
+                    if (!empty($msg['photo'])) {
+                        $fileName = basename($msg['photo']);
+                        $filePath = $fileIndex[$fileName] ?? findFileInTempFallback($tempDir, $fileName);
+                    } elseif (!empty($msg['file'])) {
+                        $fileName = $msg['file_name'] ?? basename($msg['file']);
+                        $filePath = $fileIndex[$fileName] ?? findFileInTempFallback($tempDir, $fileName);
+                    }
+                    if ($filePath && file_exists($filePath)) {
+                        $fileSize = @filesize($filePath);
+                        if ($fileSize !== false && $fileSize <= MEDIA_DOWNLOAD_MAX_SIZE) {
+                            $albumCaption = !empty($msg['photo']) ? ($msg['photo_caption'] ?? '') : ($msg['file_caption'] ?? ($msg['caption'] ?? ''));
+                            $fid = $activeTikiClient->uploadFile($filePath, $fileName, $galleryId, 'import', $albumCaption);
+                            if ($fid) {
+                                $albumUploadedIds[] = $fid;
+                            }
+                        } elseif ($fileSize !== false) {
+                            log_message("trackerGram import album: SKIP file too large ({$fileSize} bytes): {$fileName}", true);
+                        }
+                    }
+                }
+                foreach ($albumUploadedIds as $fid) {
+                    $activeTikiClient->appendMediaToTrackerItem((int) $trackerId, $itemId, $fid);
+                }
+                $mediaProcessed += count($albumUploadedIds);
+                $albumAppended++;
+                $processed++;
+                log_message("trackerGram import: Álbum msg {$messageIdStr} appendeado al item #{$itemId} (firstMsg={$albumFirst})");
+                continue;
+            }
+        }
+
         // Subir media si existe
         $uploadedFileIds = [];
         if ($msgType === 'message') {
@@ -863,12 +976,20 @@ function handleProcess(): void
                     (int) $chatId
                 );
                 if ($foundItemId !== null) {
-                    // Resuelto: intentar obtener el texto del mensaje original
+                    // Resuelto: intentar obtener el texto y fecha del mensaje original
                     $replyRef = '#' . $foundItemId;
                     $originalItem = $activeTikiClient->getTrackerItem((int) $trackerId, $foundItemId);
                     if ($originalItem) {
                         $textKey = 'field_' . $fieldPrefix . 'Text';
                         $originalText = $originalItem[$textKey] ?? $originalItem['fields'][$fieldPrefix . 'Text'] ?? '';
+                        $dateKey = 'field_' . $fieldPrefix . 'MessageDate';
+                        $originalDate = $originalItem[$dateKey] ?? $originalItem['fields'][$fieldPrefix . 'MessageDate'] ?? '';
+                        if ($originalDate !== '') {
+                            $dateFormatted = is_numeric($originalDate)
+                                ? date('Y-m-d H:i', (int) $originalDate)
+                                : $originalDate;
+                            $replyRef .= ' - ' . $dateFormatted;
+                        }
                         if ($originalText !== '') {
                             $truncated = mb_strlen($originalText) > 120
                                 ? mb_substr($originalText, 0, 120) . '…'
@@ -887,8 +1008,17 @@ function handleProcess(): void
         $fields = $messageMapper->toWikiFields($normalized);
 
         // Crear item nuevo en TikiWiki
-        if ($activeTikiClient->createTrackerItem((int) $trackerId, $fields)) {
+        $newItemId = $activeTikiClient->createTrackerItem((int) $trackerId, $fields);
+        if ($newItemId !== false) {
             $imported++;
+            // Primera foto de álbum: registrar en albumFirstItem para próximas fotos
+            if ($albumFirst !== null) {
+                $albumFirstItem[$albumFirst] = $newItemId;
+                $stateWritten = file_put_contents($albumStateFile, json_encode($albumFirstItem));
+                if ($stateWritten === false) {
+                    log_message("trackerGram import: No se pudo escribir album_state.json para firstMsg={$albumFirst}", true);
+                }
+            }
         } else {
             $failed++;
         }
@@ -914,12 +1044,14 @@ function handleProcess(): void
         'updated' => $updated,
         'failed' => $failed,
         'skipped' => $skipped,
+        'album_appended' => $albumAppended,
         'media_processed' => $mediaProcessed,
         'topics_found' => count($topics),
         'offset' => $nextOffset,
         'more' => $hasMore,
     ]);
 }
+
 /**
  * Modo legacy: todo en una request (para UI clásica)
  */
@@ -1156,6 +1288,44 @@ function handleFull(): void
         }
     }
 
+    // ── Álbumes: detectar grupos de fotos consecutivas (mismo sender, ≤1s) ──
+    $albumGroups = [];
+    $lastPhoto = null; // [sender, time, [msgIds...]]
+    foreach ($messages as $msg) {
+        if (!empty($msg['photo']) && ($msg['type'] ?? 'message') === 'message') {
+            $sender = $msg['from_id'] ?? $msg['from'] ?? '';
+            $time = $msg['date_unixtime'] ?? 0;
+            if ($lastPhoto !== null && $sender === $lastPhoto[0] && abs($time - $lastPhoto[1]) <= 1) {
+                $lastPhoto[2][] = $msg['id'];
+                $lastPhoto[1] = $time;
+            } else {
+                if ($lastPhoto !== null && count($lastPhoto[2]) >= 2) {
+                    $albumGroups[] = $lastPhoto[2];
+                }
+                $lastPhoto = [$sender, $time, [$msg['id']]];
+            }
+        } else {
+            if ($lastPhoto !== null && count($lastPhoto[2]) >= 2) {
+                $albumGroups[] = $lastPhoto[2];
+            }
+            $lastPhoto = null;
+        }
+    }
+    // Último grupo
+    if ($lastPhoto !== null && count($lastPhoto[2]) >= 2) {
+        $albumGroups[] = $lastPhoto[2];
+    }
+    // Índice rápido: msgId → group (para lookup O(1) durante el procesamiento)
+    $albumLookup = []; // msgId → [firstMsgId, ...]
+    foreach ($albumGroups as $group) {
+        $firstMsgId = $group[0];
+        foreach ($group as $mid) {
+            $albumLookup[(string)$mid] = $firstMsgId;
+        }
+    }
+    $albumFirstItem = []; // firstMsgId → itemId
+    $albumAppended = 0;
+
     // ── Mapa dedup en memoria (same as handleProcess) ──
     $dedupMap = [];
     $allItems = $activeTikiClient->getAllTrackerItems((int) $trackerId);
@@ -1309,6 +1479,48 @@ function handleFull(): void
         }
 
         // ── Solo para mensajes NUEVOS desde acá ──
+        $albumFirst = $albumLookup[(string)$msgId] ?? null;
+
+        // ── Álbum: foto subsiguiente → appendear media al item existente ──
+        if ($albumFirst !== null && $albumFirst !== (string)$msgId) {
+            // Re-import safety: si la primera foto ya existe en el tracker, skip
+            $firstKey = $chatId . ':' . $albumFirst;
+            $firstExists = isset($dedupMap[$firstKey]);
+            if ($firstExists || !isset($albumFirstItem[$albumFirst])) {
+                // Skip: el álbum ya se importó completo (primera foto existe en dedup)
+                // o la primera foto aún no se procesó en este batch
+                $skipped++;
+                continue;
+            }
+            $itemId = $albumFirstItem[$albumFirst];
+                if ($msgType === 'message') {
+                    $filePath = '';
+                    $fileName = '';
+                    if (!empty($msg['photo'])) {
+                        $fileName = basename($msg['photo']);
+                        $filePath = $fileIndex[$fileName] ?? findFileInTempFallback($tempDir, $fileName);
+                    } elseif (!empty($msg['file'])) {
+                        $fileName = $msg['file_name'] ?? basename($msg['file']);
+                        $filePath = $fileIndex[$fileName] ?? findFileInTempFallback($tempDir, $fileName);
+                    }
+                    if ($filePath && file_exists($filePath)) {
+                        $fileSize = @filesize($filePath);
+                        if ($fileSize !== false && $fileSize <= MEDIA_DOWNLOAD_MAX_SIZE) {
+                            $caption = !empty($msg['photo']) ? ($msg['photo_caption'] ?? '') : ($msg['file_caption'] ?? ($msg['caption'] ?? ''));
+                            $fid = $activeTikiClient->uploadFile($filePath, $fileName, $galleryId, 'import', $caption);
+                            if ($fid) {
+                                $activeTikiClient->appendMediaToTrackerItem((int) $trackerId, $itemId, $fid);
+                                $mediaProcessed++;
+                            }
+                        } elseif ($fileSize !== false) {
+                            log_message("trackerGram import (full): SKIP file too large ({$fileSize} bytes): {$fileName}", true);
+                        }
+                    }
+                }
+                $albumAppended++;
+                log_message("trackerGram import (full): Álbum msg {$msgId} appendeado al item #{$itemId} (firstMsg={$albumFirst})");
+                continue;
+            }
 
         $uploadedFileIds = [];
 
@@ -1375,12 +1587,20 @@ function handleFull(): void
                     (int) $chatId
                 );
                 if ($foundItemId !== null) {
-                    // Resuelto: intentar obtener el texto del mensaje original
+                    // Resuelto: intentar obtener el texto y fecha del mensaje original
                     $replyRef = '#' . $foundItemId;
                     $originalItem = $activeTikiClient->getTrackerItem((int) $trackerId, $foundItemId);
                     if ($originalItem) {
                         $textKey = 'field_' . $fieldPrefix . 'Text';
                         $originalText = $originalItem[$textKey] ?? $originalItem['fields'][$fieldPrefix . 'Text'] ?? '';
+                        $dateKey = 'field_' . $fieldPrefix . 'MessageDate';
+                        $originalDate = $originalItem[$dateKey] ?? $originalItem['fields'][$fieldPrefix . 'MessageDate'] ?? '';
+                        if ($originalDate !== '') {
+                            $dateFormatted = is_numeric($originalDate)
+                                ? date('Y-m-d H:i', (int) $originalDate)
+                                : $originalDate;
+                            $replyRef .= ' - ' . $dateFormatted;
+                        }
                         if ($originalText !== '') {
                             $truncated = mb_strlen($originalText) > 120
                                 ? mb_substr($originalText, 0, 120) . '…'
@@ -1399,8 +1619,13 @@ function handleFull(): void
         $fields = $messageMapper->toWikiFields($normalized);
 
         // Crear item nuevo en TikiWiki
-        if ($activeTikiClient->createTrackerItem((int) $trackerId, $fields)) {
+        $newItemId = $activeTikiClient->createTrackerItem((int) $trackerId, $fields);
+        if ($newItemId !== false) {
             $imported++;
+            // Primera foto de álbum: registrar en albumFirstItem
+            if ($albumFirst !== null) {
+                $albumFirstItem[$albumFirst] = $newItemId;
+            }
         } else {
             $failed++;
         }
@@ -1415,6 +1640,7 @@ function handleFull(): void
         'updated' => $updated,
         'failed' => $failed,
         'skipped' => $skipped,
+        'album_appended' => $albumAppended,
         'media_processed' => $mediaProcessed,
         'topics_found' => count($topics),
     ]);

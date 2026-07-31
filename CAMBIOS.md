@@ -1,5 +1,53 @@
 # Cambios - Changelog
 
+## v0.7.0
+
+### 🎨 Deploy automático de visualización desde el admin (V-1)
+
+- **Nuevo**: `VisualizationDeployer.php` — clase que orquesta todo el deploy: obtiene field definitions del tracker, compila el template base Smarty (placeholders → fieldIds reales), genera la página TRACKERLIST y deploya ambas páginas wiki vía API REST de TikiWiki.
+- **Nuevo**: `templates/visualization/item_template_base.smarty` — template base con placeholders `{{PLACEHOLDER}}` y bloques condicionales `{{#PLACEHOLDER}}...{{/PLACEHOLDER}}` (soporta anidamiento). Incluye reply inline parseado (preg_match), media, edited, reactions, hashtags.
+- **Nuevo**: `templates/visualization/page_template_base.txt` — esqueleto de la página de visualización con `{TRACKERLIST(...)}` + CSS inline vía `{HTML()}`.
+- **Nuevo**: `TikiWikiClient::getFieldDefinitions()` — wrapper público de `loadTrackerFields()`.
+- **Nuevo**: `TikiWikiClient::createWikiPage()`, `updateWikiPage()`, `wikiPageExists()` — endpoints REST de páginas wiki (`POST /api/wiki`, `POST /api/wiki/page/{page}`, `GET /api/wiki/page/{page}`) con SSRF protection (`createCurlHandle()`) y reintentos.
+- **Nuevo**: Handler AJAX `get_visualization_fields` — devuelve campos del tracker agrupados por categoría + preferencias guardadas.
+- **Nuevo**: Handler AJAX `deploy_visualization` — valida nombres de página, resuelve fieldIds, compila, deploya y persiste preferencias en `setup.json` (`visualization_fields`, `visualization_template_page`, `visualization_feed_page`, `visualization_max_items`).
+- **Nuevo**: Modal "🎨 Visualización" en admin.php — selector de campos por categoría, nombres de página personalizables, máx. items, botón deployar con resultado y links.
+- **Nuevo**: `admin.js` — funciones `openVisualization()`, `renderVisualizationForm()`, `deployVisualization()`.
+- **Nuevo**: `admin.css` — estilos del modal de visualización (`.viz-section`, `.viz-field-grid`, `.viz-result`, etc.).
+- **Compilador**: manejo recursivo de condicionales anidados (innermost first). `fieldMap` contiene TODOS los campos existentes (los placeholders sueltos dentro de bloques visibles siempre se resuelven, nunca queda Smarty roto); la selección del usuario controla qué bloques condicionales se mantienen.
+- **Detalle**: `sort_mode` usa formato `f_{fieldId}_desc`; `fields` del TRACKERLIST separa con `:` (formato real de TikiWiki).
+- **Detalle**: CSS de la página usa `{HTML()}` (lección aprendida: `{CSS()}` no existe en TikiWiki 27.x).
+- **Permiso requerido**: el usuario del token TikiWiki necesita `tiki_p_edit` para crear/editar páginas wiki.
+- **Versión**: bumped a v0.7.0.
+
+---
+
+## v0.6.6
+
+### 🎨 Reply-to: preview inline sin modal
+
+- **Nuevo**: `NormalizedMessage::$replyToDate` — campo transiente que captura la fecha del mensaje respondido.
+- **Cambio**: `MessageMapper::fromWebhook()` — ahora captura `reply_to_message.date` además del texto.
+- **Cambio**: `WebhookHandler::processMessage()` — el `replyToId` ahora incluye fecha formateada (`#42 - 2024-01-15 14:30 - "texto"`).
+- **Cambio**: `import.php` (ambos paths) — ahora extrae y formatea `MessageDate` del item original al resolver reply.
+- **Cambio**: `opt/visualizacion-tiki.md` — bloque reply reemplazado por preview inline sin link, con fecha. CSS nuevo para `.tgram-reply-line`, `.tgram-reply-ref`, `.tgram-reply-date`, `.tgram-reply-text`. JS de modal eliminado.
+- **Cambio**: `opt/visualizacion-lcc2026.md` — mismos cambios adaptados al tracker lcc2026.
+- **Nuevo**: `design/014-reply-visualizacion.md` — documento de diseño que documenta el análisis, decisión (Plan B) y justificación del descarte del modal.
+- **Versión**: bumped a v0.6.6.
+
+### 📸 Álbumes en import: agrupación real (import histórico)
+
+- **Fix**: Los exports ZIP de Telegram con álbumes/grupos de medios ahora se agrupan correctamente en un solo item de TikiWiki, igual que el webhook.
+- **Enfoque**: Telegram Desktop exports **no incluyen `grouped_id`** (confirmado con export real). Se usa heurística de consecutividad: fotos del **mismo sender con timestamp ≤1s de diferencia** se consideran parte del mismo álbum.
+- **handleExtract**: Nuevo scan de `album_groups` durante el barrido NDJSON. Detecta grupos de fotos consecutivas (mismo sender, diff≤1s) y los persiste en metadata.
+- **handleProcess**: `$msgToAlbumGroup` mapea msgId → firstMsgId del grupo. Foto subsiguiente (n0 es la primera): upload + `appendMediaToTrackerItem()` + `continue`. Primera foto: crea item y registra en `$albumFirstItem` persistido a `album_state.json` entre batches.
+- **handleFull**: Misma lógica en memoria con `$albumLookup` + `$albumFirstItem`. Re-import safety: si la primera foto ya existe en `$dedupMap`, las subsiguientes se skipean.
+- **Contador nuevo**: `album_appended` en respuesta JSON de ambos modos (visible en barra de progreso).
+- **Testeado con export real de 20 fotos**: 3 álbumes detectados (7+3+6 fotos) + 4 fotos solitarias = **20→7 items**.
+- **Versión**: bumped a v0.6.6 (junto con reply-to feature).
+
+---
+
 ## v0.6.3
 
 ### 🌐 Sistema de internacionalización (admin.php)

@@ -41,7 +41,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 | | |
 |---|---|
-| **Versión** | v0.6.4 |
+| **Versión** | v0.7.0 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
 | **Repositorio** | https://github.com/cheperico/trackergram |
@@ -62,7 +62,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 - ✅ Seguridad: CSRF, rate limiting, hash de contraseñas, path traversal protection, XSS fix (innerHTML→textContent), DoS protection, 20MB real download limit, token leak fix
 - ✅ Reacciones formateadas como texto legible (👍 3 · ❤️ 1)
 - ✅ Hashtags extraídos como etiquetas Freetags (webhook + import) en campo tipo `F`
-- ✅ Álbumes/grupos de medios (mediaGroup) en webhook (todas las fotos del mismo álbum comparten un solo item en TikiWiki; caption propagada entre fotos)
+- ✅ Álbumes/grupos de medios en webhook (agrupación atómica con registro lock, race-free) + **en import** (agrupación heurística: fotos mismo sender ≤1s, persistencia entre batches via album_state.json, caption propagada, re-import safety)
 - ✅ Auto-reparación de galería (repairFgGallery)
 - ✅ Webhook Secret obligatorio (rechaza 500 si vacío)
 - ✅ Cache de topics por chatId:threadId
@@ -119,6 +119,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 - ✅ **Admin.php refactorizado**: CSS/JS extraídos a archivos externos cacheables (`admin.css`, `admin.js`, `admin_import.js`). Handlers POST extraídos a `admin_handlers.php` (508 líneas). admin.php reducido de 2529 a 1114 líneas (-56%).
 - ✅ **Handlers antes de loops pesados**: `include admin_handlers.php` ejecutado ANTES de llamadas a APIs externas (Telegram/TikiWiki). Los handlers AJAX responden en milisegundos.
 - ✅ **$connectionsSafe sincronizado siempre**: construido al final de todo el procesamiento (handlers + loops + health check), refleja el estado final de `$connections` sin actualizaciones manuales intermedias.
+- ✅ **Deploy automático de visualización (V-1)**: botón "🎨 Visualización" en cada conexión del admin. Modal con selector de campos por categoría, nombres de página personalizables, deploy de 2 páginas wiki vía API REST (`POST /api/wiki` + `POST /api/wiki/page/{page}`). Compilador recursivo de condicionales anidados. Preferencias persistidas en `setup.json`.
 
 ---
 ## 2. Decisiones Arquitectónicas
@@ -205,6 +206,7 @@ La mayoría de los archivos están en la raíz. Subdirectorios:
 | Directorio | Contenido |
 |---|---|
 | `opt/` | Investigaciones, templates Smarty, archivos opcionales |
+| `templates/visualization/` | **Templates base de visualización** (`item_template_base.smarty`, `page_template_base.txt`) — compilados por VisualizationDeployer al deployar |
 | `tmp/` | Archivos temporales (rate limiting, buffers async, etc.) |
 | `reports/` | Reportes históricos de auditoría (referencia) |
 | `design/` | **📐 Documentos de diseño activos** — captura de decisiones, exploraciones y discusiones antes de implementar. **Leer antes de arrancar una feature nueva**. Contiene: `001-configuracion-inversa-via-telegram.md`, `004-trabajo-sobre-existentes.md`, `005-crear-tracker-en-conexion.md`, `006-mtproto-pyrogram.md`, `008-estrategia-recoleccion-estructurada.md`, `009-permisos-por-tracker-tikiwiki.md`, `999-a-tener-en-cuenta.md`. |
@@ -232,6 +234,7 @@ La mayoría de los archivos están en la raíz. Subdirectorios:
 | `MessageMapper.php` | Transforma mensajes → NormalizedMessage → campos TikiWiki |
 | `WebhookHandler.php` | Orquesta: valida, resuelve topics, descarga media, envía a TikiWiki |
 | `ConfigManager.php` | CRUD de conexiones multi-bot/wiki/tracker en `setup.json` |
+| `VisualizationDeployer.php` | Deploy automático de visualización: compila template Smarty con fieldIds reales, genera TRACKERLIST, sube páginas wiki vía API |
 | `exceptions.php` | Excepciones de dominio: `TrackerGramException`, `TelegramApiException`, `TikiWikiApiException`, `ImportException`, `ConfigException`, `SecurityException` |
 
 #### Frontend Admin
@@ -241,6 +244,13 @@ La mayoría de los archivos están en la raíz. Subdirectorios:
 | `admin.css` | Estilos del panel de administración (211 líneas cacheables) |
 | `admin.js` | JS del panel de administración (558 líneas): funciones de modal, test, fetch, CSRF. Carga en todos los tabs. |
 | `admin_import.js` | JS del flujo de importación (166 líneas): chunked processing con barra de progreso |
+
+#### Templates de Visualización
+
+| Archivo | Responsabilidad |
+|---|---|
+| `templates/visualization/item_template_base.smarty` | Template base Smarty con placeholders `{{PLACEHOLDER}}` y bloques condicionales `{{#P}}...{{/P}}` — compilado por VisualizationDeployer a fieldIds reales |
+| `templates/visualization/page_template_base.txt` | Esqueleto de la página de visualización: `{TRACKERLIST(...)}` + CSS inline via `{HTML()}` |
 
 #### Soporte
 
@@ -584,7 +594,8 @@ Ver [CAMBIOS.md](CAMBIOS.md) para el detalle completo por versión.
 ### Resumen
 
 | Versión | Cambio principal |
-|---|---|---|
+|---|---|
+| **v0.7.0** | **Deploy automático de visualización (V-1)**: `VisualizationDeployer.php` + template base con placeholders + handlers AJAX (`get_visualization_fields`, `deploy_visualization`) + modal en admin. `TikiWikiClient` gana `getFieldDefinitions()`, `createWikiPage()`, `updateWikiPage()`, `wikiPageExists()` (API REST de páginas wiki, SSRF-safe). Preferencias persistidas en setup.json. |
 | **v0.5.12** | **Fixes de code review externo**: edited_message ruteado por webhook (bug funcional), configure_webhook usa POST (token fuera de URLs), safeRender() elimina innerHTML residual (XSS fix), htmlspecialchars eliminado de fromWebhook() (caption data fix), tmp/test_create.php eliminado (token hardcodeado). Docs sincronizados. |
 | **v0.6.0** | **Desarme admin.php Fase B + fixes post-revision**: Handlers extraídos a `admin_handlers.php` (508 líneas). admin.php: 2529→1114 líneas (-56%). `include` handlers movido ANTES de loops pesados (AJAX responde en ms). `$connectionsSafe` construido al final del procesamiento (datos frescos). `validateCSRFToken()` responde JSON+403 para AJAX. Eliminado `escapeHtml()` en handlers (doble escape). Vista itera `$connectionsSafe` (tokens sanitizados). Eliminado `$webhookStatuses = [];` redundante. |
 | **v0.6.2** | **#10 Álbumes atómicos + #8 Excepciones + Code review fixes**: `registerOrLookupAlbum()` (atómico, race-free), `appendMediaToTrackerItem()`, `completeAlbumRegistration()`, album buffer con flock + GC. `exceptions.php` con jerarquía `TrackerGramException`. ConfigManager lanza `ConfigException` en JSON corrupto. F3-1 a F3-7 verificados y marcados como hechos (ya implementados previamente). api.php: catch distingue `TrackerGramException`. import.php: `handleException()` con tipo. Code review: worker.php `ftruncate(0)` race fix, api.php `missing_token` rate key + `DirectoryIterator`, import.php `MAX_JSON_IMPORT_SIZE`. |

@@ -218,6 +218,27 @@ input[type="file"]:focus-visible { outline: 2px solid var(--primary); outline-of
 .sub-conn-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .view-toggle { display: flex; gap: 6px; margin-bottom: 16px; }
 .view-toggle .btn { font-size: 0.85em; padding: 6px 16px; }
+/* ── Visualización Modal ── */
+.modal.modal-wide { max-width: 680px; width: 92%; }
+.viz-section { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.viz-section:last-of-type { border-bottom: none; }
+.viz-section-title { font-weight: 600; font-size: 0.95em; margin-bottom: 10px; color: var(--text); }
+.viz-category { margin-bottom: 10px; }
+.viz-category-title { font-size: 0.85em; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.viz-field-grid { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.viz-field-item { display: flex; align-items: center; gap: 4px; font-size: 0.88em; }
+.viz-field-item input[type="checkbox"] { margin: 0; }
+.viz-field-item label { cursor: pointer; }
+.viz-field-missing { opacity: 0.5; text-decoration: line-through; }
+.viz-input { width: 100%; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9em; }
+.viz-input:focus { outline: none; border-color: var(--primary); box-shadow: var(--focus-ring); }
+.viz-warning { background: #fff3e0; border: 1px solid #ffcc80; border-radius: 8px; padding: 8px 12px; font-size: 0.85em; color: #e65100; margin-bottom: 10px; }
+.viz-result { border-radius: 8px; padding: 10px 14px; font-size: 0.88em; }
+.viz-result.success { background: var(--success-bg); border: 1px solid #a5d6a7; color: var(--success); }
+.viz-result.error { background: var(--error-bg); border: 1px solid #ef9a9a; color: var(--error); }
+.viz-result .viz-result-link { display: block; margin-top: 4px; }
+.viz-result .viz-result-link a { color: var(--primary); text-decoration: underline; }
+#viz-deploy-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 @media (max-width: 600px) {
     .navbar { padding: 0 12px; }
     a.navbar-brand { font-size: 1em; }

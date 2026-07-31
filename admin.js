@@ -624,3 +624,217 @@ function toggleGlobalConfig(header) {
     content.style.display = isHidden ? 'block' : 'none';
     header.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
 }
+
+// ── Visualización: Open modal ──
+
+/** Cache de datos de visualización para la conexión actual */
+var _vizData = null;
+
+function openVisualization(slug) {
+    var overlay = document.getElementById('visualization-modal');
+    document.getElementById('viz-connection-name').textContent = slug;
+    document.getElementById('viz-loading').style.display = 'block';
+    document.getElementById('viz-content').style.display = 'none';
+    document.getElementById('viz-result').style.display = 'none';
+    document.getElementById('viz-missing-warning').style.display = 'none';
+    document.getElementById('viz-deploy-btn').disabled = true;
+    closeModal('visualization-modal'); // reset state if open
+    openModal('visualization-modal');
+
+    var data = new URLSearchParams();
+    data.append('action', 'get_visualization_fields');
+    data.append('slug', slug);
+    data.append('csrf_token', csrftoken());
+
+    fetch('admin.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: data.toString()
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(resp) {
+        if (resp.error) {
+            document.getElementById('viz-loading').textContent = 'Error: ' + resp.error;
+            return;
+        }
+        _vizData = resp;
+        renderVisualizationForm(slug, resp);
+    })
+    .catch(function(err) {
+        document.getElementById('viz-loading').textContent = 'Error de red: ' + err.message;
+    });
+}
+
+function renderVisualizationForm(slug, data) {
+    document.getElementById('viz-loading').style.display = 'none';
+    document.getElementById('viz-content').style.display = 'block';
+
+    // Nombres de página
+    document.getElementById('viz-template-page').value = data.saved_template_page || 'plantilla' + slug.replace(/[^a-zA-Z0-9]/g, '');
+    document.getElementById('viz-feed-page').value = data.saved_feed_page || 'Feed' + slug.replace(/[^a-zA-Z0-9]/g, '');
+    document.getElementById('viz-max-items').value = data.saved_max_items || 50;
+
+    // Categorías de campos
+    var container = document.getElementById('viz-fields-container');
+    container.innerHTML = '';
+
+    var categories = data.categories || {};
+    var savedFields = data.saved_fields || data.defaults || [];
+    var fields = data.fields || [];
+
+    // Construir lookup placeholder → field info
+    var fieldInfo = {};
+    for (var i = 0; i < fields.length; i++) {
+        fieldInfo[fields[i].placeholder] = fields[i];
+    }
+
+    var catLabels = {
+        'basicos': 'Básicos',
+        'texto': 'Texto',
+        'usuario': 'Usuario',
+        'multimedia': 'Multimedia',
+        'referencias': 'Referencias',
+        'tags': 'Tags',
+        'ubicacion': 'Ubicación',
+        'identificadores': 'Identificadores (siempre incluidos)'
+    };
+
+    for (var cat in categories) {
+        var placeholders = categories[cat];
+        var catDiv = document.createElement('div');
+        catDiv.className = 'viz-category';
+        var title = document.createElement('div');
+        title.className = 'viz-category-title';
+        title.textContent = catLabels[cat] || cat;
+        catDiv.appendChild(title);
+
+        var grid = document.createElement('div');
+        grid.className = 'viz-field-grid';
+
+        for (var p = 0; p < placeholders.length; p++) {
+            var ph = placeholders[p];
+            var info = fieldInfo[ph];
+            if (!info) continue;
+
+            var item = document.createElement('div');
+            item.className = 'viz-field-item';
+
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.id = 'viz-cb-' + ph;
+            cb.value = ph;
+            // Check si está en savedFields
+            if (savedFields.indexOf(ph) !== -1) {
+                cb.checked = true;
+            }
+
+            var label = document.createElement('label');
+            label.htmlFor = 'viz-cb-' + ph;
+            label.textContent = ph;
+
+            if (!info.exists) {
+                label.textContent += ' (falta en tracker)';
+                item.className += ' viz-field-missing';
+                cb.disabled = true;
+            }
+
+            item.appendChild(cb);
+            item.appendChild(label);
+            grid.appendChild(item);
+        }
+
+        catDiv.appendChild(grid);
+        container.appendChild(catDiv);
+    }
+
+    // Listener para habilitar botón Deployar (una sola vez por checkbox)
+    var checkboxes = container.querySelectorAll('input[type="checkbox"]:not(:disabled)');
+    for (var c = 0; c < checkboxes.length; c++) {
+        checkboxes[c].addEventListener('change', updateDeployButton);
+    }
+
+    updateDeployButton();
+}
+
+function updateDeployButton() {
+    var checked = document.querySelectorAll('#viz-fields-container input[type="checkbox"]:checked:not(:disabled)');
+    var hasTemplate = document.getElementById('viz-template-page').value.trim().length > 0;
+    var hasFeed = document.getElementById('viz-feed-page').value.trim().length > 0;
+    document.getElementById('viz-deploy-btn').disabled = (checked.length === 0) || !hasTemplate || !hasFeed;
+}
+
+// Re-check al escribir nombres
+document.addEventListener('DOMContentLoaded', function() {
+    var tp = document.getElementById('viz-template-page');
+    var fp = document.getElementById('viz-feed-page');
+    if (tp) tp.addEventListener('input', updateDeployButton);
+    if (fp) fp.addEventListener('input', updateDeployButton);
+});
+
+function deployVisualization() {
+    var btn = document.getElementById('viz-deploy-btn');
+    btn.disabled = true;
+    btn.textContent = 'Deployando...';
+
+    var resultDiv = document.getElementById('viz-result');
+    resultDiv.style.display = 'none';
+
+    // Recolectar campos seleccionados
+    var checkboxes = document.querySelectorAll('#viz-fields-container input[type="checkbox"]:checked:not(:disabled)');
+    var selected = [];
+    for (var i = 0; i < checkboxes.length; i++) {
+        selected.push(checkboxes[i].value);
+    }
+
+    var slug = document.getElementById('viz-connection-name').textContent.trim();
+
+    var data = new URLSearchParams();
+    data.append('action', 'deploy_visualization');
+    data.append('slug', slug);
+    data.append('template_page', document.getElementById('viz-template-page').value.trim());
+    data.append('feed_page', document.getElementById('viz-feed-page').value.trim());
+    data.append('max_items', document.getElementById('viz-max-items').value);
+    data.append('selected_fields', JSON.stringify(selected));
+    data.append('csrf_token', csrftoken());
+
+    fetch('admin.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: data.toString()
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(resp) {
+        resultDiv.style.display = 'block';
+        if (resp.success) {
+            var lines = ['✅ Deploy completado'];
+            for (var r = 0; r < resp.results.length; r++) {
+                var ri = resp.results[r];
+                var icon = ri.success ? '✅' : '❌';
+                var actionLabel = ri.action === 'create' ? 'creada' : 'actualizada';
+                var line = icon + ' ' + ri.pageName + ' (' + actionLabel + ')';
+                if (ri.url) {
+                    line += ' → ' + ri.url;
+                }
+                lines.push(line);
+            }
+            if (resp.missing && resp.missing.length > 0) {
+                lines.push('⚠️ Campos omitidos (no existen en tracker): ' + resp.missing.join(', '));
+            }
+            lines.push('📊 ' + resp.resolved_count + ' campos mapeados correctamente');
+            resultDiv.className = 'viz-result success';
+            safeRender(resultDiv, lines);
+        } else {
+            resultDiv.className = 'viz-result error';
+            resultDiv.textContent = '❌ Error: ' + (resp.error || 'Error desconocido');
+        }
+    })
+    .catch(function(err) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = 'viz-result error';
+        resultDiv.textContent = '❌ Error de red: ' + err.message;
+    })
+    .finally(function() {
+        btn.disabled = false;
+        btn.textContent = '✅ Deployar';
+    });
+}

@@ -69,9 +69,10 @@ class MessageMapper
                 if (isset($replyToMsg[$k])) { $isTopicMsg = true; break; }
             }
             $msg->replyToId = $isTopicMsg ? '' : (string) ($replyToMsg['message_id'] ?? '');
-            // Extraer texto del mensaje original (gratis en webhook) para replyToText
+            // Extraer texto y fecha del mensaje original (gratis en webhook) para reply
             if (!$isTopicMsg) {
                 $msg->replyToText = $replyToMsg['text'] ?? $replyToMsg['caption'] ?? '';
+                $msg->replyToDate = (string) ($replyToMsg['date'] ?? '');
             }
         } else {
             $msg->replyToId = '';

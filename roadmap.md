@@ -18,7 +18,7 @@
 
 | | |
 |---|---|
-| **Versión actual** | v0.6.5 |
+| **Versión actual** | v0.7.0 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Instancias activas** | Dev (tracker 26) · Prod (tracker 22) |
 | **Filosofía** | Sin DB con servidor · JSON files para estado local (no SQLite) · PHP puro sin framework · MVP pragmático |
@@ -41,7 +41,7 @@
 - ✅ Gallery resolution via endpoint `/fields`
 - ✅ Timeouts separados upload (60s) / api (30s)
 - ✅ debug.log respeta DEBUG_MODE ($force para críticos)
-- ✅ Álbumes/grupos de medios (mediaGroup): todas las fotos del mismo álbum comparten UN solo item en TikiWiki; caption propagada entre fotos. Sincronización atómica con lock exclusivo (race-free).
+- ✅ Álbumes/grupos de medios: webhook (registerOrLookupAlbum atómico, race-free) + import (agrupación por grouped_id, persistencia entre batches, caption propagada).
 - ✅ Cache de topics por chatId:threadId
 - ✅ Cache de gallery ID por tracker
 - ✅ Webhook Secret obligatorio (rechaza si vacío)
@@ -95,6 +95,7 @@
 - ✅ **createCurlHandle() fix**: reparada recursión infinita (llamaba a $this->createCurlHandle() en vez de curl_init()).
 - ✅ **#20 Desarme admin.php — Fase A**: CSS/JS extraídos a `admin.css` (211 líneas), `admin.js` (558 líneas), `admin_import.js` (166 líneas). admin.php reducido de 2529 a ~1597 líneas.
 - ✅ **#20 Desarme admin.php — Fase B**: Handlers POST extraídos a `admin_handlers.php` (508 líneas). admin.php reducido a ~1114 líneas (-56% del original). Handlers ejecutados ANTES de loops pesados (AJAX en ms). `$connectionsSafe` construido al final. ValidateCSRF con JSON+403. Sin doble escape.
+- ✅ **Deploy automático de visualización (V-1)**: botón "🎨 Visualización" en cada conexión del admin. Modal con selector de campos por categoría, nombres de página personalizables, deploy de 2 páginas wiki vía API REST (`POST /api/wiki` + `POST /api/wiki/page/{page}`). Compilador recursivo de condicionales anidados. Preferencias persistidas en `setup.json`.
 
 ---
 
@@ -177,6 +178,7 @@
 | **F4-10** | **Versionado de assets estáticos (CSS/JS)** | 30 min | `admin.css`, `admin.js`, `admin_import.js` se cargan sin hash versionado. Si cambian, navegadores pueden servir versión cacheada. Agregar query string `?v=` con hash del archivo o timestamp del deploy. |
 | **F4-11** | **Consistencia en manejo de errores de handlers admin** | 1 sesión | Algunos handlers POST en `admin_handlers.php` responden con `echo json_encode(...)` + `exit` (AJAX), otros setean `$errorMessage` y continúan a renderizar HTML. Estandarizar: todos los handlers POST devuelven `{success: bool, error?: string}` + HTTP status code. Conveniente para el frontend JS. |
 | **F4-12** | **Reforzar validación de $_POST en admin_handlers.php** | 1 sesión | Aunque los campos se sanitizan con `trim()`, `(int)`, `preg_replace()`, algunos (bot_token, tiki_api_token, webhook_secret, tiki_api_url) solo reciben `trim()`. Agregar validación de formato (regex para tokens/URLs) para detectar typos temprano. No es vulnerabilidad (se almacenan en setup.json bloqueado por .htaccess), pero mejora experiencia de usuario. |
+| **V-1** | **Deploy automático de visualización desde trackerGram** | 3-4 sesiones | ✅ **v0.7.0** — `VisualizationDeployer.php` compila template base con placeholders → fieldIds reales (fieldMap completo + selected), genera página TRACKERLIST con `fields:` y `sort_mode=f_X_desc`, deploya vía API REST de páginas wiki (SSRF-safe con `createCurlHandle()`). Modal en admin con selector de campos por categoría, nombres de página personalizables. Preferencias persistidas en setup.json. Diseño en `design/015-deploy-visualizacion.md`. **Pendiente**: prueba manual de deploy en instancia real. |
 
 ### ⚪ Fase 5: Pendientes de reevaluación (muy baja prioridad)
 

@@ -1357,6 +1357,137 @@ class TikiWikiClient
         return $result;
     }
 
+    /**
+     * Obtener field definitions del tracker vía GET /api/trackers/{id}/fields.
+     * Wrapper público de loadTrackerFields() — incluye cache interno y SSRF protection.
+     *
+     * @return array Lista de fields (cada uno con permName, fieldId, type, name, ...)
+     */
+    public function getFieldDefinitions(int $trackerId): array
+    {
+        return $this->loadTrackerFields($trackerId);
+    }
+
+    /**
+     * Verificar si una página wiki existe (GET /api/wiki/page/{page}).
+     */
+    public function wikiPageExists(string $pageName): bool
+    {
+        $url = $this->apiUrl . 'wiki/page/' . rawurlencode($pageName);
+        for ($attempt = 0; $attempt < RETRY_MAX_ATTEMPTS; $attempt++) {
+            $ch = $this->createCurlHandle();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Authorization: Bearer " . $this->token,
+                "User-Agent: Mozilla/5.0"
+            ]);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+            curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            if ($httpCode === 200) {
+                return true;
+            }
+            if ($httpCode >= 500 && $attempt < RETRY_MAX_ATTEMPTS - 1) {
+                usleep(RETRY_DELAY_MICROSECONDS * (1 << $attempt));
+                continue;
+            }
+            break;
+        }
+        return false;
+    }
+
+    /**
+     * Crear página wiki (POST /api/wiki).
+     *
+     * @param string $pageName    Nombre de la página
+     * @param string $data        Contenido wiki
+     * @param string $description Descripción (max 200 chars)
+     * @param string $comment     Resumen de edición
+     * @return array [ 'success' => bool, 'httpCode' => int, 'error' => string|null, 'info' => array|null ]
+     */
+    public function createWikiPage(string $pageName, string $data, string $description = '', string $comment = ''): array
+    {
+        return $this->postWikiPage('wiki', [
+            'pageName'    => $pageName,
+            'data'        => $data,
+            'description' => $description,
+            'comment'     => $comment,
+        ]);
+    }
+
+    /**
+     * Actualizar página wiki existente (POST /api/wiki/page/{page}).
+     *
+     * @param string $pageName Nombre de la página a actualizar
+     * @param string $data     Nuevo contenido wiki
+     * @param string $comment  Resumen de edición
+     * @return array [ 'success' => bool, 'httpCode' => int, 'error' => string|null, 'info' => array|null ]
+     */
+    public function updateWikiPage(string $pageName, string $data, string $comment = ''): array
+    {
+        return $this->postWikiPage('wiki/page/' . rawurlencode($pageName), [
+            'data'    => $data,
+            'comment' => $comment,
+        ]);
+    }
+
+    /**
+     * POST form-urlencoded a un endpoint wiki de la API.
+     */
+    private function postWikiPage(string $endpoint, array $params): array
+    {
+        $url = $this->apiUrl . $endpoint;
+        $postData = http_build_query($params);
+
+        for ($attempt = 0; $attempt < RETRY_MAX_ATTEMPTS; $attempt++) {
+            $ch = $this->createCurlHandle();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Authorization: Bearer " . $this->token,
+                "Content-Type: application/x-www-form-urlencoded",
+                "User-Agent: Mozilla/5.0"
+            ]);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            curl_close($ch);
+
+            $result = ['success' => $httpCode === 200, 'httpCode' => $httpCode, 'error' => null, 'info' => null];
+
+            if ($httpCode === 200) {
+                $decoded = json_decode($response, true);
+                if (is_array($decoded)) {
+                    $result['info'] = $decoded['info'] ?? $decoded;
+                }
+                return $result;
+            }
+
+            if ($curlError || $httpCode >= 500) {
+                if ($attempt < RETRY_MAX_ATTEMPTS - 1) {
+                    usleep(RETRY_DELAY_MICROSECONDS * (1 << $attempt));
+                    log_message("TikiWikiClient: postWikiPage retry {$attempt} {$endpoint}" . ($curlError ? ": {$curlError}" : " HTTP {$httpCode}"));
+                    continue;
+                }
+            }
+
+            $errorMsg = $curlError ?: "HTTP {$httpCode}";
+            $decoded = json_decode($response, true);
+            if (isset($decoded['error']['message'])) {
+                $errorMsg .= ': ' . $decoded['error']['message'];
+            }
+            $result['error'] = $errorMsg;
+            return $result;
+        }
+
+        return ['success' => false, 'httpCode' => 0, 'error' => 'Sin respuesta', 'info' => null];
+    }
+
     public function createTracker(string $trackerName, string $description = '', string $prefix = 'telegrammessage', ?int $galleryId = null): ?int
     {
         // Validar prefix

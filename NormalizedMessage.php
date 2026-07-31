@@ -50,4 +50,6 @@ class NormalizedMessage
     public ?string $topicName = null;
     /** Texto del mensaje al que responde (extraído de reply_to_message en webhook) */
     public string $replyToText = '';
+    /** Timestamp UNIX del mensaje al que responde (extraído de reply_to_message.date) */
+    public string $replyToDate = '';
 }
