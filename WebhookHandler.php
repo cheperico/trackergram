@@ -833,10 +833,11 @@ class WebhookHandler
                 $this->completeAlbumRegistration($albumKey, $newItemId, $msg->uploadedFileIds);
             }
 
-            $postInsertCount = $this->tikiWikiClient->messageExists($this->trackerId, $message['message_id'], $chatId);
-            if ($postInsertCount !== null && $postInsertCount > 1) {
-                log_message("WARNING: duplicado detectado post-insert para message_id={$message['message_id']} — posible race condition", true);
-            }
+            // Nota: el chequeo post-insert de duplicados (messageExists() > 1) se eliminó en v0.7.1.
+            // messageExists() ahora usa el cache local (1 entrada por (chatId, messageId)), así que
+            // no puede detectar count > 1. La protección contra race conditions la da el TOCTOU lock
+            // (adquirido antes de messageExists() inicial y liberado acá), que serializa el
+            // procesamiento del mismo mensaje.
         }
 
         // Liberar lock TOCTOU

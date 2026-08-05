@@ -1,5 +1,20 @@
 # Cambios - Changelog
 
+## v0.7.1
+
+### 🐛 BUG-009: Dedup roto en webhook — mensajes editados creaban duplicados
+
+- **Fix**: `TikiWikiClient::messageExists()` y `findItemByMessageId()` usaban `GET /api/trackers/{id}/items?filter[fields][...]`, una URL que **no existe** (esa ruta es solo POST) y cuyo filtro `filter[fields]` TikiWiki **ignora** (confirmado en `ApiBridge.php` y `Controller::action_list_items`). El resultado era siempre `null` → el webhook creaba un item nuevo en cada `edited_message` → duplicados con re-upload de media.
+- **Fix**: Implementada **cache local de messageIds** (roadmap F4-7): `tmp/message_ids_{trackerId}.json` mapea `"chatId:messageId" → itemId`. Se siembra UNA sola vez desde `getAllTrackerItems()` (ruta correcta `GET /api/trackers/{id}`) y se actualiza en `createTrackerItem()`. Con `flock(LOCK_EX/LOCK_SH)` + poda a 1000 entradas si supera 5000.
+- **Fix**: `messageExists()`/`findItemByMessageId()` ahora usan el cache (O(1) por mensaje, sin HTTP call por mensaje). Sin `chatId` cae a `getAllTrackerItems()` + conteo.
+- **Fix**: `TikiWikiClient::getAllTrackerItems()` ahora devuelve `null` en error de conexión/HTTP/JSON (antes `[]`), para distinguir "tracker vacío" de "API caída". El cache NO se escribe si la API falla (re-intenta en el próximo request).
+- **Fix**: `import.php` (`handleProcess()` + `handleFull()`) guard contra `null` de `getAllTrackerItems()` (log + dedup desactivado si falla).
+- **Fix (code review)**: `ensureMessageIdsCache()` mueve el fetch de `getAllTrackerItems()` FUERA del `LOCK_EX` (evita congelar webhooks concurrentes durante I/O de red en el seed). `lookupMessageIdInCache()` preserva `null` en vez de castear a `0` (itemId ausente). Chequeo post-insert `messageExists() > 1` eliminado (el cache guarda 1 entrada por key; la protección la da el TOCTOU lock). `invalidateMessageIdsCache()` nuevo: `import.php` lo llama tras construir el dedupMap para evitar cache stale cuando items se crean fuera del webhook.
+- **Efecto**: un mensaje editado N veces genera UN solo item (se actualiza Text+EditedDate+Reactions). El caso "cambio de medio en edit" sigue pendiente (ver `design/013-cambios-de-medio-en-edits.md`).
+- **Versión**: bumped a v0.7.1.
+
+---
+
 ## v0.7.0
 
 ### 🎨 Deploy automático de visualización desde el admin (V-1)

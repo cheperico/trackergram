@@ -41,7 +41,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 
 | | |
 |---|---|
-| **Versión** | v0.7.0 |
+| **Versión** | v0.7.1 |
 | **Estado** | Beta funcional, desarrollo activo |
 | **Metodología** | Director humano + agentes de IA |
 | **Repositorio** | https://github.com/cheperico/trackergram |
@@ -105,6 +105,7 @@ trackerGram es un puente entre **Telegram** y **TikiWiki**. Recibe mensajes de u
 - ✅ **Fan-out con try-catch individual**: si una conexión falla en el fan-out (timeout, error TikiWiki), no rompe las demás conexiones. Loggea el error individualmente y responde 200 con resultados por conexión.
 - ✅ **Cache auto-detección field prefix**: flag `field_prefix_checked` evita que admin.php y api.php llamen a la API de TikiWiki en cada request. Se ejecuta UNA SOLA VEZ por conexión.
 - ✅ **Mensajes editados capturados en webhook**: `edited_message` y `edited_channel_post` ruteados a `processEditedMessage()` que busca item existente por `(chat_id, message_id)` y aplica `updateTrackerItem()` con solo Text+EditedDate+Reactions. Si no existe, crea item nuevo.
+- ✅ **BUG-009 fix (v0.7.1)**: dedup del webhook arreglado con **cache local de messageIds** (`tmp/message_ids_{trackerId}.json`, roadmap F4-7). `messageExists()`/`findItemByMessageId()` antes usaban `filter[fields]` (URL 404 + filtro ignorado por TikiWiki) → siempre `null` → duplicados en cada edit. Ahora: cache sembrado una vez desde `getAllTrackerItems()`, actualizado en `createTrackerItem()`, O(1) por mensaje. `getAllTrackerItems()` devuelve `null` en error (distingue tracker vacío de API caída).
 - ✅ **safeRender() para datos de APIs externas**: admin.php usa función `safeRender()` con `textContent` + nodos `<br>` en vez de `innerHTML` para evitar XSS con datos de Telegram.
 - ✅ **configure_webhook usa POST**: el token de bot viaja en body HTTP, no en URL query string, evitando exposición en logs.
 - ✅ **Rate limiting con flock(LOCK_EX)**: `fopen('c+')` + `flock()` en vez de `file_put_contents()` sin lock, eliminando race condition entre requests concurrentes.
@@ -595,6 +596,7 @@ Ver [CAMBIOS.md](CAMBIOS.md) para el detalle completo por versión.
 
 | Versión | Cambio principal |
 |---|---|
+| **v0.7.1** | **BUG-009: dedup webhook arreglado con cache local de messageIds (F4-7)**: `messageExists()`/`findItemByMessageId()` usaban `filter[fields]` (URL 404 + filtro ignorado por TikiWiki) → siempre `null` → duplicados en cada edit. Ahora cache local `tmp/message_ids_{trackerId}.json` (sembrado una vez desde `getAllTrackerItems()`, actualizado en `createTrackerItem()`, O(1) por mensaje). `getAllTrackerItems()` devuelve `null` en error. |
 | **v0.7.0** | **Deploy automático de visualización (V-1)**: `VisualizationDeployer.php` + template base con placeholders + handlers AJAX (`get_visualization_fields`, `deploy_visualization`) + modal en admin. `TikiWikiClient` gana `getFieldDefinitions()`, `createWikiPage()`, `updateWikiPage()`, `wikiPageExists()` (API REST de páginas wiki, SSRF-safe). Preferencias persistidas en setup.json. |
 | **v0.5.12** | **Fixes de code review externo**: edited_message ruteado por webhook (bug funcional), configure_webhook usa POST (token fuera de URLs), safeRender() elimina innerHTML residual (XSS fix), htmlspecialchars eliminado de fromWebhook() (caption data fix), tmp/test_create.php eliminado (token hardcodeado). Docs sincronizados. |
 | **v0.6.0** | **Desarme admin.php Fase B + fixes post-revision**: Handlers extraídos a `admin_handlers.php` (508 líneas). admin.php: 2529→1114 líneas (-56%). `include` handlers movido ANTES de loops pesados (AJAX responde en ms). `$connectionsSafe` construido al final del procesamiento (datos frescos). `validateCSRFToken()` responde JSON+403 para AJAX. Eliminado `escapeHtml()` en handlers (doble escape). Vista itera `$connectionsSafe` (tokens sanitizados). Eliminado `$webhookStatuses = [];` redundante. |

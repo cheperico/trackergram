@@ -544,6 +544,25 @@ class TikiWikiClient
 
         $itemId = (int) $responseData['itemId'];
         log_message("TikiWikiClient: Item creado - itemId={$itemId}");
+
+        // Cachear mapeo (chatId, messageId) → itemId para dedup sin API.
+        // Extrae el prefix desde las keys del postFields (evita llamada API).
+        $chatIdVal = null;
+        $msgIdVal = null;
+        foreach ($postFields as $key => $val) {
+            if (!is_string($key)) {
+                continue;
+            }
+            if (preg_match('/^fields\[.+TelegramMessageId\]$/', $key)) {
+                $msgIdVal = $val;
+            } elseif (preg_match('/^fields\[.+ChatId\]$/', $key)) {
+                $chatIdVal = $val;
+            }
+        }
+        if ($chatIdVal !== null && $msgIdVal !== null && $chatIdVal !== '' && $msgIdVal !== '') {
+            $this->cacheMessageId($trackerId, (string) $chatIdVal, (string) $msgIdVal, $itemId);
+        }
+
         return $itemId;
     }
 
@@ -640,52 +659,197 @@ class TikiWikiClient
         return $ok;
     }
 
+    // ─────────────────────────────────────────────────────────
+    // Cache local de messageIds (dedup sin API por mensaje)
+    // Mapea "chatId:messageId" → itemId. Sembrado UNA sola vez desde
+    // getAllTrackerItems(); actualizado en createTrackerItem().
+    // La API de TikiWiki NO soporta filter[fields], así que este cache
+    // evita traer todos los items en cada webhook (roadmap F4-7).
+    // ─────────────────────────────────────────────────────────
+
+    private function messageIdsCachePath(int $trackerId): string
+    {
+        return (defined('TEMP_DIR') ? TEMP_DIR : __DIR__) . '/message_ids_' . (int) $trackerId . '.json';
+    }
+
+    /**
+     * Leer cache de messageIds con flock(LOCK_SH).
+     * @return array assoc "chatId:messageId" => itemId
+     */
+    private function readMessageIdsCache(int $trackerId): array
+    {
+        $path = $this->messageIdsCachePath($trackerId);
+        if (!file_exists($path)) {
+            return [];
+        }
+        $fp = fopen($path, 'r');
+        if (!$fp) {
+            return [];
+        }
+        flock($fp, LOCK_SH);
+        $content = stream_get_contents($fp);
+        flock($fp, LOCK_UN);
+        fclose($fp);
+
+        if ($content === false || trim($content) === '') {
+            return [];
+        }
+        $decoded = json_decode($content, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * Cachear mapeo (chatId, messageId) → itemId con read-modify-write atómico (LOCK_EX) + poda.
+     */
+    private function cacheMessageId(int $trackerId, string $chatId, string $messageId, int $itemId): void
+    {
+        $path = $this->messageIdsCachePath($trackerId);
+        $fp = fopen($path, 'c+');
+        if (!$fp) {
+            return;
+        }
+        flock($fp, LOCK_EX);
+
+        $content = stream_get_contents($fp);
+        $cache = [];
+        if ($content !== false && trim($content) !== '') {
+            $decoded = json_decode($content, true);
+            if (is_array($decoded)) {
+                $cache = $decoded;
+            }
+        }
+
+        $cache[$chatId . ':' . $messageId] = $itemId;
+
+        // Evitar crecimiento infinito: podar a últimas 1000 si supera 5000
+        if (count($cache) > 5000) {
+            $cache = array_slice($cache, -1000, null, true);
+        }
+
+        rewind($fp);
+        $written = fwrite($fp, json_encode($cache));
+        if ($written !== false) {
+            ftruncate($fp, ftell($fp));
+        }
+
+        flock($fp, LOCK_UN);
+        fclose($fp);
+    }
+
+    /**
+     * Asegurar que el cache esté sembrado desde TikiWiki (una sola vez).
+     * @return bool true si el cache está listo (sembrado o ya existía),
+     *              false si el fetch a TikiWiki falló (no se pudo verificar).
+     */
+    private function ensureMessageIdsCache(int $trackerId): bool
+    {
+        $path = $this->messageIdsCachePath($trackerId);
+
+        // Fast path: ya sembrado (archivo con al menos "{}") → sin lock de escritura ni refetch.
+        // filesize >= 2 distingue "sembrado" (incluso tracker vacío "{}") de "0 bytes" (fopen fallido).
+        if (file_exists($path) && filesize($path) >= 2) {
+            return true;
+        }
+
+        // Fetch FUERA del lock: getAllTrackerItems puede tardar segundos en trackers grandes.
+        // Mantener el LOCK_EX durante I/O de red congelaría requests concurrentes (code review M1).
+        $allItems = $this->getAllTrackerItems($trackerId);
+        if ($allItems === null) {
+            return false; // API caída — no escribir cache vacío (re-intentar en el próximo request)
+        }
+
+        $prefix = $this->resolveFieldPrefix($trackerId);
+        $cache = [];
+        foreach ($allItems as $item) {
+            $iChatId = $item['field_' . $prefix . 'ChatId'] ?? $item['fields'][$prefix . 'ChatId'] ?? '';
+            $iMsgId = $item['field_' . $prefix . 'TelegramMessageId'] ?? $item['fields'][$prefix . 'TelegramMessageId'] ?? '';
+            if ($iChatId !== '' && $iMsgId !== '') {
+                $cache[(string) $iChatId . ':' . (string) $iMsgId] = $item['itemId'] ?? null;
+            }
+        }
+
+        // Re-adquirir lock y escribir SOLO si sigue sin sembrar (no pisar un seed concurrente).
+        $fp = fopen($path, 'c+');
+        if (!$fp) {
+            return true; // fetch OK, pero no pudimos persistir — el próximo request reintentará
+        }
+        flock($fp, LOCK_EX);
+        $content = stream_get_contents($fp);
+        $alreadySeeded = ($content !== false && trim($content) !== '' && json_decode($content, true) !== null);
+        if (!$alreadySeeded) {
+            rewind($fp);
+            $written = fwrite($fp, json_encode($cache));
+            if ($written !== false) {
+                ftruncate($fp, ftell($fp));
+            }
+            log_message("TikiWikiClient: message_ids_{$trackerId}.json sembrado con " . count($cache) . " entradas");
+        }
+        flock($fp, LOCK_UN);
+        fclose($fp);
+        return true;
+    }
+
+    /**
+     * Buscar itemId en cache local por (chatId, messageId).
+     * @return int|null itemId si existe, null si no
+     */
+    private function lookupMessageIdInCache(int $trackerId, string $chatId, string $messageId): ?int
+    {
+        $cache = $this->readMessageIdsCache($trackerId);
+        if (empty($cache)) {
+            return null;
+        }
+        $key = $chatId . ':' . $messageId;
+        $v = $cache[$key] ?? null;
+        // Preservar null (no castear a 0): un itemId ausente/0 no es un item válido.
+        return ($v !== null && (int) $v > 0) ? (int) $v : null;
+    }
+
+    /**
+     * Invalidar el cache de messageIds de un tracker (borra el archivo).
+     * Se usa cuando items se crean FUERA del webhook (import, inserción manual):
+     * el cache quedaría stale y un edited_message sobre un item importado
+     * crearía un duplicado. Al borrarlo, el próximo webhook re-siembra desde
+     * getAllTrackerItems() con los items nuevos incluidos (code review M2).
+     */
+    public function invalidateMessageIdsCache(int $trackerId): void
+    {
+        $path = $this->messageIdsCachePath($trackerId);
+        if (file_exists($path)) {
+            @unlink($path);
+            log_message("TikiWikiClient: message_ids_{$trackerId}.json invalidado (re-seed en próximo webhook)");
+        }
+    }
+
     /**
      * Verificar si un mensaje ya existe en el tracker.
      * @return int|null Cantidad de items encontrados (0 = no existe), o null si hubo error de conexión/timeout
      */
     public function messageExists(int $trackerId, int|string $messageId, ?int $chatId = null): ?int
     {
-        $prefix = $this->resolveFieldPrefix($trackerId);
-        $url = $this->apiUrl . "trackers/$trackerId/items?filter[fields][{$prefix}TelegramMessageId]=" . urlencode((string) $messageId);
-
         if ($chatId !== null) {
-            $url .= "&filter[fields][{$prefix}ChatId]=$chatId";
+            $seeded = $this->ensureMessageIdsCache($trackerId);
+            if (!$seeded) {
+                return null; // no se pudo verificar (error TikiWiki)
+            }
+            $itemId = $this->lookupMessageIdInCache($trackerId, (string) $chatId, (string) $messageId);
+            return $itemId !== null ? 1 : 0;
         }
 
-        for ($attempt = 0; $attempt < RETRY_MAX_ATTEMPTS; $attempt++) {
-            $ch = $this->createCurlHandle();
-            curl_setopt($ch, CURLOPT_URL, $url);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                "Authorization: Bearer " . $this->token,
-                "User-Agent: Mozilla/5.0"
-            ]);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
-
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $curlError = curl_error($ch);
-            curl_close($ch);
-
-            if ($curlError || $httpCode >= 500) {
-                // Error de red o server error — reintentar con backoff
-                if ($attempt < RETRY_MAX_ATTEMPTS - 1) {
-                    usleep(RETRY_DELAY_MICROSECONDS * (1 << $attempt));
-                    log_message("TikiWikiClient: messageExists retry {$attempt} para message_id={$messageId}" . ($curlError ? ": {$curlError}" : " HTTP {$httpCode}"));
-                }
-                continue;
-            }
-
-            if ($httpCode !== 200) {
-                return null; // 4xx — no reintentar
-            }
-
-            $data = json_decode($response, true);
-            return count($data['data'] ?? []);
+        // Sin chatId: la clave del cache es incompleta → getAllTrackerItems + conteo
+        $items = $this->getAllTrackerItems($trackerId);
+        if ($items === null) {
+            return null;
         }
-
-        return null;
+        $prefix = $this->resolveFieldPrefix($trackerId);
+        $count = 0;
+        foreach ($items as $item) {
+            $iMsgId = $item['field_' . $prefix . 'TelegramMessageId'] ?? $item['fields'][$prefix . 'TelegramMessageId'] ?? '';
+            if ((string) $iMsgId === (string) $messageId) {
+                $count++;
+            }
+        }
+        return $count;
     }
 
     /**
@@ -698,55 +862,11 @@ class TikiWikiClient
      */
     public function findItemByMessageId(int $trackerId, int|string $messageId, int $chatId): ?int
     {
-        $prefix = $this->resolveFieldPrefix($trackerId);
-        $url = $this->apiUrl . "trackers/$trackerId/items"
-            . "?filter[fields][{$prefix}TelegramMessageId]=" . urlencode((string) $messageId)
-            . "&filter[fields][{$prefix}ChatId]=" . urlencode((string) $chatId)
-            . "&maxRecords=1";
-        log_message("TikiWikiClient findItemByMessageId: {$prefix}TelegramMessageId={$messageId}&{$prefix}ChatId={$chatId}");
-
-        for ($attempt = 0; $attempt < RETRY_MAX_ATTEMPTS; $attempt++) {
-            $ch = $this->createCurlHandle();
-            curl_setopt($ch, CURLOPT_URL, $url);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                "Authorization: Bearer " . $this->token,
-                "User-Agent: Mozilla/5.0"
-            ]);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeout);
-
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $curlError = curl_error($ch);
-            curl_close($ch);
-
-            if ($curlError || $httpCode >= 500) {
-                if ($attempt < RETRY_MAX_ATTEMPTS - 1) {
-                    usleep(RETRY_DELAY_MICROSECONDS * (1 << $attempt));
-                    log_message("TikiWikiClient: findItemByMessageId retry {$attempt} para message_id={$messageId}" . ($curlError ? ": {$curlError}" : " HTTP {$httpCode}"));
-                }
-                continue;
-            }
-
-            if ($httpCode !== 200) {
-                return null;
-            }
-
-            $data = json_decode($response, true);
-            if (!is_array($data)) {
-                return null;
-            }
-
-            $items = $data['data'] ?? $data['result'] ?? [];
-            if (empty($items) || !is_array($items)) {
-                return null;
-            }
-
-            $first = reset($items);
-            return isset($first['itemId']) ? (int) $first['itemId'] : null;
+        $seeded = $this->ensureMessageIdsCache($trackerId);
+        if (!$seeded) {
+            return null; // no se pudo verificar (error TikiWiki)
         }
-
-        return null;
+        return $this->lookupMessageIdInCache($trackerId, (string) $chatId, (string) $messageId);
     }
 
     /**
@@ -754,9 +874,11 @@ class TikiWikiClient
      * Usa la ruta GET /api/trackers/{id} (correcta, sin /items).
      * La API devuelve clave 'result' (no 'data').
      * @param int $trackerId ID del tracker
-     * @return array Lista de items, cada uno con itemId y fields
+     * @return array|null Lista de items (cada uno con itemId y fields),
+     *                    o null si hubo error de conexión/HTTP/JSON (no se pudo verificar).
+     *                    Un tracker vacío devuelve [] (no null).
      */
-    public function getAllTrackerItems(int $trackerId): array
+    public function getAllTrackerItems(int $trackerId): ?array
     {
         $url = $this->apiUrl . "trackers/" . $trackerId . "?maxRecords=-1";
 
@@ -784,18 +906,18 @@ class TikiWikiClient
             }
 
             if ($httpCode !== 200) {
-                return [];
+                return null; // error definitivo (ej: 403, 404) — no se pudo verificar
             }
 
             $data = json_decode($response, true);
             if (!is_array($data)) {
-                return [];
+                return null;
             }
 
             return $data['result'] ?? $data['data'] ?? [];
         }
 
-        return [];
+        return null;
     }
 
     /**

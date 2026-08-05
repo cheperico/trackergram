@@ -653,6 +653,10 @@ function handleProcess(): void
     // todos los items y construimos un mapa en memoria.
     $dedupMap = []; // "chatId:messageId" => itemId
     $allItems = $activeTikiClient->getAllTrackerItems((int) $trackerId);
+    if ($allItems === null) {
+        log_message("trackerGram import dedup: ERROR obteniendo items del tracker {$trackerId} — dedup desactivado", true);
+        $allItems = [];
+    }
     foreach ($allItems as $item) {
         $iChatId = $item['field_' . $fieldPrefix . 'ChatId']
             ?? $item['fields'][$fieldPrefix . 'ChatId']
@@ -665,6 +669,9 @@ function handleProcess(): void
         }
     }
     log_message("trackerGram import dedup: mapa construido con " . count($dedupMap) . " entradas para tracker {$trackerId}");
+    // Invalidar cache de messageIds del webhook: el import agrega items que el cache no conoce.
+    // Sin esto, un edited_message sobre un item importado crearía un duplicado (code review M2).
+    $activeTikiClient->invalidateMessageIdsCache((int) $trackerId);
 
     // Determinar qué álbumes ya están completamente importados (re-import safety)
     $albumImported = []; // firstMsgId → true si el grupo ya se importó completo
@@ -1329,6 +1336,10 @@ function handleFull(): void
     // ── Mapa dedup en memoria (same as handleProcess) ──
     $dedupMap = [];
     $allItems = $activeTikiClient->getAllTrackerItems((int) $trackerId);
+    if ($allItems === null) {
+        log_message("trackerGram import (full) dedup: ERROR obteniendo items del tracker {$trackerId} — dedup desactivado", true);
+        $allItems = [];
+    }
     foreach ($allItems as $item) {
         $iChatId = $item['field_' . $fieldPrefix . 'ChatId']
             ?? $item['fields'][$fieldPrefix . 'ChatId']
@@ -1340,6 +1351,9 @@ function handleFull(): void
             $dedupMap[$iChatId . ':' . $iMsgId] = $item['itemId'] ?? null;
         }
     }
+
+    // Invalidar cache de messageIds del webhook (ver handleProcess — code review M2)
+    $activeTikiClient->invalidateMessageIdsCache((int) $trackerId);
 
     $galleryId = $activeTikiClient->getMediaGalleryId((int) $trackerId);
     if ($galleryId === null) {
