@@ -235,6 +235,19 @@ Cada tracker tiene una file gallery asociada en su configuración. `TikiWikiClie
 
 Cuando se exporta un chat de Telegram sin incluir los archivos multimedia, los mensajes tienen texto como `(File not included. Change data exporting settings to download.)`. `MessageMapper::isMediaExcluded()` detecta este patrón y evita intentar subir archivos inexistentes. El mensaje se guarda igual, solo sin el campo Media.
 
+### Álbumes: agrupación atómica
+
+Telegram envía las fotos de un álbum como **mensajes individuales** (distintos `message_id`) en rápida sucesión, todos con el mismo `media_group_id`. Para que compartan un solo item en TikiWiki se usa un buffer JSON (`tmp/media_group_album.json`) con registro atómico vía `flock(LOCK_EX)`:
+
+1. `registerOrLookupAlbum()` — dentro de un solo lock: si el álbum no existe, lo **reserva** con `pending=true` y `itemId=0` (modo creator); si ya existe, retorna la entrada (modo append). Elimina la race condition entre fotos concurrentes del mismo álbum.
+2. `completeAlbumRegistration()` — tras crear el item exitosamente, llena el `itemId` real y quita `pending`.
+3. `removeAlbumRegistration()` — si falló la creación, elimina la entrada pending del buffer.
+4. GC probabilístico (1% por `processUpdate()`) limpia entradas stale: pending >5 min (creator crasheó), completadas >1h.
+
+**Idempotencia**: `appendMediaToTrackerItem()` en `TikiWikiClient` chequea que el `fileId` no esté ya en el campo FG antes de agregarlo (no duplica archivos).
+
+**En import**: la agrupación es heurística (fotos del mismo sender con ≤1s de diferencia), con persistencia entre batches vía `album_state.json`, caption propagada al item del álbum y re-import safety.
+
 ---
 
 ## Paso 5: Los Topics (Forums)
@@ -301,7 +314,7 @@ if ($tikiWikiClient->messageExists($trackerId, $message['message_id'], $chatId) 
 
 > (El `$trackerId` viene de la conexión; antes era la constante global `TIKIWIKI_TRACKER_ID`.)
 
-`messageExists` hace un GET a la API de TikiWiki filtrando por `telegrammessageTelegramMessageId` Y `telegrammessageChatId`. Retorna la cantidad de items encontrados.
+**Nota (v0.7.1)**: `messageExists()` ya NO hace un GET con `filter[fields]` (la API de TikiWiki no soporta ese filtro — ver BUG-009). Ahora usa un **cache local** `tmp/message_ids_{trackerId}.json` que mapea `(chatId, messageId) → itemId`, sembrado UNA vez desde `getAllTrackerItems()` y actualizado en `createTrackerItem()`. Devuelve `1` si existe, `0` si no, `null` si no se pudo verificar (error TikiWiki).
 
 **Lección aprendida**: Al principio solo filtrábamos por `message_id`. Pero dos chats diferentes pueden tener mensajes con el mismo ID. La deduplicación correcta es por el par `(chat_id, message_id)`.
 
@@ -309,15 +322,7 @@ if ($tikiWikiClient->messageExists($trackerId, $message['message_id'], $chatId) 
 
 Incluso con verificación previa, puede haber race conditions: dos webhooks del mismo mensaje llegan casi al mismo tiempo, ambos pasan la verificación, y ambos crean el item.
 
-**Solución**: Verificación post-insert:
-
-```php
-if ($tikiWikiClient->messageExists(...) > 1) {
-    log_message("WARNING: duplicado detectado post-insert — posible race condition", true);
-}
-```
-
-Esto no previene el duplicado pero lo detecta para logging.
+**Solución (v0.7.1)**: un **lock TOCTOU** por `(chatId, messageId)` en `WebhookHandler` (`tmp/dedup_locks/`). Se adquiere ANTES del `messageExists()` inicial y se libera después de crear el item, serializando el procesamiento del mismo mensaje. El chequeo post-insert (`messageExists() > 1`) se eliminó en v0.7.1 porque el cache guarda una sola entrada por key y no puede detectar count > 1; la protección la da el lock TOCTOU.
 
 ### Edit detection: capturar cambios en mensajes
 
@@ -637,6 +642,27 @@ Tanto el webhook como el login del admin tienen rate limiting por IP. Sin esto, 
 2. ⬜ **Tests unitarios desde el principio**: Muchos bugs se hubieran detectado automáticamente.
 3. ✅ ~~Un modelo intermedio único para mensajes~~ — **Ya implementado** (NormalizedMessage, v0.1.9)
 4. ✅ ~~**Excepciones de dominio**~~ — **Ya implementado** (v0.6.2, `exceptions.php` con `TrackerGramException` + 5 subclases)
+
+---
+
+## Constantes de config.php
+
+| Constante | Valor |
+|---|---|
+| `ADMIN_USERNAME` | del `.env` |
+| `ADMIN_PASSWORD` | del `.env` (hash bcrypt) |
+| `DEBUG_MODE` | del `.env` (default false) |
+| `ASYNC_PROCESSING` | del `.env` (default false, sobrescribible por conexión) |
+| `ALLOWED_CHAT_IDS` | del `.env` (filtro global opcional) |
+| `TIMEOUT_TIKIWIKI_API` | 30 segundos |
+| `TIMEOUT_TIKIWIKI_UPLOAD` | 60 segundos |
+| `TIMEOUT_TELEGRAM_API` | 5 segundos |
+| `TIMEOUT_TELEGRAM_DOWNLOAD` | 10 segundos |
+| `MEDIA_DOWNLOAD_MAX_SIZE` | 20 MB |
+| `MAX_ZIP_UNCOMPRESSED_SIZE` | 500 MB |
+| `RETRY_MAX_ATTEMPTS` | 2 |
+| `RETRY_DELAY_MICROSECONDS` | 100000 (0.1s) |
+| `CACHE_ENABLED` | true |
 
 ---
 

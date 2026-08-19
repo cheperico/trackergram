@@ -227,6 +227,18 @@ Ver [opt/visualizacion-tiki.md](opt/visualizacion-tiki.md) para la documentació
 
 ---
 
+## Servidores conocidos
+
+| Servicio | URL |
+|---|---|
+| trackerGram webhook (prod) | https://trackergram2.cheps.chela.org.ar/api.php |
+| TikiWiki API | https://wiki.chela.org.ar/api/ |
+| TikiWiki (web) | https://wiki.chela.org.ar |
+
+---
+
+## Troubleshooting
+
 | Problema | Qué hacer |
 |---|---|---|
 | **500 Internal Server Error** | Revisá logs de Apache y sintaxis PHP: `php -l api.php` |
