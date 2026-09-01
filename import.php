@@ -860,8 +860,60 @@ function handleProcess(): void
                     $failed++;
                 }
             } else {
-                // Sin cambios: skip completo (no upload, no update, no fill)
-                $skipped++;
+                // Sin cambios por edit, pero intentar rellenar campos vacíos (Media/MediaUrl etc)
+                // si el ZIP trae el archivo y el item lo tiene vacío (webhook falló por tamaño)
+                $existingItemForFill = $existingItem ?? $activeTikiClient->getTrackerItem((int) $trackerId, $existingItemId);
+                $fillUploadedIds = [];
+                $fillMediaUrl = '';
+                if ($existingItemForFill && $msgType === 'message' && $galleryId !== null) {
+                    $fillFileName = '';
+                    $fillFilePath = '';
+                    if (!empty($msg['photo'])) {
+                        $fillFileName = basename($msg['photo']);
+                        $fillFilePath = $fileIndex[$fillFileName] ?? findFileInTempFallback($tempDir, $fillFileName);
+                    } elseif (!empty($msg['file'])) {
+                        $fillFileName = $msg['file_name'] ?? basename($msg['file']);
+                        $fillFilePath = $fileIndex[$fillFileName] ?? findFileInTempFallback($tempDir, $fillFileName);
+                    }
+                    if ($fillFilePath && file_exists($fillFilePath)) {
+                        $fillSize = @filesize($fillFilePath);
+                        if ($fillSize !== false && $fillSize <= MEDIA_IMPORT_MAX_SIZE) {
+                            $fillCaption = !empty($msg['photo']) ? ($msg['photo_caption'] ?? '') : ($msg['file_caption'] ?? ($msg['caption'] ?? ''));
+                            $fid = $activeTikiClient->uploadFile($fillFilePath, $fillFileName, $galleryId, 'import-fill', $fillCaption);
+                            if ($fid) {
+                                $fillUploadedIds[] = $fid;
+                                $fillMediaUrl = rtrim(str_replace('/api/', '', $tikiApiUrl), '/') . '/tiki-download_file.php?fileId=' . $fid;
+                            }
+                        } elseif ($fillSize !== false) {
+                            log_message("trackerGram import fill: SKIP file too large ({$fillSize} bytes): {$fillFileName}", true);
+                        }
+                    }
+                    if (!empty($fillUploadedIds) || $fillMediaUrl !== '') {
+                        $normalizedFill = $messageMapper->fromExport($msg, [
+                            'chat_id' => $chatId,
+                            'chat_title' => $chatTitle,
+                            'topic_id' => $topicId,
+                            'topic_title' => $topicTitle,
+                            'file_ids' => $fillUploadedIds,
+                            'media_url' => $fillMediaUrl,
+                        ]);
+                        $fillFields = $messageMapper->getFillEmptyFields($normalizedFill, $existingItemForFill);
+                        if (!empty($fillFields)) {
+                            if ($activeTikiClient->updateTrackerItem((int) $trackerId, $existingItemId, $fillFields)) {
+                                $updated++;
+                                log_message("trackerGram import fill: item {$existingItemId} rellenado con " . implode(',', array_keys($fillFields)));
+                            } else {
+                                $failed++;
+                            }
+                        } else {
+                            $skipped++;
+                        }
+                    } else {
+                        $skipped++;
+                    }
+                } else {
+                    $skipped++;
+                }
             }
             $processed++;
             continue; // ← salta upload, normalize, create
@@ -895,7 +947,7 @@ function handleProcess(): void
                     }
                     if ($filePath && file_exists($filePath)) {
                         $fileSize = @filesize($filePath);
-                        if ($fileSize !== false && $fileSize <= MEDIA_DOWNLOAD_MAX_SIZE) {
+                        if ($fileSize !== false && $fileSize <= MEDIA_IMPORT_MAX_SIZE) {
                             $albumCaption = !empty($msg['photo']) ? ($msg['photo_caption'] ?? '') : ($msg['file_caption'] ?? ($msg['caption'] ?? ''));
                             $fid = $activeTikiClient->uploadFile($filePath, $fileName, $galleryId, 'import', $albumCaption);
                             if ($fid) {
@@ -933,7 +985,7 @@ function handleProcess(): void
 
             if ($filePath && file_exists($filePath)) {
                 $fileSize = @filesize($filePath);
-                if ($fileSize !== false && $fileSize <= MEDIA_DOWNLOAD_MAX_SIZE) {
+                if ($fileSize !== false && $fileSize <= MEDIA_IMPORT_MAX_SIZE) {
                     $caption = !empty($msg['photo']) ? ($msg['photo_caption'] ?? '') : ($msg['file_caption'] ?? ($msg['caption'] ?? ''));
                     $fileId = $activeTikiClient->uploadFile($filePath, $fileName, $galleryId, 'import', $caption);
                     if ($fileId) {
@@ -1487,7 +1539,59 @@ function handleFull(): void
                     $failed++;
                 }
             } else {
-                $skipped++;
+                // Sin edit, intentar rellenar vacíos (Media/MediaUrl) si ZIP trae archivo
+                $existingItemForFill = $existingItem ?? $activeTikiClient->getTrackerItem((int) $trackerId, $existingItemId);
+                $fillUploadedIds = [];
+                $fillMediaUrl = '';
+                if ($existingItemForFill && $msgType === 'message' && $galleryId !== null) {
+                    $fillFileName = '';
+                    $fillFilePath = '';
+                    if (!empty($msg['photo'])) {
+                        $fillFileName = basename($msg['photo']);
+                        $fillFilePath = $fileIndex[$fillFileName] ?? findFileInTempFallback($tempDir, $fillFileName);
+                    } elseif (!empty($msg['file'])) {
+                        $fillFileName = $msg['file_name'] ?? basename($msg['file']);
+                        $fillFilePath = $fileIndex[$fillFileName] ?? findFileInTempFallback($tempDir, $fillFileName);
+                    }
+                    if ($fillFilePath && file_exists($fillFilePath)) {
+                        $fillSize = @filesize($fillFilePath);
+                        if ($fillSize !== false && $fillSize <= MEDIA_IMPORT_MAX_SIZE) {
+                            $fillCaption = !empty($msg['photo']) ? ($msg['photo_caption'] ?? '') : ($msg['file_caption'] ?? ($msg['caption'] ?? ''));
+                            $fid = $activeTikiClient->uploadFile($fillFilePath, $fillFileName, $galleryId, 'import-fill', $fillCaption);
+                            if ($fid) {
+                                $fillUploadedIds[] = $fid;
+                                $fillMediaUrl = rtrim(str_replace('/api/', '', $tikiApiUrl), '/') . '/tiki-download_file.php?fileId=' . $fid;
+                            }
+                        } elseif ($fillSize !== false) {
+                            log_message("trackerGram import fill (full): SKIP file too large ({$fillSize} bytes): {$fillFileName}", true);
+                        }
+                    }
+                    if (!empty($fillUploadedIds) || $fillMediaUrl !== '') {
+                        $normalizedFill = $messageMapper->fromExport($msg, [
+                            'chat_id' => $chatId,
+                            'chat_title' => $chatTitle,
+                            'topic_id' => $topicId,
+                            'topic_title' => $topicTitle,
+                            'file_ids' => $fillUploadedIds,
+                            'media_url' => $fillMediaUrl,
+                        ]);
+                        $fillFields = $messageMapper->getFillEmptyFields($normalizedFill, $existingItemForFill);
+                        if (!empty($fillFields)) {
+                            if ($activeTikiClient->updateTrackerItem((int) $trackerId, $existingItemId, $fillFields)) {
+                                $updated++;
+                                log_message("trackerGram import fill (full): item {$existingItemId} rellenado con " . implode(',', array_keys($fillFields)));
+                            } else {
+                                $failed++;
+                            }
+                        } else {
+                            $skipped++;
+                        }
+                    } else {
+                        $skipped++;
+                    }
+                } else {
+                    $skipped++;
+                }
             }
             continue; // ← salta upload, normalize, create (siguiente mensaje)
         }
@@ -1519,7 +1623,7 @@ function handleFull(): void
                     }
                     if ($filePath && file_exists($filePath)) {
                         $fileSize = @filesize($filePath);
-                        if ($fileSize !== false && $fileSize <= MEDIA_DOWNLOAD_MAX_SIZE) {
+                        if ($fileSize !== false && $fileSize <= MEDIA_IMPORT_MAX_SIZE) {
                             $caption = !empty($msg['photo']) ? ($msg['photo_caption'] ?? '') : ($msg['file_caption'] ?? ($msg['caption'] ?? ''));
                             $fid = $activeTikiClient->uploadFile($filePath, $fileName, $galleryId, 'import', $caption);
                             if ($fid) {
@@ -1551,7 +1655,7 @@ function handleFull(): void
 
             if ($filePath && file_exists($filePath)) {
                 $fileSize = @filesize($filePath);
-                if ($fileSize !== false && $fileSize <= MEDIA_DOWNLOAD_MAX_SIZE) {
+                if ($fileSize !== false && $fileSize <= MEDIA_IMPORT_MAX_SIZE) {
                     $caption = !empty($msg['photo']) ? ($msg['photo_caption'] ?? '') : ($msg['file_caption'] ?? ($msg['caption'] ?? ''));
                     $fileId = $activeTikiClient->uploadFile($filePath, $fileName, $galleryId, 'import', $caption);
                     if ($fileId) {

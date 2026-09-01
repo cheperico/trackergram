@@ -82,8 +82,10 @@ define('TIMEOUT_TIKIWIKI_UPLOAD', 60);
 define('RETRY_MAX_ATTEMPTS', 2);
 define('RETRY_DELAY_MICROSECONDS', 100000); // 0.1 segundos
 
-// Límite de descarga de media (20 MB)
+// Límite de descarga de media vía webhook (20 MB)
 define('MEDIA_DOWNLOAD_MAX_SIZE', 20 * 1024 * 1024);
+// Límite para import desde ZIP local (100 MB — cubre videos grandes vía re-import)
+define('MEDIA_IMPORT_MAX_SIZE', 100 * 1024 * 1024);
 
 // Límite de tamaño total descomprimido del ZIP importado (500 MB)
 define('MAX_ZIP_UNCOMPRESSED_SIZE', 500 * 1024 * 1024);
