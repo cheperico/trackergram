@@ -652,6 +652,7 @@ function handleProcess(): void
     // buscar por (chat_id, message_id) vía API. En vez de eso, obtenemos
     // todos los items y construimos un mapa en memoria.
     $dedupMap = []; // "chatId:messageId" => itemId
+    $dedupItemMap = []; // "chatId:messageId" => item completo (para fill sin N+1)
     $allItems = $activeTikiClient->getAllTrackerItems((int) $trackerId);
     if ($allItems === null) {
         log_message("trackerGram import dedup: ERROR obteniendo items del tracker {$trackerId} — dedup desactivado", true);
@@ -665,7 +666,9 @@ function handleProcess(): void
             ?? $item['fields'][$fieldPrefix . 'TelegramMessageId']
             ?? '';
         if ($iChatId !== '' && $iMsgId !== '') {
-            $dedupMap[$iChatId . ':' . $iMsgId] = $item['itemId'] ?? null;
+            $key = $iChatId . ':' . $iMsgId;
+            $dedupMap[$key] = $item['itemId'] ?? null;
+            $dedupItemMap[$key] = $item;
         }
     }
     log_message("trackerGram import dedup: mapa construido con " . count($dedupMap) . " entradas para tracker {$trackerId}");
@@ -829,9 +832,10 @@ function handleProcess(): void
             // Mensaje ya existe → ver si necesita update por edit
             $shouldUpdate = false;
             $edited = (string) ($msg['edited_unixtime'] ?? '');
+            $existingItem = null;
 
             if ($edited !== '') {
-                $existingItem = $activeTikiClient->getTrackerItem((int) $trackerId, $existingItemId);
+                $existingItem = $dedupItemMap[$dedupKey] ?? $activeTikiClient->getTrackerItem((int) $trackerId, $existingItemId);
                 if ($existingItem) {
                     $storedEdited = $existingItem['field_' . $fieldPrefix . 'EditedDate']
                         ?? $existingItem['fields'][$fieldPrefix . 'EditedDate']
@@ -862,54 +866,63 @@ function handleProcess(): void
             } else {
                 // Sin cambios por edit, pero intentar rellenar campos vacíos (Media/MediaUrl etc)
                 // si el ZIP trae el archivo y el item lo tiene vacío (webhook falló por tamaño)
-                $existingItemForFill = $existingItem ?? $activeTikiClient->getTrackerItem((int) $trackerId, $existingItemId);
-                $fillUploadedIds = [];
-                $fillMediaUrl = '';
+                // P1/P2 fix: check vacío ANTES de subir para evitar huérfanos y N+1
+                $existingItemForFill = $existingItem ?? $dedupItemMap[$dedupKey] ?? $dedupItemMap[$oldKey ?? ''] ?? $activeTikiClient->getTrackerItem((int) $trackerId, $existingItemId);
                 if ($existingItemForFill && $msgType === 'message' && $galleryId !== null) {
-                    $fillFileName = '';
-                    $fillFilePath = '';
-                    if (!empty($msg['photo'])) {
-                        $fillFileName = basename($msg['photo']);
-                        $fillFilePath = $fileIndex[$fillFileName] ?? findFileInTempFallback($tempDir, $fillFileName);
-                    } elseif (!empty($msg['file'])) {
-                        $fillFileName = $msg['file_name'] ?? basename($msg['file']);
-                        $fillFilePath = $fileIndex[$fillFileName] ?? findFileInTempFallback($tempDir, $fillFileName);
-                    }
-                    if ($fillFilePath && file_exists($fillFilePath)) {
-                        $fillSize = @filesize($fillFilePath);
-                        if ($fillSize !== false && $fillSize <= MEDIA_IMPORT_MAX_SIZE) {
-                            $fillCaption = !empty($msg['photo']) ? ($msg['photo_caption'] ?? '') : ($msg['file_caption'] ?? ($msg['caption'] ?? ''));
-                            $fid = $activeTikiClient->uploadFile($fillFilePath, $fillFileName, $galleryId, 'import-fill', $fillCaption);
-                            if ($fid) {
-                                $fillUploadedIds[] = $fid;
-                                $fillMediaUrl = rtrim(str_replace('/api/', '', $tikiApiUrl), '/') . '/tiki-download_file.php?fileId=' . $fid;
-                            }
-                        } elseif ($fillSize !== false) {
-                            log_message("trackerGram import fill: SKIP file too large ({$fillSize} bytes): {$fillFileName}", true);
+                    $mediaVal = $existingItemForFill['field_' . $fieldPrefix . 'Media'] ?? $existingItemForFill['fields'][$fieldPrefix . 'Media'] ?? '';
+                    $mediaUrlVal = $existingItemForFill['field_' . $fieldPrefix . 'MediaUrl'] ?? $existingItemForFill['fields'][$fieldPrefix . 'MediaUrl'] ?? '';
+                    $hasEmptyMedia = trim((string) $mediaVal) === '' || trim((string) $mediaUrlVal) === '';
+                    if (!$hasEmptyMedia) {
+                        $skipped++;
+                    } else {
+                        $fillFileName = '';
+                        $fillFilePath = '';
+                        if (!empty($msg['photo'])) {
+                            $fillFileName = basename($msg['photo']);
+                            $fillFilePath = $fileIndex[$fillFileName] ?? findFileInTempFallback($tempDir, $fillFileName);
+                        } elseif (!empty($msg['file'])) {
+                            $fillFileName = $msg['file_name'] ?? basename($msg['file']);
+                            $fillFilePath = $fileIndex[$fillFileName] ?? findFileInTempFallback($tempDir, $fillFileName);
                         }
-                    }
-                    if (!empty($fillUploadedIds) || $fillMediaUrl !== '') {
-                        $normalizedFill = $messageMapper->fromExport($msg, [
-                            'chat_id' => $chatId,
-                            'chat_title' => $chatTitle,
-                            'topic_id' => $topicId,
-                            'topic_title' => $topicTitle,
-                            'file_ids' => $fillUploadedIds,
-                            'media_url' => $fillMediaUrl,
-                        ]);
-                        $fillFields = $messageMapper->getFillEmptyFields($normalizedFill, $existingItemForFill);
-                        if (!empty($fillFields)) {
-                            if ($activeTikiClient->updateTrackerItem((int) $trackerId, $existingItemId, $fillFields)) {
-                                $updated++;
-                                log_message("trackerGram import fill: item {$existingItemId} rellenado con " . implode(',', array_keys($fillFields)));
+                        if ($fillFilePath && file_exists($fillFilePath)) {
+                            $fillSize = @filesize($fillFilePath);
+                            if ($fillSize !== false && $fillSize <= MEDIA_IMPORT_MAX_SIZE) {
+                                $fillCaption = !empty($msg['photo']) ? ($msg['photo_caption'] ?? '') : ($msg['file_caption'] ?? ($msg['caption'] ?? ''));
+                                $fid = $activeTikiClient->uploadFile($fillFilePath, $fillFileName, $galleryId, 'import-fill', $fillCaption);
+                                if ($fid) {
+                                    $fillMediaUrl = rtrim(str_replace('/api/', '', $tikiApiUrl), '/') . '/tiki-download_file.php?fileId=' . $fid;
+                                    $normalizedFill = $messageMapper->fromExport($msg, [
+                                        'chat_id' => $chatId,
+                                        'chat_title' => $chatTitle,
+                                        'topic_id' => $topicId,
+                                        'topic_title' => $topicTitle,
+                                        'file_ids' => [$fid],
+                                        'media_url' => $fillMediaUrl,
+                                    ]);
+                                    $fillFields = $messageMapper->getFillEmptyFields($normalizedFill, $existingItemForFill);
+                                    if (!empty($fillFields)) {
+                                        if ($activeTikiClient->updateTrackerItem((int) $trackerId, $existingItemId, $fillFields)) {
+                                            $updated++;
+                                            $mediaProcessed++;
+                                            log_message("trackerGram import fill: item {$existingItemId} rellenado con " . implode(',', array_keys($fillFields)));
+                                        } else {
+                                            $failed++;
+                                        }
+                                    } else {
+                                        $skipped++;
+                                    }
+                                } else {
+                                    $skipped++;
+                                }
+                            } elseif ($fillSize !== false) {
+                                log_message("trackerGram import fill: SKIP file too large ({$fillSize} bytes): {$fillFileName}", true);
+                                $skipped++;
                             } else {
-                                $failed++;
+                                $skipped++;
                             }
                         } else {
                             $skipped++;
                         }
-                    } else {
-                        $skipped++;
                     }
                 } else {
                     $skipped++;
@@ -1387,6 +1400,7 @@ function handleFull(): void
 
     // ── Mapa dedup en memoria (same as handleProcess) ──
     $dedupMap = [];
+    $dedupItemMap = [];
     $allItems = $activeTikiClient->getAllTrackerItems((int) $trackerId);
     if ($allItems === null) {
         log_message("trackerGram import (full) dedup: ERROR obteniendo items del tracker {$trackerId} — dedup desactivado", true);
@@ -1400,7 +1414,9 @@ function handleFull(): void
             ?? $item['fields'][$fieldPrefix . 'TelegramMessageId']
             ?? '';
         if ($iChatId !== '' && $iMsgId !== '') {
-            $dedupMap[$iChatId . ':' . $iMsgId] = $item['itemId'] ?? null;
+            $key = $iChatId . ':' . $iMsgId;
+            $dedupMap[$key] = $item['itemId'] ?? null;
+            $dedupItemMap[$key] = $item;
         }
     }
 
@@ -1508,9 +1524,10 @@ function handleFull(): void
             // Mensaje ya existe → ver si necesita update por edit
             $shouldUpdate = false;
             $edited = (string) ($msg['edited_unixtime'] ?? '');
+            $existingItem = null;
 
             if ($edited !== '') {
-                $existingItem = $activeTikiClient->getTrackerItem((int) $trackerId, $existingItemId);
+                $existingItem = $dedupItemMap[$dedupKey] ?? $dedupItemMap[$oldKey ?? ''] ?? $activeTikiClient->getTrackerItem((int) $trackerId, $existingItemId);
                 if ($existingItem) {
                     $storedEdited = $existingItem['field_' . $fieldPrefix . 'EditedDate']
                         ?? $existingItem['fields'][$fieldPrefix . 'EditedDate']
@@ -1539,55 +1556,62 @@ function handleFull(): void
                     $failed++;
                 }
             } else {
-                // Sin edit, intentar rellenar vacíos (Media/MediaUrl) si ZIP trae archivo
-                $existingItemForFill = $existingItem ?? $activeTikiClient->getTrackerItem((int) $trackerId, $existingItemId);
-                $fillUploadedIds = [];
-                $fillMediaUrl = '';
+                // Sin edit, intentar rellenar vacíos solo si Media/MediaUrl están vacíos
+                $existingItemForFill = $existingItem ?? $dedupItemMap[$dedupKey] ?? $dedupItemMap[$oldKey ?? ''] ?? $activeTikiClient->getTrackerItem((int) $trackerId, $existingItemId);
                 if ($existingItemForFill && $msgType === 'message' && $galleryId !== null) {
-                    $fillFileName = '';
-                    $fillFilePath = '';
-                    if (!empty($msg['photo'])) {
-                        $fillFileName = basename($msg['photo']);
-                        $fillFilePath = $fileIndex[$fillFileName] ?? findFileInTempFallback($tempDir, $fillFileName);
-                    } elseif (!empty($msg['file'])) {
-                        $fillFileName = $msg['file_name'] ?? basename($msg['file']);
-                        $fillFilePath = $fileIndex[$fillFileName] ?? findFileInTempFallback($tempDir, $fillFileName);
-                    }
-                    if ($fillFilePath && file_exists($fillFilePath)) {
-                        $fillSize = @filesize($fillFilePath);
-                        if ($fillSize !== false && $fillSize <= MEDIA_IMPORT_MAX_SIZE) {
-                            $fillCaption = !empty($msg['photo']) ? ($msg['photo_caption'] ?? '') : ($msg['file_caption'] ?? ($msg['caption'] ?? ''));
-                            $fid = $activeTikiClient->uploadFile($fillFilePath, $fillFileName, $galleryId, 'import-fill', $fillCaption);
-                            if ($fid) {
-                                $fillUploadedIds[] = $fid;
-                                $fillMediaUrl = rtrim(str_replace('/api/', '', $tikiApiUrl), '/') . '/tiki-download_file.php?fileId=' . $fid;
-                            }
-                        } elseif ($fillSize !== false) {
-                            log_message("trackerGram import fill (full): SKIP file too large ({$fillSize} bytes): {$fillFileName}", true);
+                    $mediaVal = $existingItemForFill['field_' . $fieldPrefix . 'Media'] ?? $existingItemForFill['fields'][$fieldPrefix . 'Media'] ?? '';
+                    $mediaUrlVal = $existingItemForFill['field_' . $fieldPrefix . 'MediaUrl'] ?? $existingItemForFill['fields'][$fieldPrefix . 'MediaUrl'] ?? '';
+                    if (trim((string) $mediaVal) !== '' && trim((string) $mediaUrlVal) !== '') {
+                        $skipped++;
+                    } else {
+                        $fillFileName = '';
+                        $fillFilePath = '';
+                        if (!empty($msg['photo'])) {
+                            $fillFileName = basename($msg['photo']);
+                            $fillFilePath = $fileIndex[$fillFileName] ?? findFileInTempFallback($tempDir, $fillFileName);
+                        } elseif (!empty($msg['file'])) {
+                            $fillFileName = $msg['file_name'] ?? basename($msg['file']);
+                            $fillFilePath = $fileIndex[$fillFileName] ?? findFileInTempFallback($tempDir, $fillFileName);
                         }
-                    }
-                    if (!empty($fillUploadedIds) || $fillMediaUrl !== '') {
-                        $normalizedFill = $messageMapper->fromExport($msg, [
-                            'chat_id' => $chatId,
-                            'chat_title' => $chatTitle,
-                            'topic_id' => $topicId,
-                            'topic_title' => $topicTitle,
-                            'file_ids' => $fillUploadedIds,
-                            'media_url' => $fillMediaUrl,
-                        ]);
-                        $fillFields = $messageMapper->getFillEmptyFields($normalizedFill, $existingItemForFill);
-                        if (!empty($fillFields)) {
-                            if ($activeTikiClient->updateTrackerItem((int) $trackerId, $existingItemId, $fillFields)) {
-                                $updated++;
-                                log_message("trackerGram import fill (full): item {$existingItemId} rellenado con " . implode(',', array_keys($fillFields)));
+                        if ($fillFilePath && file_exists($fillFilePath)) {
+                            $fillSize = @filesize($fillFilePath);
+                            if ($fillSize !== false && $fillSize <= MEDIA_IMPORT_MAX_SIZE) {
+                                $fillCaption = !empty($msg['photo']) ? ($msg['photo_caption'] ?? '') : ($msg['file_caption'] ?? ($msg['caption'] ?? ''));
+                                $fid = $activeTikiClient->uploadFile($fillFilePath, $fillFileName, $galleryId, 'import-fill', $fillCaption);
+                                if ($fid) {
+                                    $fillMediaUrl = rtrim(str_replace('/api/', '', $tikiApiUrl), '/') . '/tiki-download_file.php?fileId=' . $fid;
+                                    $normalizedFill = $messageMapper->fromExport($msg, [
+                                        'chat_id' => $chatId,
+                                        'chat_title' => $chatTitle,
+                                        'topic_id' => $topicId,
+                                        'topic_title' => $topicTitle,
+                                        'file_ids' => [$fid],
+                                        'media_url' => $fillMediaUrl,
+                                    ]);
+                                    $fillFields = $messageMapper->getFillEmptyFields($normalizedFill, $existingItemForFill);
+                                    if (!empty($fillFields)) {
+                                        if ($activeTikiClient->updateTrackerItem((int) $trackerId, $existingItemId, $fillFields)) {
+                                            $updated++;
+                                            $mediaProcessed++;
+                                            log_message("trackerGram import fill (full): item {$existingItemId} rellenado con " . implode(',', array_keys($fillFields)));
+                                        } else {
+                                            $failed++;
+                                        }
+                                    } else {
+                                        $skipped++;
+                                    }
+                                } else {
+                                    $skipped++;
+                                }
+                            } elseif ($fillSize !== false) {
+                                log_message("trackerGram import fill (full): SKIP file too large ({$fillSize} bytes): {$fillFileName}", true);
+                                $skipped++;
                             } else {
-                                $failed++;
+                                $skipped++;
                             }
                         } else {
                             $skipped++;
                         }
-                    } else {
-                        $skipped++;
                     }
                 } else {
                     $skipped++;

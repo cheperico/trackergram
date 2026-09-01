@@ -85,6 +85,7 @@ define('RETRY_DELAY_MICROSECONDS', 100000); // 0.1 segundos
 // Límite de descarga de media vía webhook (20 MB)
 define('MEDIA_DOWNLOAD_MAX_SIZE', 20 * 1024 * 1024);
 // Límite para import desde ZIP local (100 MB — cubre videos grandes vía re-import)
+// Requiere host: upload_max_filesize ≥105M, post_max_size ≥110M, memory_limit ≥512M (ver opt/shared_hosting.md)
 define('MEDIA_IMPORT_MAX_SIZE', 100 * 1024 * 1024);
 
 // Límite de tamaño total descomprimido del ZIP importado (500 MB)
