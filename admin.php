@@ -788,6 +788,7 @@ foreach ($connectionsSafe as $slug => $conn) {
                             <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
                             <button type="submit" class="btn btn-outline btn-sm" title="<?php echo __('subconn.sync_title'); ?>"><?php echo __('subconn.sync'); ?></button>
                         </form>
+                        <button class="btn btn-outline btn-sm" onclick="openVisualization('<?php echo escapeHtml($conn['slug']); ?>')" title="Deployar visualización en TikiWiki">🎨 Visualización</button>
                         <form method="post" class="inline-form" onsubmit="return confirm('<?php echo addslashes(sprintf(__('conn.delete_confirm'), $conn['name'])); ?>')">
                             <input type="hidden" name="action" value="delete_connection">
                             <input type="hidden" name="slug" value="<?php echo escapeHtml($conn['slug']); ?>">
