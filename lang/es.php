@@ -116,6 +116,7 @@ return [
     'form.add_button_title'  => 'Agregar una nueva conexión entre un bot de Telegram y un tracker de TikiWiki',
     'form.show_title'        => 'Mostrar u ocultar',
     'form.show_aria'         => 'Mostrar contraseña',
+    'form.hide_aria'         => 'Ocultar contraseña',
     'form.save_title'        => 'Guardar los datos de la conexión',
     'modal.close'            => 'Cerrar',
 
@@ -154,6 +155,8 @@ return [
     'import.file_title'      => 'Archivo ZIP con el export de conversaciones de Telegram',
     'import.button'          => 'Importar',
     'import.button_title'    => 'Iniciar importación del archivo ZIP seleccionado',
+    'import.autofilled'      => 'Credenciales cargadas desde "%s"',
+    'import.autofilled_cleared' => 'Credenciales limpiadas',
     'import.completed'       => 'Importacion completada',
     'import.imported'        => 'Mensajes importados',
     'import.errors'          => 'Errores',
@@ -176,7 +179,7 @@ return [
     'create.field_prefix_hint' => 'Prefijo para los nombres de campo (permNames). Solo minúsculas + números, máximo 16 caracteres.',
     'create.connection_label' => 'Asignar a conexión (opcional)',
     'create.connection_default' => '— Solo crear tracker —',
-    'create.connection_hint' => 'Seleccioná una conexión para recordar sus datos al asignar',
+    'create.connection_hint' => 'Toma Tiki URL y token de una conexión existente — autocompleta los campos de abajo.',
     'create.tiki_url'        => 'Tiki API URL',
     'create.tiki_url_placeholder' => 'https://wiki.ejemplo.org/api/',
     'create.tiki_url_title'  => 'URL base de la API REST de TikiWiki',
@@ -190,6 +193,8 @@ return [
     'create.button'          => 'Crear Tracker',
     'create.button_title'    => 'Crear el tracker en TikiWiki con los campos especificados',
     'create.preview_label'   => 'Vista previa de campos que se crearán',
+    'create.autofilled'      => 'Credenciales cargadas desde "%s"',
+    'create.autofilled_cleared' => 'Credenciales limpiadas',
 
     // ── Messages / Alerts ──
     'msg.saved'              => 'Conexión "%s" guardada exitosamente (slug: %s)',

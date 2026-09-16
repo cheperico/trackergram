@@ -481,7 +481,7 @@ if (isset($_GET['edit'])) {
 }
 ?>
 <!DOCTYPE html>
-<html lang="es">
+<html lang="<?php echo $langCode; ?>">
 <head>
     <title>trackerGram - Admin</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -550,7 +550,7 @@ if (isset($_GET['edit'])) {
 <?php if ($view === 'classic'): ?>
 <!-- ── VISTA CLASICA ── -->
 <div class="section">
-    <div class="section-header"><?php echo __('webhook.section_title'); ?></div>
+    <h2 class="section-header"><?php echo __('webhook.section_title'); ?></h2>
     <div class="section-content">
         <?php if (empty($connections)): ?>
             <div class="empty-state">
@@ -816,7 +816,7 @@ foreach ($detections as $det) {
 ?>
 <?php if (!empty($detectionsBySlug)): ?>
 <div class="section">
-    <div class="section-header"><?php echo __('detected.title'); ?></div>
+    <h2 class="section-header"><?php echo __('detected.title'); ?></h2>
     <div class="section-content">
         <p style="font-size:0.85em;color:var(--text-secondary);margin-bottom:16px;">
             <?php echo __('detected.description'); ?>
@@ -886,14 +886,14 @@ foreach ($detections as $det) {
                         <label for="form-bot_token"><?php echo __('form.bot_token'); ?></label>
                         <div class="input-wrapper">
                             <input type="password" name="bot_token" id="form-bot_token" required aria-required="true" autocomplete="new-password" placeholder="<?php echo __('form.bot_token_placeholder'); ?>" title="<?php echo __('form.bot_token_title'); ?>">
-                            <button type="button" class="icon-btn" onclick="togglePassword(this)" title="<?php echo __('form.show_title'); ?>" aria-label="<?php echo __('form.show_aria'); ?>"><?php echo __('misc.show'); ?></button>
+                            <button type="button" class="icon-btn" onclick="togglePassword(this)" title="<?php echo __('form.show_title'); ?>" aria-label="<?php echo __('form.show_aria'); ?>" data-show-text="<?php echo __('misc.show'); ?>" data-hide-text="<?php echo __('misc.hide'); ?>" data-show-aria="<?php echo __('form.show_aria'); ?>" data-hide-aria="<?php echo __('form.hide_aria'); ?>"><?php echo __('misc.show'); ?></button>
                         </div>
                     </div>
                     <div class="form-group">
                         <label for="form-webhook_secret"><?php echo __('form.webhook_secret'); ?></label>
                         <div class="input-wrapper">
                             <input type="password" name="webhook_secret" id="form-webhook_secret" autocomplete="new-password" placeholder="<?php echo __('form.webhook_secret_placeholder'); ?>" aria-describedby="hint-webhook_secret" title="<?php echo __('form.webhook_secret_title'); ?>">
-                            <button type="button" class="icon-btn" onclick="togglePassword(this)" title="<?php echo __('form.show_title'); ?>" aria-label="<?php echo __('form.show_aria'); ?>"><?php echo __('misc.show'); ?></button>
+                            <button type="button" class="icon-btn" onclick="togglePassword(this)" title="<?php echo __('form.show_title'); ?>" aria-label="<?php echo __('form.show_aria'); ?>" data-show-text="<?php echo __('misc.show'); ?>" data-hide-text="<?php echo __('misc.hide'); ?>" data-show-aria="<?php echo __('form.show_aria'); ?>" data-hide-aria="<?php echo __('form.hide_aria'); ?>"><?php echo __('misc.show'); ?></button>
                         </div>
                         <div class="hint" id="hint-webhook_secret"><?php echo __('form.webhook_secret_hint'); ?></div>
                     </div>
@@ -920,7 +920,7 @@ foreach ($detections as $det) {
                     <label for="form-tiki_api_token"><?php echo __('form.tiki_api_token'); ?></label>
                     <div class="input-wrapper">
                         <input type="password" name="tiki_api_token" id="form-tiki_api_token" required aria-required="true" autocomplete="new-password" placeholder="<?php echo __('form.tiki_api_token_placeholder'); ?>" title="<?php echo __('form.tiki_api_token_title'); ?>">
-                        <button type="button" class="icon-btn" onclick="togglePassword(this)" title="<?php echo __('form.show_title'); ?>" aria-label="<?php echo __('form.show_aria'); ?>"><?php echo __('misc.show'); ?></button>
+                        <button type="button" class="icon-btn" onclick="togglePassword(this)" title="<?php echo __('form.show_title'); ?>" aria-label="<?php echo __('form.show_aria'); ?>" data-show-text="<?php echo __('misc.show'); ?>" data-hide-text="<?php echo __('misc.hide'); ?>" data-show-aria="<?php echo __('form.show_aria'); ?>" data-hide-aria="<?php echo __('form.hide_aria'); ?>"><?php echo __('misc.show'); ?></button>
                     </div>
                 </div>
                 
@@ -1001,7 +1001,7 @@ foreach ($detections as $det) {
 <!-- ===== TAB: IMPORTAR ===== -->
 
 <div class="section">
-    <div class="section-header"><?php echo __('import.title'); ?></div>
+    <h2 class="section-header"><?php echo __('import.title'); ?></h2>
     <div class="section-content">
         <p style="margin-bottom:16px;">
             <?php echo __('import.description'); ?>
@@ -1035,10 +1035,11 @@ foreach ($detections as $det) {
                     <label for="import-tiki_api_token"><?php echo __('import.tiki_token'); ?></label>
                     <div class="input-wrapper">
                         <input type="password" name="tiki_api_token" id="import-tiki_api_token" required aria-required="true" autocomplete="new-password" placeholder="<?php echo __('import.tiki_token_placeholder'); ?>" title="<?php echo __('import.tiki_token_title'); ?>">
-                        <button type="button" class="icon-btn" onclick="togglePassword(this)" title="<?php echo __('form.show_title'); ?>" aria-label="<?php echo __('form.show_aria'); ?>"><?php echo __('misc.show'); ?></button>
+                        <button type="button" class="icon-btn" onclick="togglePassword(this)" title="<?php echo __('form.show_title'); ?>" aria-label="<?php echo __('form.show_aria'); ?>" data-show-text="<?php echo __('misc.show'); ?>" data-hide-text="<?php echo __('misc.hide'); ?>" data-show-aria="<?php echo __('form.show_aria'); ?>" data-hide-aria="<?php echo __('form.hide_aria'); ?>"><?php echo __('misc.show'); ?></button>
                     </div>
                 </div>
             </div>
+            <div id="import-autofill-status" class="autofill-status" aria-live="polite" aria-atomic="true" data-autofilled="<?php echo escapeHtml(__('import.autofilled', '%s')); ?>" data-cleared="<?php echo escapeHtml(__('import.autofilled_cleared')); ?>"></div>
             <input type="hidden" name="field_prefix" id="import-field_prefix" value="telegrammessage">
             
             <div class="form-row">
@@ -1069,7 +1070,7 @@ foreach ($detections as $det) {
 <!-- ===== TAB: CREAR TRACKER ===== -->
 
 <div class="section">
-    <div class="section-header"><?php echo __('create.title'); ?></div>
+    <h2 class="section-header"><?php echo __('create.title'); ?></h2>
     <div class="section-content">
         <p style="margin-bottom:16px;">
             <?php echo __('create.description'); ?>
@@ -1123,10 +1124,11 @@ foreach ($detections as $det) {
                     <label for="create-tiki_api_token"><?php echo __('create.tiki_token'); ?> <span id="create-token-required" style="color:var(--error);">*</span></label>
                     <div class="input-wrapper">
                         <input type="password" name="tiki_api_token" id="create-tiki_api_token" required aria-required="true" autocomplete="new-password" placeholder="<?php echo __('create.tiki_token_placeholder'); ?>" value="<?php echo escapeHtml($_POST['tiki_api_token'] ?? ''); ?>" title="<?php echo __('create.tiki_token_title'); ?>">
-                        <button type="button" class="icon-btn" onclick="togglePassword(this)" title="<?php echo __('form.show_title'); ?>" aria-label="<?php echo __('form.show_aria'); ?>"><?php echo __('misc.show'); ?></button>
+                        <button type="button" class="icon-btn" onclick="togglePassword(this)" title="<?php echo __('form.show_title'); ?>" aria-label="<?php echo __('form.show_aria'); ?>" data-show-text="<?php echo __('misc.show'); ?>" data-hide-text="<?php echo __('misc.hide'); ?>" data-show-aria="<?php echo __('form.show_aria'); ?>" data-hide-aria="<?php echo __('form.hide_aria'); ?>"><?php echo __('misc.show'); ?></button>
                     </div>
                 </div>
             </div>
+            <div id="create-autofill-status" class="autofill-status" aria-live="polite" aria-atomic="true" data-autofilled="<?php echo escapeHtml(__('create.autofilled', '%s')); ?>" data-cleared="<?php echo escapeHtml(__('create.autofilled_cleared')); ?>"></div>
             
             <div class="form-group">
                 <div style="border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-size:0.85em;color:var(--text);" aria-live="polite" aria-atomic="true">

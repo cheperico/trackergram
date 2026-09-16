@@ -530,14 +530,21 @@ function resetConnectionForm() {
  */
 function fillConnectionSlug(selectEl, prefix) {
     var slug = selectEl.value;
+    var statusEl = document.getElementById(prefix + 'autofill-status');
     if (!slug) {
         // Limpiar campos si se volvió a "Ingresar manual"
         var urlInput = document.getElementById(prefix + 'tiki_api_url');
         var tokenInput = document.getElementById(prefix + 'tiki_api_token');
         var trackerInput = document.getElementById(prefix + 'tracker_id');
-        if (urlInput) urlInput.value = '';
-        if (tokenInput) tokenInput.value = '';
-        if (trackerInput) trackerInput.value = '';
+        if (urlInput) { urlInput.value = ''; urlInput.classList.remove('is-autofilled'); }
+        if (tokenInput) { tokenInput.value = ''; tokenInput.classList.remove('is-autofilled'); }
+        if (trackerInput) { trackerInput.value = ''; trackerInput.classList.remove('is-autofilled'); }
+        if (statusEl) {
+            var clearedMsg = statusEl.getAttribute('data-cleared') || '';
+            statusEl.textContent = clearedMsg;
+            statusEl.classList.add('is-cleared');
+            statusEl.classList.remove('is-ok');
+        }
         return;
     }
     
@@ -559,14 +566,23 @@ function fillConnectionSlug(selectEl, prefix) {
         var tokenInput = document.getElementById(prefix + 'tiki_api_token');
         var trackerInput = document.getElementById(prefix + 'tracker_id');
         
-        if (urlInput) urlInput.value = conn.tiki_api_url || '';
-        if (tokenInput) tokenInput.value = conn.tiki_api_token || '';
-        if (trackerInput) trackerInput.value = conn.tracker_id || '';
+        if (urlInput) { urlInput.value = conn.tiki_api_url || ''; if (conn.tiki_api_url) urlInput.classList.add('is-autofilled'); }
+        if (tokenInput) { tokenInput.value = conn.tiki_api_token || ''; if (conn.tiki_api_token) tokenInput.classList.add('is-autofilled'); }
+        if (trackerInput) { trackerInput.value = conn.tracker_id || ''; if (conn.tracker_id) trackerInput.classList.add('is-autofilled'); }
         
         // También el field_prefix si existe en el formulario
         var prefixInput = document.getElementById(prefix + 'field_prefix') || document.getElementById(prefix + 'field-prefix');
         if (prefixInput && conn.field_prefix) {
             prefixInput.value = conn.field_prefix;
+            prefixInput.classList.add('is-autofilled');
+        }
+        // Feedback accesible
+        if (statusEl) {
+            var tmpl = statusEl.getAttribute('data-autofilled') || 'Loaded from %s';
+            var name = conn.name || slug;
+            statusEl.textContent = tmpl.replace('%s', name);
+            statusEl.classList.remove('is-cleared');
+            statusEl.classList.add('is-ok');
         }
     })
     .catch(function() {
@@ -604,14 +620,18 @@ document.addEventListener('DOMContentLoaded', function() {
  */
 function togglePassword(btn) {
     var input = btn.parentElement.querySelector('input');
+    var showText = btn.getAttribute('data-show-text') || 'Mostrar';
+    var hideText = btn.getAttribute('data-hide-text') || 'Ocultar';
+    var showAria = btn.getAttribute('data-show-aria') || 'Mostrar contraseña';
+    var hideAria = btn.getAttribute('data-hide-aria') || 'Ocultar contraseña';
     if (input && input.type === 'password') {
         input.type = 'text';
-        btn.textContent = 'Ocultar';
-        btn.setAttribute('aria-label', 'Ocultar contraseña');
+        btn.textContent = hideText;
+        btn.setAttribute('aria-label', hideAria);
     } else if (input) {
         input.type = 'password';
-        btn.textContent = 'Mostrar';
-        btn.setAttribute('aria-label', 'Mostrar contraseña');
+        btn.textContent = showText;
+        btn.setAttribute('aria-label', showAria);
     }
 }
 

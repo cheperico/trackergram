@@ -117,6 +117,7 @@ return [
     'form.add_button_title'  => 'Add a new connection between a Telegram bot and a TikiWiki tracker',
     'form.show_title'        => 'Show / hide',
     'form.show_aria'         => 'Show password',
+    'form.hide_aria'         => 'Hide password',
     'form.save_title'        => 'Save the connection data',
     'modal.close'            => 'Close',
 
@@ -155,6 +156,8 @@ return [
     'import.file_title'      => 'ZIP file with exported Telegram conversations',
     'import.button'          => 'Import',
     'import.button_title'    => 'Start importing the selected ZIP file',
+    'import.autofilled'      => 'Credentials loaded from "%s"',
+    'import.autofilled_cleared' => 'Credentials cleared',
     'import.completed'       => 'Import completed',
     'import.imported'        => 'Messages imported',
     'import.errors'          => 'Errors',
@@ -177,7 +180,7 @@ return [
     'create.field_prefix_hint' => 'Prefix for field names (permNames). Lowercase letters + numbers only, max 16 characters.',
     'create.connection_label' => 'Assign to connection (optional)',
     'create.connection_default' => '— Create tracker only —',
-    'create.connection_hint' => 'Select a connection to pre-fill its data',
+    'create.connection_hint' => 'Use Tiki URL and token from an existing connection — fields below are auto-filled.',
     'create.tiki_url'        => 'Tiki API URL',
     'create.tiki_url_placeholder' => 'https://wiki.example.org/api/',
     'create.tiki_url_title'  => 'TikiWiki REST API base URL',
@@ -191,6 +194,8 @@ return [
     'create.button'          => 'Create Tracker',
     'create.button_title'    => 'Create the tracker in TikiWiki with the specified fields',
     'create.preview_label'   => 'Preview of fields to be created',
+    'create.autofilled'      => 'Credentials loaded from "%s"',
+    'create.autofilled_cleared' => 'Credentials cleared',
 
     // ── Messages / Alerts ──
     'msg.saved'              => 'Connection "%s" saved successfully (slug: %s)',

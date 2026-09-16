@@ -1,0 +1,112 @@
+{* ============================================================
+   PLANTILLA TRACKERGRAM GENÉRICA - Cada burbuja de mensaje
+   Compatible con cualquier tracker de trackerGram
+   Prefijo variable (rcct2026, telegrammessage, qpch, etc.)
+   No hardcodea fieldIds - normaliza por sufijo via $fields
+   Para deploy manual: copiar a wiki page plantillaTrackergram
+   ============================================================ *}
+
+{* ── NORMALIZACIÓN POR SUFIJO ── *}
+{foreach $fields as $fv}
+  {assign var="suf" value=$fv.permName|regex_replace:"/^[a-z0-9]+/":""}
+  {if $suf == "DisplayName"}{assign var="tg_name" value=$fv.value}{/if}
+  {if $suf == "Username"}{assign var="tg_user" value=$fv.value}{/if}
+  {if $suf == "MessageDate"}{assign var="tg_date" value=$fv.value}{/if}
+  {if $suf == "MessageType"}{assign var="tg_type" value=$fv.value}{/if}
+  {if $suf == "Text"}{assign var="tg_text" value=$fv.value}{/if}
+  {if $suf == "Media"}{assign var="tg_media" value=$fv.value}{/if}
+  {if $suf == "MediaUrl"}{assign var="tg_mediaUrl" value=$fv.value}{/if}
+  {if $suf == "MediaType"}{assign var="tg_mediaType" value=$fv.value}{/if}
+  {if $suf == "MediaCaption"}{assign var="tg_caption" value=$fv.value}{/if}
+  {if $suf == "Location"}{assign var="tg_loc" value=$fv.value}{/if}
+  {if $suf == "ReplyToId"}{assign var="tg_reply" value=$fv.value}{/if}
+  {if $suf == "EditedDate"}{assign var="tg_edited" value=$fv.value}{/if}
+  {if $suf == "Hashtags"}{assign var="tg_tags" value=$fv.value}{/if}
+  {if $suf == "TelegramMessageId"}{assign var="tg_replyPerm" value=$fv.permName}{/if}
+{/foreach}
+
+<div id="item-{$f_itemId}" class="tgram-bubble {$tg_type|lower}">
+
+  {* ── CABECERA ── *}
+  <div class="tgram-header">
+    <strong class="tgram-name">{$tg_name}</strong>
+    {if $tg_user}
+      <span class="tgram-username">@{$tg_user}</span>
+    {/if}
+    <span class="tgram-date">{if $tg_date|is_numeric}{$tg_date|date_format:"%d/%m/%Y %H:%M"}{else}{$tg_date}{/if}</span>
+  </div>
+
+  {* ── TEXTO ── *}
+  {if $tg_text}
+    <div class="tgram-text">{$tg_text}</div>
+  {/if}
+
+{* ── MULTIMEDIA ── *}
+{if $tg_mediaUrl || $tg_media}
+  <div class="tgram-media">
+    {if $tg_type == 'photo' || $tg_type == 'sticker'}
+      {assign var="mediaUrls" value=","|explode:$tg_mediaUrl}
+      {foreach $mediaUrls as $mediaUrl}
+        {if $mediaUrl != ''}
+          <a href="{$mediaUrl}" data-box="shadowbox[tgram];type=img"><img src="{$mediaUrl}" /></a>
+        {/if}
+      {/foreach}
+    {/if}
+    {if $tg_type == 'animation'}
+      {wikiplugin _name="html"}<video src="{$tg_mediaUrl}" autoplay loop muted playsinline style="width:100%;height:auto">{/wikiplugin}
+    {/if}
+    {if $tg_type == 'video' || $tg_type == 'video_note'}
+      {wikiplugin _name="html"}<video src="{$tg_mediaUrl}" controls style="width:100%;height:auto">{/wikiplugin}
+    {/if}
+    {if $tg_type == 'audio' || $tg_type == 'voice'}
+      {wikiplugin _name="mediaplayer" src=$tg_mediaUrl type=$tg_mediaType}{/wikiplugin}
+    {/if}
+    {if $tg_type == 'document'}
+      {if $tg_mediaType|strstr:"image/"}
+        <a href="{$tg_mediaUrl}" data-box="shadowbox[tgram];type=img"><img src="{$tg_mediaUrl}" /></a>
+      {elseif $tg_mediaType|strstr:"video/"}
+        {wikiplugin _name="html"}<video src="{$tg_mediaUrl}" controls style="width:100%;height:auto">{/wikiplugin}
+      {else}
+        <a href="{$tg_mediaUrl}" target="_blank" class="tgram-download">📎 {$tg_mediaType}</a>
+      {/if}
+    {/if}
+  </div>
+  {if $tg_caption}
+    <div class="tgram-caption"><em>{$tg_caption}</em></div>
+  {/if}
+{/if}
+
+  {* ── UBICACIÓN ── *}
+  {if $tg_loc}
+    <div class="tgram-location">
+      {wikiplugin _name="map" coords=$tg_loc}{/wikiplugin}
+    </div>
+  {/if}
+
+  {* ── RESPUESTA ── *}
+  {if $tg_reply}
+    <div class="tgram-reply">
+      ↪️ Respuesta a:
+      {if $tg_reply|strstr:"#"}
+        {if preg_match('/^#(\d+)/', $tg_reply, $matches)}
+          <a href="tiki-view_tracker_item.php?itemId={$matches[1]}&modal=1" class="tgram-reply-link tgram-reply-modal">{$tg_reply}</a>
+        {else}
+          {$tg_reply}
+        {/if}
+      {else}
+        <a href="tiki-view_tracker.php?trackerId={$item.trackerId}&filterfield={$tg_replyPerm}&filtervalue={$tg_reply|escape:'url'}" class="tgram-reply-link tgram-reply-modal">{$tg_reply}</a>
+      {/if}
+    </div>
+  {/if}
+
+  {* ── EDITADO ── *}
+  {if $tg_edited}
+    <div class="tgram-edited">✏️ Editado {$tg_edited|date_format:"%d/%m/%Y %H:%M"}</div>
+  {/if}
+
+  {* ── HASHTAGS ── *}
+  {if $tg_tags}
+    <div class="tgram-hashtags">{$tg_tags}</div>
+  {/if}
+
+</div>
