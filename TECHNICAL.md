@@ -68,33 +68,47 @@ Usando `findAllByChatId()`, si dos conexiones tienen el mismo `(chat_id, webhook
 #### El código real
 
 ```php
+// api.php (simplificado) — incluye rate limit, migración y fan-out
+$rateKey = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? 'missing_token';
+// ... rate limit con fopen('c+') + flock(LOCK_EX) + GC 1% DirectoryIterator ...
+
+// Extraer chatId de todos los tipos: message | edited_message | channel_post | message_reaction | my_chat_member
+$secretToken = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '';
 $configManager = new ConfigManager();
 $allFound = $configManager->findAllByChatId((int) $chatId, $secretToken);
 
+// Migración grupo→supergrupo: actualiza chat_id en setup.json antes de la búsqueda final
+if (isset($update['message']['migrate_to_chat_id'])) { /* updateConnectionFields + re-find */ }
+
 if (empty($allFound)) {
+    // Detección pasiva: findByWebhookSecretPending() → addDetection() → 200 detected | 403 si secret desconocido
     http_response_code(403);
     die(json_encode(['error' => 'Forbidden: no connection for this chat']));
 }
 
-// Fan-out: procesar el update para TODAS las conexiones que matcheen
+// Fan-out + async opcional + 502 si todas fallan
 foreach ($allFound as $found) {
     $tikiClient = new TikiWikiClient(
         apiUrl: $found['tiki_api_url'],
-        token: $found['tiki_api_token']
+        token: $found['tiki_api_token'],
+        timeout: TIMEOUT_TIKIWIKI_API,
+        uploadTimeout: TIMEOUT_TIKIWIKI_UPLOAD
     );
+    $tikiClient->setFieldPrefix($found['field_prefix'] ?? 'telegrammessage');
+    // ... resolveFieldPrefix UNA vez (field_prefix_checked) ...
     $tgClient = new TelegramClient(botToken: $found['bot_token']);
-    
     $handler = new WebhookHandler(
         tikiWikiClient: $tikiClient,
         telegramClient: $tgClient,
-        messageMapper: new MessageMapper(),
+        messageMapper: $messageMapper, // con setFieldPrefix
         trackerId: (int) $found['tracker_id']
     );
+    // Si async_processing: file_put_contents(.tmp) + rename() atómico a tmp/buffer/event_*.json
     $handler->processUpdate($update);
 }
 ```
 
-**Por qué está así**: `api.php` no tiene lógica de negocio. Solo valida que la petición venga de Telegram (secret token), limita la cantidad de peticiones (rate limiting), busca la conexión por `(chat_id, secret)`, y delega en `WebhookHandler`. Esto se hizo en la refactorización v0.1.7 — antes, `api.php` tenía cientos de líneas de lógica mezclada.
+**Por qué está así**: `api.php` no tiene lógica de negocio — solo **entry point**. Valida `CONTENT_LENGTH` ≤1MB, hace **rate limiting con flock**, detecta **migración** (`migrate_to_chat_id`), maneja **detección pasiva** y **fan-out**. Desde v0.5.13 el buffer async es atómico (`.tmp+rename`) y el fan-out responde **502 si todas las conexiones fallan** para que Telegram reintente. Esto se hizo en la refactorización v0.1.7 — antes, `api.php` tenía cientos de líneas de lógica mezclada.
 
 **Lección aprendida**: Separar el "recibir la petición" del "procesar los datos" hace que el código sea más fácil de entender y modificar.
 
@@ -487,47 +501,54 @@ El método `fromExport()` en `MessageMapper` soporta dos formatos de export:
 ```
 Telegram
     ↓ (webhook POST)
-api.php ← valida token, rate limit
+api.php ← CONTENT_LENGTH 1MB + rate limit tg_rate_* (LOCK_EX) + secret_token
+    ↓ (migrate_to_chat_id / migrate_from_chat_id → update setup.json)
+    ↓ findAllByChatId() fan-out (502 si todas fallan) → async .tmp+rename o sync
     ↓
 WebhookHandler::processUpdate()
-    ↓ (dispatch)
+    ↓ (dispatch a processMessage / processEditedMessage / processMessageReaction)
 WebhookHandler::processMessage()
     ↓
-1. Validar campos requeridos
-2. Resolver topic (cache → fallback)
-3. Resolver reply: buscar itemId en tracker + extraer texto del original
-4. Verificar duplicado
-5. MessageMapper::fromWebhook() → extraer datos
-6. downloadAndUploadMedia() → descargar de Telegram, subir a TikiWiki
-7. sendToTikiWikiWithRetries() → crear item con reintentos
+1. fromWebhook() → NormalizedMessage (incl. media_group_id, reply_to, hashtags)
+2. TOCTOU lock tmp/dedup_locks/{chatId:messageId}
+3. Resolver topic (cache topic_names.json con LOCK_EX → fallback)
+4. messageExists() vía cache message_ids_{trackerId}.json (seed UNA vez GET /api/trackers/{id})
+5. downloadAndUploadMedia() → HEAD + streaming + retry×3 → uploadFile() → mediaUrl
+6. Álbum: registerOrLookupAlbum() (LOCK_EX sobre media_group_album.json); si existe → appendMediaToTrackerItem() idempotente
+7. Resolver reply: lookupReplyCache() → findItemByMessageId() → format "#itemId - fecha - \"texto\""
+8. toWikiFields() + strip_tags() → sendToTikiWikiWithRetries() → createTrackerItem() (cachea chatId:messageId→itemId)
 ```
 
 ### Cómo se relacionan los archivos (v0.6.0+)
 
 ```
 bootstrap.php
-    ├── config.php          → carga .env, define constantes globales
+    ├── config.php          → carga .env, define constantes, TEMP_DIR, resolveHostToIp(), log_message()
+    ├── lang/load.php       → i18n __() / _n()
+    ├── exceptions.php      → jerarquía TrackerGramException
     ├── NormalizedMessage.php
-    ├── TikiWikiClient.php  → comunicación con TikiWiki
-    ├── TelegramClient.php  → comunicación con Telegram
-    ├── MessageMapper.php   → transformación de datos
-    └── WebhookHandler.php  → orquesta todo
+    ├── TikiWikiClient.php  → comunicación con TikiWiki (SSRF CURLOPT_RESOLVE, wiki pages)
+    ├── TelegramClient.php  → comunicación con Telegram (getFile, setWebhook, getChat)
+    ├── MessageMapper.php   → transformación de datos (strip_tags en toWikiFields)
+    ├── WebhookHandler.php  → orquesta todo (TOCTOU, álbumes, topics, replies)
+    └── CollectSessionManager.php → sesiones /gather
 
-api.php            → ConfigManager → clientes por conexión → WebhookHandler::processUpdate()
-admin.php          → ConfigManager → clientes por conexión (test, create)
-  └── admin_handlers.php  → 12 handlers POST + 3 AJAX (incluido ANTES de loops pesados)
-  └── admin.css           → 211 líneas cacheables de estilos
-  └── admin.js            → 558 líneas cacheables (modal, test, fetch, CSRF)
-  └── admin_import.js     → 166 líneas cacheables (chunked import + progress bar)
-import.php         → clientes locales desde formulario → MessageMapper::toWikiFields()
-worker.php         → ConfigManager → clientes por conexión → WebhookHandler
+api.php            → ConfigManager → clientes por conexión → WebhookHandler::processUpdate() (+fan-out, migración, async buffer)
+admin.php          → ConfigManager → clientes por conexión (test, create, health check, prefix auto-detección)
+  └── admin_handlers.php  → 12 handlers POST + 2 AJAX visualization (incluido ANTES de loops pesados)
+  └── admin.css           → estilos cacheables (incl. .viz-* para visualización)
+  └── admin.js            → modal, test, fetch, CSRF, openVisualization()
+  └── admin_import.js     → chunked import + progress bar (extract/process/cancel)
+import.php         → clientes locales desde formulario → MessageMapper::toWikiFields() (NDJSON + messageTopicMap + grouped_id ≤1s)
+worker.php         → ConfigManager → clientes por conexión → WebhookHandler (flock sobre .json, ftruncate+rename .done, GC .failed/.tmp)
+VisualizationDeployer.php → compila template Smarty (placeholders → fieldIds) + deploy POST /api/wiki
 ```
 
 **No hay un wiring central**. Cada entry point crea sus propios clientes desde las credenciales de la conexión en `setup.json`. Esto permite tener múltiples bots, wikis y trackers desde una misma instalación.
 
 **admin.php** pasó de 2529 líneas monolíticas a ~1114 (-56%). La lógica POST se movió a `admin_handlers.php`, los estilos a `admin.css`, y el JS a `admin.js`/`admin_import.js`. Los handlers se incluyen **antes** de los loops pesados a APIs externas (Telegram/TikiWiki), por lo que los AJAX responden en milisegundos. `$connectionsSafe` se construye al final de todo el procesamiento, reflejando el estado final de `$connections` sin actualizaciones manuales intermedias.
 
-### Deuda técnica (v0.6.0)
+### Deuda técnica (v0.7.1)
 
 Items **ya resueltos**:
 - ✅ **Inyección de dependencias**: Clases instanciables con dependencias inyectadas por constructor, sin wiring central en bootstrap.
@@ -569,6 +590,10 @@ Items **ya resueltos**:
 - ✅ **Cache-Control: no-store en get_connection**: Evita que tokens queden en cachés intermedias (v0.5.14).
 - ✅ **Admin.php refactorizado (Fase A)**: CSS/JS extraídos a archivos externos cacheables (`admin.css`, `admin.js`, `admin_import.js`). admin.php reducido de 2529 a ~1597 líneas (v0.5.14/0.6.0).
 - ✅ **Admin.php refactorizado (Fase B)**: Handlers POST extraídos a `admin_handlers.php` (508 líneas). admin.php reducido a 1114 líneas (-56% del original). Handlers ejecutados ANTES de loops pesados (AJAX en ms). `$connectionsSafe` construido al final del procesamiento (datos frescos). `validateCSRFToken()` responde JSON+403 para AJAX. Sin doble escape en handlers.
+- ✅ **Deploy automático de visualización (V-1)**: botón "🎨 Visualización" en cada conexión del admin. Modal con selector de campos por categoría, nombres de página personalizables, deploy de 2 páginas wiki vía API REST (`POST /api/wiki` + `POST /api/wiki/page/{page}`). Compilador recursivo de condicionales anidados. Preferencias persistidas en `setup.json`. Pendiente prueba manual en instancia real (v0.7.0).
+- ✅ **Cache local messageIds para dedup sin API (F4-7 / BUG-009)**: `tmp/message_ids_{trackerId}.json` mapea `chatId:messageId→itemId`, sembrado UNA vez vía `getAllTrackerItems()` (fetch fuera del LOCK_EX) y actualizado en `createTrackerItem()`. `messageExists()`/`findItemByMessageId()` sin HTTP por mensaje. Poda 1000 si >5000, `invalidateMessageIdsCache()` para imports (v0.7.1).
+- ✅ **Reply-To cache local**: `reply_cache.json` con `LOCK_EX/SH` para resolver `reply_to` sin API inmediata.
+- ✅ **Álbumes en import**: heurística fotos mismo sender ≤1s, `album_state.json` entre batches, `album_appended` counter.
 
 Items aún pendientes:
 - ⬜ **Tests unitarios**: Las clases son instanciables y testeables, pero faltan los tests. JsonFileStorage utility como primer candidato.
@@ -647,22 +672,25 @@ Tanto el webhook como el login del admin tienen rate limiting por IP. Sin esto, 
 
 ## Constantes de config.php
 
-| Constante | Valor |
-|---|---|
-| `ADMIN_USERNAME` | del `.env` |
-| `ADMIN_PASSWORD` | del `.env` (hash bcrypt) |
-| `DEBUG_MODE` | del `.env` (default false) |
-| `ASYNC_PROCESSING` | del `.env` (default false, sobrescribible por conexión) |
-| `ALLOWED_CHAT_IDS` | del `.env` (filtro global opcional) |
-| `TIMEOUT_TIKIWIKI_API` | 30 segundos |
-| `TIMEOUT_TIKIWIKI_UPLOAD` | 60 segundos |
-| `TIMEOUT_TELEGRAM_API` | 5 segundos |
-| `TIMEOUT_TELEGRAM_DOWNLOAD` | 10 segundos |
-| `MEDIA_DOWNLOAD_MAX_SIZE` | 20 MB |
-| `MAX_ZIP_UNCOMPRESSED_SIZE` | 500 MB |
-| `RETRY_MAX_ATTEMPTS` | 2 |
-| `RETRY_DELAY_MICROSECONDS` | 100000 (0.1s) |
-| `CACHE_ENABLED` | true |
+| Constante | Valor | Descripción |
+|---|---|---|
+| `ADMIN_USERNAME` | del `.env` | Usuario admin |
+| `ADMIN_PASSWORD` | del `.env` (hash bcrypt) | Contraseña admin |
+| `DEBUG_MODE` | del `.env` (default false) | Si `true` escribe `debug.log` |
+| `ASYNC_PROCESSING` | del `.env` (default false, sobrescribible por conexión) | Encola webhooks a `tmp/buffer/` |
+| `ALLOWED_CHAT_IDS` | del `.env` (filtro global opcional) | Whitelist global de chats |
+| `TIMEOUT_TIKIWIKI_API` | 30 segundos | Llamadas API generales |
+| `TIMEOUT_TIKIWIKI_UPLOAD` | 60 segundos | Subida a file gallery |
+| `TIMEOUT_TELEGRAM_API` | 5 segundos | Bot API (mensajes, getMe) |
+| `TIMEOUT_TELEGRAM_DOWNLOAD` | 10 segundos | Descarga `getFile` |
+| `MEDIA_DOWNLOAD_MAX_SIZE` | 20 MB | Límite descarga webhook (verificado HEAD + streaming) |
+| `MEDIA_IMPORT_MAX_SIZE` | 100 MB | Límite por archivo en import ZIP |
+| `MAX_ZIP_UNCOMPRESSED_SIZE` | 500 MB | Total descomprimido ZIP |
+| `MAX_JSON_IMPORT_SIZE` | 150 MB | `result.json` dentro del ZIP |
+| `RETRY_MAX_ATTEMPTS` | 2 | Reintentos Tiki/Telegram |
+| `RETRY_DELAY_MICROSECONDS` | 100000 (0.1s) | Backoff base |
+| `CACHE_ENABLED` | true | Cache topics/gallery |
+| `TEMP_DIR` | `__DIR__/tmp` | Directorio temporal aislado (creado 0700) |
 
 ---
 
@@ -674,11 +702,11 @@ Este apéndice describe **qué campos debe tener un tracker de TikiWiki** para s
 
 | Aspecto | Requisito |
 |---|---|
-| **Campos** | Debe tener **los 26 campos** listados abajo. Faltan → sincronizables con botón 🛠️ Sync. Sobran → no importa. |
+| **Campos** | Debe tener **los 28 campos** listados abajo. Faltan → sincronizables con botón 🛠️ Sync. Sobran → no importa. |
 | **Field prefix** | El permName de cada campo sigue el patrón `{prefix} + Sufijo`. El prefix por defecto es `telegrammessage`, pero puede ser cualquiera (ej: `soporte`, `qpch`, `equipo`). |
 | **Auto-detección** | Si el prefix storeado es `telegrammessage`, el sistema lo verifica contra los campos reales vía API y lo corrige automáticamente. |
 | **File Gallery** | El campo `{prefix}Media` (tipo `FG`) necesita un gallery ID asignado. Al crear el tracker desde el admin, se crea una galería automática. |
-| **Dropdown MessageType** | El campo `{prefix}MessageType` (tipo `D`) debe tener las options: `["text","photo","video","audio","document","sticker","voice","video_note","system","animation","contact","poll","location","other"]`. |
+| **MessageType** | El campo `{prefix}MessageType` (tipo `t`) guarda valores: `text`, `photo`, `video`, `audio`, `document`, `sticker`, `voice`, `video_note`, `system`, `animation`, `contact`, `poll`, `quiz`, `location`, `other`. |
 | **Mandatory** | Solo `{prefix}TelegramMessageId` es obligatorio (isMandatory). Los demás pueden estar vacíos. |
 
 ### Lista completa de campos

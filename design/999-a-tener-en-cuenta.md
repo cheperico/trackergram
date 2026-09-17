@@ -147,7 +147,7 @@ Aplicar `strip_tags()` a todo texto de usuario ANTES de enviarlo a TikiWiki elim
 
 ### Defensa actual
 
-Por el momento trackerGram **no aplica `strip_tags()`** y confía en que TikiWiki escape correctamente en sus templates Smarty. Esta sección documenta la recomendación de implementar `strip_tags()` como defensa en profundidad.
+Desde **v0.6.2** trackerGram **sí aplica `strip_tags()`** en `MessageMapper::toWikiFields()` y `toWikiFieldsEdit()` a todo texto de usuario (ver `AGENTS.md` § Qué NO hacer). Esto complementa el escape Smarty de TikiWiki como **defensa en profundidad** — Telegram envía texto plano (entities separadas), por lo que `strip_tags()` no pierde información legítima. El §5 original recomendaba implementarlo; ya está implementado y verificado.
 
 ### Mecanismos adicionales
 

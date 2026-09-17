@@ -26,40 +26,48 @@
 
 | Directorio | Contenido |
 |---|---|
-| `opt/` | Investigaciones, templates Smarty, archivos opcionales |
+| `config/` | `setup.json` multi-conexión (generado por ConfigManager, bloqueado por `.htaccess`), `.htaccess` |
+| `lang/` | i18n del admin (`es.php`, `en.php`, `load.php` con `__()`/`_n()`) |
 | `templates/visualization/` | Templates base de visualización (compilados por VisualizationDeployer) |
-| `tmp/` | Archivos temporales (rate limiting, buffers async, caches) |
-| `reports/` | Reportes históricos de auditoría (referencia) |
+| `assets/` | `favicon.svg`, `icon.svg` |
+| `tmp/` | Archivos temporales (rate limiting, buffers async `tmp/buffer/`, caches `topic_names.json`, `message_ids_*.json`, dedup locks) — aislado vía `TEMP_DIR` |
+| `opt/` | Investigaciones, templates Smarty de referencia (`visualizacion-tiki.md`, `shared_hosting.md`) |
+| `reports/` | Reportes históricos de auditoría (referencia, ya consolidados en roadmap) |
 | `design/` | **📐 Diseños activos** — leer antes de arrancar una feature nueva |
 | `design/archived/` | 🗄️ Diseños implementados/consolidados — **nunca borrar** |
 | `docs/` | Guías de contribución (`CONTRIBUTING.md` — gestión de documentación) |
 | `.opencode/` | Configuración de opencode (agentes, skills) |
+| `tikipickit/` | PWA offline standalone (inconcluso, no destacar — ver `tikipickit/README.md`) |
 
 ### Entry Points HTTP
 
 | Archivo | Qué hace |
 |---|---|
-| `bootstrap.php` | Carga config + clases PHP (sin DI wiring central) — primer include |
-| `api.php` | Recibe webhooks de Telegram (solo entry point, sin lógica de negocio) |
-| `admin.php` | Panel de administración web |
-| `admin_handlers.php` | Handlers POST/AJAX (incluido desde admin.php) |
-| `import.php` | Procesa exports ZIP de Telegram |
+| `bootstrap.php` | Carga config + clases PHP (sin DI wiring central) — primer include. También carga `lang/load.php`, `exceptions.php`, `CollectSessionManager` |
+| `api.php` | Recibe webhooks de Telegram (solo entry point, sin lógica de negocio). Maneja rate limit, migración `migrate_to_chat_id`, fan-out, async buffer `.tmp+rename` |
+| `admin.php` | Panel de administración web (auth, CSRF, rate limit, health check, auto-detección prefix) |
+| `admin_handlers.php` | Handlers POST/AJAX (incluido desde admin.php **antes** de loops pesados para respuesta en ms) |
+| `import.php` | Procesa exports ZIP de Telegram (modos `extract`/`process`/`full`, NDJSON, dedup, álbumes) |
+| `worker.php` | Procesa cola async `tmp/buffer/event_*.json` con `flock` sobre `.json`, GC de `.done`/`.failed` (cron) |
+| `index.php` | Redirect a `admin.php` |
 
 ### Clientes y Lógica
 
 | Archivo | Responsabilidad |
 |---|---|
-| `config.php` | Carga `.env`, define constantes globales, `log_message()`, `TRACKERGRAM_VERSION` |
+| `config.php` | Carga `.env`, define constantes globales, `log_message()`, `TRACKERGRAM_VERSION`, `TEMP_DIR`, `resolveHostToIp()` |
 | `NormalizedMessage.php` | Modelo intermedio único entre parsers y TikiWiki |
-| `TikiWikiClient.php` | API de TikiWiki (crear items, subir archivos, crear trackers, dedup) |
-| `TelegramClient.php` | API de Telegram (descargar archivos, info de chats) |
-| `MessageMapper.php` | Transforma mensajes → NormalizedMessage → campos TikiWiki |
-| `WebhookHandler.php` | Orquesta: valida, resuelve topics, descarga media, envía a TikiWiki |
-| `ConfigManager.php` | CRUD de conexiones multi-bot/wiki/tracker en `setup.json` |
-| `VisualizationDeployer.php` | Deploy automático de visualización (compila template Smarty, sube páginas wiki) |
+| `TikiWikiClient.php` | API de TikiWiki (crear items, subir archivos, crear trackers, dedup vía `message_ids_*.json` cache, SSRF `CURLOPT_RESOLVE`, wiki pages) |
+| `TelegramClient.php` | API de Telegram (descargar archivos, `getMe`/`getChat`/`getWebhookInfo`/`setWebhook`) |
+| `MessageMapper.php` | Transforma mensajes → NormalizedMessage → campos TikiWiki (`strip_tags()` en `toWikiFields`) |
+| `WebhookHandler.php` | Orquesta: valida, resuelve topics, descarga media, dedup TOCTOU lock, álbumes atómicos, envía a TikiWiki |
+| `ConfigManager.php` | CRUD de conexiones multi-bot/wiki/tracker en `config/setup.json` (load con `LOCK_SH`, `LOCK_EX` en save) |
+| `VisualizationDeployer.php` | Deploy automático de visualización (compila template Smarty con placeholders → fieldIds, sube páginas wiki vía `POST /api/wiki`) |
+| `CollectSessionManager.php` | Sesiones `/gather` (colecta estructurada) con GC por inactividad |
+| `detect_helper.php` | Detección pasiva de chats (`chats_detectados.json`, `saveDetections`/`assignDetection`) |
 | `exceptions.php` | Excepciones de dominio (`TrackerGramException` y subclases) |
 
-Frontend admin: `admin.css`, `admin.js`, `admin_import.js`. Soporte: `.env` (NO versionar), `.htaccess`, `setup.json` (auto-generado, bloqueado por `.htaccess`), `debug.log`.
+Frontend admin: `admin.css`, `admin.js`, `admin_import.js`. Soporte: `.env` (NO versionar), `.htaccess`, `config/setup.json` (auto-generado, bloqueado por `.htaccess` + `chmod 0600`), `debug.log` (rotación 10MB, fallback `tmp/debug_fallback.log`).
 
 ### Orden recomendado de lectura del código
 
@@ -96,13 +104,13 @@ Telegram envía las fotos de un álbum como mensajes individuales. Para que comp
 
 ### Flujo de datos
 
-**Webhook (tiempo real)**: `Telegram → api.php` → extraer `chat_id` + header `X-Telegram-Bot-Api-Secret-Token` → buscar conexión por `(chat_id, webhook_secret)` en ConfigManager → crear clientes per-conexión → `$handler->processUpdate()`. Si no hay conexión → HTTP 403 (sin fallback legacy). Async opcional: buffer a `tmp/buffer/` con `connection_slug`.
+**Webhook (tiempo real)**: `Telegram → api.php` → rate limit (`tg_rate_*` con `LOCK_EX`) → validar `CONTENT_LENGTH` ≤1MB → extraer `chat_id` (cubre `message`/`edited_message`/`channel_post`/`message_reaction`…) + header `X-Telegram-Bot-Api-Secret-Token` → detectar migración `migrate_to_chat_id`/`migrate_from_chat_id` y actualizar `setup.json` → buscar conexiones por `(chat_id, webhook_secret)` vía `findAllByChatId()` (fan-out) → crear clientes per-conexión → `$handler->processUpdate()`. Si no hay conexión: detección pasiva (`chats_detectados.json`) → HTTP 200 si conocido, 403 si `webhook_secret` desconocido (sin fallback legacy). Async opcional: buffer a `tmp/buffer/event_*.json` con `.tmp+rename` atómico y `connection_slug`; fan-out 502 si todas las conexiones fallan.
 
-**Handler**: `processUpdate()` → `processMessage()` → `fromWebhook()` (→ NormalizedMessage) → descargar media si hay → `messageExists()` (dedup) → `toWikiFields()` → `createTrackerItem()`. Si `mediaGroupId` set: `registerOrLookupAlbum()` → si álbum existente, `appendMediaToTrackerItem()` y return (no crear item nuevo); si es la primera foto, `completeAlbumRegistration()` tras crear.
+**Handler**: `processUpdate()` → dispatch a `processMessage()`/`processEditedMessage()`/`processMessageReaction()` → `fromWebhook()` (→ NormalizedMessage) → TOCTOU lock `tmp/dedup_locks/{md5(chatId:messageId)}.lock` → `messageExists()` (dedup vía cache local `tmp/message_ids_{trackerId}.json`, sembrada UNA vez desde `GET /api/trackers/{id}`) → `toWikiFields()` + `strip_tags()` → descargar media (`TelegramClient::getFileUrl` con `HEAD` + streaming, retry×3) → `createTrackerItem()` (cachea `chatId:messageId→itemId`). Si `mediaGroupId` set: `registerOrLookupAlbum()` atómico (`LOCK_EX` sobre `media_group_album.json`) → si álbum existente, `appendMediaToTrackerItem()` idempotente y return; si es la primera foto, `completeAlbumRegistration()` tras crear.
 
-**Import (ZIP export)**: `admin.php → import.php` → extraer ZIP (validar path traversal) → parsear `result.json` → `fromExport()` → `toWikiFields()` → `createTrackerItem()`.
+**Import (ZIP export)**: `admin.php → import.php` → validar/traversal + límites (`MAX_ZIP_UNCOMPRESSED_SIZE`/`MAX_JSON_IMPORT_SIZE`) → extraer → NDJSON + `messageTopicMap` cronológico + heurística álbumes (fotos mismo sender ≤1s) → `fromExport()` → `toWikiFields()` → dedup vía `getAllTrackerItems()` + `invalidateMessageIdsCache()` → `createTrackerItem()` o `updateTrackerItem()`/`getFillEmptyFields()`.
 
-**Mensajes editados**: `edited_message`/`edited_channel_post` → `processEditedMessage()` busca item existente por `(chat_id, message_id)` y aplica `updateTrackerItem()` con solo Text+EditedDate+Reactions. Si no existe, crea item nuevo.
+**Mensajes editados**: `edited_message`/`edited_channel_post` → `processEditedMessage()` con mismo TOCTOU lock → `findItemByMessageId()` (cache local) → si existe, `toWikiFieldsEdit()` + `updateTrackerItem()` (solo Text+EditedDate+Reactions); si no existe (out-of-order), delega a `processMessage()` para crearlo.
 
 ---
 
@@ -198,7 +206,8 @@ Telegram envía las fotos de un álbum como mensajes individuales. Para que comp
 | Feature nueva / diseño exploratorio | `design/` (activos) |
 | Decisiones históricas implementadas | `design/archived/` |
 | Auditorías históricas | `reports/` (ya consolidadas en roadmap) |
-| Código interno de TikiWiki 27.5 | `..\TikiWiki\` + agente `@tiki-expert` |
+| PWA offline (inconclusa) | `tikipickit/README.md` + `tikipickit/roadmap.md` — no destacar en README raíz |
+| Código interno de TikiWiki 27.5 | `TikiWiki/tiki-27.5/` + agente `@tiki-expert` |
 
 ---
 

@@ -7,7 +7,7 @@
 - **PHP 8.0+** con extensiones: `curl`, `json`, `mbstring`, `session`, `zip`
 - **Apache 2.4+** con `mod_rewrite` (o Nginx)
 - **HTTPS** obligatorio (Telegram requiere URLs seguras para webhooks)
-- **TikiWiki 21.x+** con API habilitada
+- **TikiWiki 27.5+** con API habilitada (API base desde 21.x, visualización automática y file galleries estables desde 27.x)
 
 ### Verificar extensiones PHP
 
@@ -208,22 +208,30 @@ Estos límites se definen como constantes en `config.php`:
 
 ## Paso 6 (Opcional): Configurar la Vista Wiki Feed
 
-trackerGram incluye una plantilla Smarty para mostrar los mensajes del tracker como un feed tipo chat en una página wiki de TikiWiki.
+trackerGram muestra los mensajes del tracker como un feed tipo chat en una página wiki de TikiWiki (burbujas, multimedia, replies).
+
+### Opción A — Automática (recomendada, desde v0.7.0)
+
+1. En el panel admin, tarjeta de la conexión → botón **🎨 Visualización**
+2. Elegí qué campos mostrar, nombres de páginas y máx. items
+3. Click **Deployar** — crea/actualiza dos páginas wiki vía API (`POST /api/wiki`): plantilla Smarty + página `TRACKERLIST`
+4. Requiere permiso `tiki_p_edit` para el usuario del token TikiWiki
+
+> Estado: funcional, pendiente de prueba manual en instancia real. Detalle técnico en `design/015-deploy-visualizacion.md` y templates base en `templates/visualization/`.
+
+### Opción B — Manual (fallback)
 
 1. Creá dos páginas wiki en TikiWiki:
    - `plantillaTrackergram` — contiene el template Smarty por-item
    - `ChatTelegram` (o el nombre que quieras) — página principal con el `{TRACKERLIST}` + CSS
-
-2. Copiá el contenido de `opt/visualizacion-tiki.md` según la sección que corresponda (investigación e implementación están separadas).
-
+2. Copiá el contenido de `opt/visualizacion-tiki.md` según la sección que corresponda
 3. Asegurate de que los plugins necesarios estén habilitados en TikiWiki:
    - `wikiplugin_html` (habilitado + aprobado)
    - `wikiplugin_mediaplayer` (para audio/video)
    - `wikiplugin_trackerlist` (normalmente activo por defecto)
+4. Ajustá el `trackerId="22"` en el `{TRACKERLIST}` al ID real de tu tracker
 
-4. Ajustá el `trackerId="22"` en el `{TRACKERLIST}` al ID real de tu tracker.
-
-Ver [opt/visualizacion-tiki.md](opt/visualizacion-tiki.md) para la documentación completa y código de las plantillas.
+Ver [opt/visualizacion-tiki.md](opt/visualizacion-tiki.md) para la documentación completa y código manual. La opción automática genera el mismo resultado sin copiar código a mano.
 
 ---
 

@@ -17,7 +17,9 @@
 | `design/*` | Equipo de desarrollo | Diseño exploratorio pre-implementación (activos) | Mantener como referencia, pasar a roadmap cuando madure |
 | `design/archived/*` | Equipo de desarrollo | Diseños implementados o consolidados | **Nunca borrar** — referencia histórica de decisiones |
 | `reports/*` | Histórico | Auditorías externas | NO borrar, roadmap consolida items accionables |
-| `opt/*` | Uso local | Credenciales, templates de instancia | NO versionar en GitHub |
+| `opt/*` | Referencia versionada + uso local | `*.md` versionados (`visualizacion-tiki.md`, `shared_hosting.md`) son referencia histórica; credenciales locales no versionar | Versionar `*.md`, ignorar credenciales/`tmp/` |
+| `tikipickit/` | PWA offline standalone | `tikipickit/README.md` + `tikipickit/roadmap.md` | Inconcluso, **no destacar** en README raíz hasta prueba |
+| `templates/visualization/` | Templates base visualización | `item_template_base.smarty`, `page_template_base.txt` | Fuente para `VisualizationDeployer` |
 | `config.php` | Todos | Constantes globales, timeouts, versión del proyecto | **`TRACKERGRAM_VERSION` debe actualizarse en cada versión** — es la fuente de verdad que se muestra en la UI del admin |
 
 ## Reglas detalladas
@@ -58,9 +60,10 @@
 - **Cuándo borrar**: NUNCA — mantener como referencia. El roadmap.md ya consolidó los items accionables.
 - Excepción: Si un reporte fue dividido y absorbido completamente por otro archivo (ej: template-wiki-feed → opt/visualizacion-tiki.md), el original puede eliminarse.
 
-### opt/*
-- **Propósito**: Credenciales locales, templates específicos de instancia, cosas útiles pero no parte del código
-- **NO versionar en GitHub** — son locales
+### opt/* y templates/visualization/*
+- **Propósito**: `opt/*.md` son documentación versionada de referencia (visualización, hosting). `templates/visualization/*` son templates base para deploy automático. Credenciales locales en `opt/` no se versionan.
+- **Regla**: Versionar `*.md` y `templates/`; ignorar credenciales, `.env` local, `tmp/` vía `.gitignore`
+- **tikipickit/**: PWA standalone inconclusa — mantener `tikipickit/README.md` y `tikipickit/roadmap.md` actualizados pero **no destacar** en README raíz hasta que esté probada
 
 ## Flujo de actualización
 

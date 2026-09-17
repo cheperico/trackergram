@@ -21,7 +21,7 @@ Puente entre Telegram y TikiWiki. Recibe mensajes de un grupo de Telegram y los 
 ## Qué Necesitás Antes de Empezar
 
 1. **Un bot de Telegram** — Se crea gratis hablando con [@BotFather](https://t.me/BotFather). Necesitás el token.
-2. **Un TikiWiki 21.x+** — Con la API habilitada, un token de acceso y un tracker (o dejá que trackerGram lo cree automáticamente).
+2. **Un TikiWiki 27.5+** — Con la API habilitada, un token de acceso y un tracker (o dejá que trackerGram lo cree automáticamente). La API funciona desde 21.x, pero visualización automática y file galleries requieren 27.x.
 3. **Un servidor con PHP 8.0+** — Apache o Nginx, accesible desde internet con HTTPS.
 4. **⚠️ El bot debe ser administrador del grupo** — Para recibir **todos los mensajes** (texto, fotos, videos, etc.), el bot necesita ser administrador del grupo de Telegram. Los bots por defecto tienen **Privacy Mode** habilitado, lo que significa que solo ven mensajes de sistema (miembros que entran/salen, topics, pins) y comandos. Hacé admin al bot desde los ajustes del grupo con permisos mínimos (solo "Leer mensajes"). Ver [Privacy Mode](https://core.telegram.org/bots/features#privacy-mode) en la documentación oficial de Telegram.
 
@@ -200,6 +200,7 @@ Si tu servidor tiene ModSecurity activado, puede bloquear las peticiones a TikiW
 | [roadmap.md](roadmap.md) | Qué falta por hacer, prioridades |
 | [CAMBIOS.md](CAMBIOS.md) | Historial de cambios por versión |
 | `design/*` | Documentos de diseño exploratorio (features en discusión) |
+| `tikipickit/` | PWA offline standalone (inconcluso, no destacar) |
 
 ## Licencia
 
