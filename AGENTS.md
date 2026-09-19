@@ -198,8 +198,10 @@ Telegram envía las fotos de un álbum como mensajes individuales. Para que comp
 |---|---|
 | Historial de cambios / versiones | `CAMBIOS.md` |
 | Roadmap / pendientes / bugs conocidos | `roadmap.md` |
-| Schema completo del tracker + INI manual | `TECHNICAL.md` (apéndice) |
-| Arquitectura detallada, flujos, lecciones | `TECHNICAL.md` |
+| Schema completo del tracker + INI manual | `docs/TRACKER_SCHEMA.md` (extraído de TECHNICAL) |
+| Cómo funciona (pocos conocimientos) | `TECHNICAL-basico.md` — glosario + 8 pasos llanos + Mermaid |
+| Arquitectura profunda (básico-medio) | `TECHNICAL-avanzado.md` — código, deuda v0.7.1, seguridad, constantes |
+| Hub técnico | `TECHNICAL.md` — índice a basico/avanzado/schema |
 | Instalación / deploy / servidores conocidos | `INSTALL.md` |
 | Uso final, tipos de mensaje soportados | `README.md` |
 | Mantenimiento de documentación | `docs/CONTRIBUTING.md` |

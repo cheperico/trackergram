@@ -147,7 +147,7 @@ El tracker usa **28 campos** con permNames que siguen el patrón `{prefix}Telegr
 
 > **Alternativa más fácil**: Usá la pestaña "Crear Tracker" del panel de admin — genera todos los campos automáticamente.
 >
-> Si necesitás la configuración INI completa para importar campos manualmente en TikiWiki, consultá el [Apéndice en TECHNICAL.md](TECHNICAL.md#ini-para-importar-campos-manualmente-en-tikiwiki).
+> Si necesitás la configuración INI completa para importar campos manualmente en TikiWiki, consultá [`docs/TRACKER_SCHEMA.md`](docs/TRACKER_SCHEMA.md) (extraído del apéndice de `TECHNICAL-avanzado.md`).
 
 ## Visualizaciones Personalizadas
 
@@ -195,7 +195,10 @@ Si tu servidor tiene ModSecurity activado, puede bloquear las peticiones a TikiW
 | Documento | Para quién |
 |---|---|
 | [INSTALL.md](INSTALL.md) | Cómo instalar paso a paso |
-| [TECHNICAL.md](TECHNICAL.md) | Cómo está construido (para desarrolladores y curiosos) |
+| [TECHNICAL-basico.md](TECHNICAL-basico.md) | Cómo funciona (pocos conocimientos) |
+| [TECHNICAL-avanzado.md](TECHNICAL-avanzado.md) | Arquitectura profunda (básico-medio) |
+| [TECHNICAL.md](TECHNICAL.md) | Hub técnico (índice basico/avanzado) |
+| [docs/TRACKER_SCHEMA.md](docs/TRACKER_SCHEMA.md) | Schema 28 campos + INI importable |
 | [AGENTS.md](AGENTS.md) | Contexto para agentes de IA (lectura obligatoria para IA) |
 | [roadmap.md](roadmap.md) | Qué falta por hacer, prioridades |
 | [CAMBIOS.md](CAMBIOS.md) | Historial de cambios por versión |

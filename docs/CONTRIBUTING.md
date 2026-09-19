@@ -9,7 +9,10 @@
 | Archivo | Para quién | Qué contiene | Regla clave |
 |---------|-----------|-------------|-------------|
 | `README.md` | Usuario final (técnico + no técnico) | Qué hace, cómo se usa, instalación rápida | Simplificar, mover tecnicismos a otros docs |
-| `TECHNICAL.md` | Desarrollador / aprendiz | Decisiones de arquitectura, flujo educativo, lecciones | Explicar el "por qué" + "cómo" |
+| `TECHNICAL.md` | Hub técnico | Índice a `TECHNICAL-basico.md` / `TECHNICAL-avanzado.md` / `docs/TRACKER_SCHEMA.md` | No editar contenido, solo redirigir |
+| `TECHNICAL-basico.md` | Curioso / pocos conocimientos | Qué hace, cómo lo hace, glosario + 8 pasos llanos + Mermaid, sin código | Explicar el "por qué" en lenguaje llano, neutro, ejemplo real |
+| `TECHNICAL-avanzado.md` | Dev / básico-medio | Arquitectura profunda: código, `lib/`, fan-out, TOCTOU, álbumes, deuda v0.7.1, seguridad, constantes, lecciones | Código en `<details>`, decisiones con fundamento |
+| `docs/TRACKER_SCHEMA.md` | Ambos | Schema 28 campos + INI importable (ex apéndice) | Fuente única del INI, link desde basico/avanzado |
 | `INSTALL.md` | Usuario que instala | Pasos de instalación exhaustivos | Solo instalación, detalle completo |
 | `roadmap.md` | Equipo de desarrollo | Items pendientes por fase | Marcar completados, agregar nuevos, consolidar |
 | `AGENTS.md` | Agentes de IA | Contexto completo del proyecto | Fuente de verdad para agentes |
@@ -33,12 +36,12 @@
 - **Puede** incluir el schema del tracker (campos) solo si es necesario para configuración manual; si pesa mucho, mover a TECHNICAL.md
 - **NO**: Decisiones de arquitectura, detalles internos de código, referencias a constantes internas
 
-### TECHNICAL.md
-- **Debe** ser educativo: explicar el "por qué" además del "cómo"
-- **Debe** actualizarse cuando cambia la arquitectura (DI, multi-conexión, async, etc.)
-- **Debe** incluir referencias a APIs externas (Telegram, TikiWiki)
-- **Debe** incluir lecciones aprendidas y problemas resueltos
-- **NO**: Guías de instalación, tablas de compatibilidad de mensajes (eso va en README)
+### TECHNICAL.md / TECHNICAL-basico.md / TECHNICAL-avanzado.md / docs/TRACKER_SCHEMA.md
+- **Razón del split:** `TECHNICAL.md` tenía 1200 líneas y mezclaba público curioso con dev. Ahora `TECHNICAL.md` es hub de 10 líneas, `basico` (~350 líneas) es para pocos conocimientos (glosario + Mermaid + 8 pasos sin código), `avanzado` (~700 líneas) es para básico-medio (snippets `api.php:70`, `lib/Handler/WebhookHandler` TOCTOU, `lib/Infra/ConfigManager` fan-out, deuda, seguridad). `TRACKER_SCHEMA.md` es la única fuente del INI 28 campos.
+- **Guía basico:** Lenguaje neutro, analogías (webhook = correo que toca puerta), ejemplo real `Hola #urgente + foto` → item, sin `flock`/`CURLOPT_RESOLVE`/`SSRF`.
+- **Guía avanzado:** Código en `<details>`, explicar el "por qué" además del "cómo", mantener diagrama `lib/` `524-544`, deuda `551-610`, constantes `673-694`.
+- **Fundamento:** Curioso entiende en 5 min (basico), junior entiende para contribuir (avanzado), ambos linkean a schema. Evita duplicación INI.
+- **NO:** Poner INI en basico/avanzado (solo en schema), poner código en basico, poner glosario solo en avanzado.
 
 ### INSTALL.md
 - **Debe** actualizarse cuando cambian los requisitos de instalación
