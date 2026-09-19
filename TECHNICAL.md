@@ -723,7 +723,7 @@ Este apéndice describe **qué campos debe tener un tracker de TikiWiki** para s
 | 8 | `FirstName` | `t` (text) | Nombre (en import: display name completo) | | | | |
 | 9 | `LastName` | `t` (text) | Apellido (solo webhook) | | | | |
 | 10 | `DisplayName` | `t` (text) | Nombre completo para mostrar (unificado) | | | ✅ | ✅ |
-| 11 | `MessageType` | `D` (dropdown) | Tipo de mensaje (ver options arriba) | | | | |
+| 11 | `MessageType` | `t` (text) | Tipo de mensaje (ver values arriba) | | | | |
 | 12 | `Text` | `a` (textarea) | Contenido del mensaje (incluye captions) | | | ✅ | ✅ |
 | 13 | `MessageDate` | `f` (datetime) | Fecha/hora (timestamp UNIX) | | | ✅ | ✅ |
 | 14 | `Media` | `FG` (file gallery) | Archivo multimedia adjunto | | | | ✅ |

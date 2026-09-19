@@ -44,7 +44,7 @@
 
 | Archivo | Qué hace |
 |---|---|
-| `bootstrap.php` | Carga config + clases PHP (sin DI wiring central) — primer include. También carga `lang/load.php`, `exceptions.php`, `CollectSessionManager` |
+| `bootstrap.php` | Carga config + clases PHP (sin DI wiring central) — primer include. También carga `lang/load.php`, `lib/Infra/exceptions.php`, `lib/Infra/CollectSessionManager` |
 | `api.php` | Recibe webhooks de Telegram (solo entry point, sin lógica de negocio). Maneja rate limit, migración `migrate_to_chat_id`, fan-out, async buffer `.tmp+rename` |
 | `admin.php` | Panel de administración web (auth, CSRF, rate limit, health check, auto-detección prefix) |
 | `admin_handlers.php` | Handlers POST/AJAX (incluido desde admin.php **antes** de loops pesados para respuesta en ms) |
