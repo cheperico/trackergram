@@ -17,7 +17,7 @@
  */
 
 require_once __DIR__ . '/bootstrap.php';
-require_once __DIR__ . '/ConfigManager.php';
+require_once __DIR__ . '/lib/Infra/ConfigManager.php';
 
 // ── Parámetros ──
 $maxEvents = PHP_INT_MAX;

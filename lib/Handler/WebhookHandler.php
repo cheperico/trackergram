@@ -65,7 +65,7 @@ class WebhookHandler
      */
     private function withTopicNamesLock(callable $mutate): void
     {
-        $file = (defined('TEMP_DIR') ? TEMP_DIR : __DIR__) . '/topic_names.json';
+        $file = (defined('TEMP_DIR') ? TEMP_DIR : dirname(__DIR__, 2) . '/tmp') . '/topic_names.json';
         $fp = fopen($file, 'c+');
         if (!$fp) {
             log_message("trackerGram: No se pudo abrir topic_names.json para lock atómico", true);
@@ -109,7 +109,7 @@ class WebhookHandler
      */
     private function replyCachePath(): string
     {
-        return (defined('TEMP_DIR') ? TEMP_DIR : __DIR__) . '/reply_cache.json';
+        return (defined('TEMP_DIR') ? TEMP_DIR : dirname(__DIR__, 2) . '/tmp') . '/reply_cache.json';
     }
 
     /**
@@ -192,7 +192,7 @@ class WebhookHandler
 
     private function albumBufferPath(): string
     {
-        return (defined('TEMP_DIR') ? TEMP_DIR : __DIR__) . '/media_group_album.json';
+        return (defined('TEMP_DIR') ? TEMP_DIR : dirname(__DIR__, 2) . '/tmp') . '/media_group_album.json';
     }
 
     private function withAlbumBufferLock(callable $mutate): void
@@ -1618,7 +1618,7 @@ class WebhookHandler
 
     private function getMediaGroupCaptionFile(): string
     {
-        return defined('TEMP_DIR') ? TEMP_DIR . '/media_group_captions.json' : __DIR__ . '/media_group_captions.json';
+        return (defined('TEMP_DIR') ? TEMP_DIR : dirname(__DIR__, 2) . '/tmp') . '/media_group_captions.json';
     }
 
     /**

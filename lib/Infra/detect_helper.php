@@ -13,7 +13,7 @@
  *   getDetections()                                → todas las detecciones activas
  */
 
-define('DETECT_FILE', __DIR__ . '/tmp/chats_detectados.json');
+define('DETECT_FILE', (defined('TEMP_DIR') ? TEMP_DIR : dirname(__DIR__, 2) . '/tmp') . '/chats_detectados.json');
 
 // ── Carga/Save ──
 

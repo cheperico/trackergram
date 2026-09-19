@@ -669,7 +669,7 @@ class TikiWikiClient
 
     private function messageIdsCachePath(int $trackerId): string
     {
-        return (defined('TEMP_DIR') ? TEMP_DIR : __DIR__) . '/message_ids_' . (int) $trackerId . '.json';
+        return (defined('TEMP_DIR') ? TEMP_DIR : dirname(__DIR__, 2) . '/tmp') . '/message_ids_' . (int) $trackerId . '.json';
     }
 
     /**

@@ -1,0 +1,30 @@
+# trackerGram — SFTP deploy ignore
+# Archivos que NO se suben al dock / no se pisan con rsync
+# Uso con rsync: rsync -av --exclude-from=.sftpignore source/ dest/
+# Uso manual SFTP: excluir estos en FileZilla/WinSCP filtro
+
+# Config real (secretos)
+.env
+config/setup.json
+
+# Runtime generado
+tmp/
+debug.log
+*.log
+*.tmp
+
+# Accesorios agentes / no-deploy
+.opencode/
+AGENTS.md
+design/
+reports/
+opt/
+docs/
+.git/
+.github/
+agents.md.bak
+*.bak
+
+# PWA inconclusa (actualmente sí deployable si se quiere, pero opcional)
+# Descomentar para excluir:
+# tikipickit/

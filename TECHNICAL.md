@@ -525,23 +525,23 @@ WebhookHandler::processMessage()
 bootstrap.php
     ├── config.php          → carga .env, define constantes, TEMP_DIR, resolveHostToIp(), log_message()
     ├── lang/load.php       → i18n __() / _n()
-    ├── exceptions.php      → jerarquía TrackerGramException
-    ├── NormalizedMessage.php
-    ├── TikiWikiClient.php  → comunicación con TikiWiki (SSRF CURLOPT_RESOLVE, wiki pages)
-    ├── TelegramClient.php  → comunicación con Telegram (getFile, setWebhook, getChat)
-    ├── MessageMapper.php   → transformación de datos (strip_tags en toWikiFields)
-    ├── WebhookHandler.php  → orquesta todo (TOCTOU, álbumes, topics, replies)
-    └── CollectSessionManager.php → sesiones /gather
+    ├── lib/Infra/exceptions.php      → jerarquía TrackerGramException
+    ├── lib/Core/NormalizedMessage.php
+    ├── lib/Client/TikiWikiClient.php  → comunicación con TikiWiki (SSRF CURLOPT_RESOLVE, wiki pages)
+    ├── lib/Client/TelegramClient.php  → comunicación con Telegram (getFile, setWebhook, getChat)
+    ├── lib/Core/MessageMapper.php   → transformación de datos (strip_tags en toWikiFields)
+    ├── lib/Handler/WebhookHandler.php  → orquesta todo (TOCTOU, álbumes, topics, replies)
+    └── lib/Infra/CollectSessionManager.php → sesiones /gather
 
-api.php            → ConfigManager → clientes por conexión → WebhookHandler::processUpdate() (+fan-out, migración, async buffer)
-admin.php          → ConfigManager → clientes por conexión (test, create, health check, prefix auto-detección)
-  └── admin_handlers.php  → 12 handlers POST + 2 AJAX visualization (incluido ANTES de loops pesados)
+api.php            → lib/Infra/ConfigManager → clientes por conexión → lib/Handler/WebhookHandler::processUpdate() (+fan-out, migración, async buffer)
+admin.php          → lib/Infra/ConfigManager → clientes por conexión (test, create, health check, prefix auto-detección)
+  └── admin_handlers.php  → 12 handlers POST + 2 AJAX visualization (incluido ANTES de loops pesados, require lib/Core/VisualizationDeployer.php)
   └── admin.css           → estilos cacheables (incl. .viz-* para visualización)
   └── admin.js            → modal, test, fetch, CSRF, openVisualization()
   └── admin_import.js     → chunked import + progress bar (extract/process/cancel)
-import.php         → clientes locales desde formulario → MessageMapper::toWikiFields() (NDJSON + messageTopicMap + grouped_id ≤1s)
-worker.php         → ConfigManager → clientes por conexión → WebhookHandler (flock sobre .json, ftruncate+rename .done, GC .failed/.tmp)
-VisualizationDeployer.php → compila template Smarty (placeholders → fieldIds) + deploy POST /api/wiki
+import.php         → clientes locales desde formulario → lib/Core/MessageMapper::toWikiFields() (NDJSON + messageTopicMap + grouped_id ≤1s)
+worker.php         → lib/Infra/ConfigManager → clientes por conexión → lib/Handler/WebhookHandler (flock sobre .json, ftruncate+rename .done, GC .failed/.tmp)
+lib/Core/VisualizationDeployer.php → compila template Smarty (placeholders → fieldIds) + deploy POST /api/wiki
 ```
 
 **No hay un wiring central**. Cada entry point crea sus propios clientes desde las credenciales de la conexión en `setup.json`. Esto permite tener múltiples bots, wikis y trackers desde una misma instalación.

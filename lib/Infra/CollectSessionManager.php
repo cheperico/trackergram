@@ -18,7 +18,7 @@ class CollectSessionManager
 
     public function __construct()
     {
-        $dir = defined('TEMP_DIR') ? TEMP_DIR : __DIR__ . '/tmp';
+        $dir = defined('TEMP_DIR') ? TEMP_DIR : dirname(__DIR__, 2) . '/tmp';
         $this->storageFile = $dir . '/collect_sessions.json';
     }
 

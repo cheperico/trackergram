@@ -20,6 +20,9 @@
 | `opt/*` | Referencia versionada + uso local | `*.md` versionados (`visualizacion-tiki.md`, `shared_hosting.md`) son referencia histórica; credenciales locales no versionar | Versionar `*.md`, ignorar credenciales/`tmp/` |
 | `tikipickit/` | PWA offline standalone | `tikipickit/README.md` + `tikipickit/roadmap.md` | Inconcluso, **no destacar** en README raíz hasta prueba |
 | `templates/visualization/` | Templates base visualización | `item_template_base.smarty`, `page_template_base.txt` | Fuente para `VisualizationDeployer` |
+| `lib/` | Programa | Clases `Client/`, `Core/`, `Infra/`, `Handler/` — ver `bootstrap.php` | `bootstrap.php` carga `lib/...`, no root |
+| `config/setup.json` | Runtime (prod) | Conexiones multi-bot (generado por admin), `setup.json.example` es plantilla vacía | **NO versionar** `setup.json` (`*` no copia dotfiles, `rsync` con `.sftpignore`) |
+| `.sftpignore` | Deploy | Lista de excludes para SFTP/rsync al dock | `rsync -av --exclude-from=.sftpignore` |
 | `config.php` | Todos | Constantes globales, timeouts, versión del proyecto | **`TRACKERGRAM_VERSION` debe actualizarse en cada versión** — es la fuente de verdad que se muestra en la UI del admin |
 
 ## Reglas detalladas

@@ -39,8 +39,8 @@ if (!isset($_SESSION['last_regeneration'])) {
 }
 
 require_once 'bootstrap.php';
-require_once 'ConfigManager.php';
-require_once 'detect_helper.php';
+require_once 'lib/Infra/ConfigManager.php';
+require_once 'lib/Infra/detect_helper.php';
 
 // GC probabilístico para archivos tg_admin_rate_* viejos
 gcAdminRateFiles();

@@ -8,8 +8,8 @@
  */
 
 require_once 'bootstrap.php';
-require_once 'ConfigManager.php';
-require_once 'detect_helper.php';
+require_once 'lib/Infra/ConfigManager.php';
+require_once 'lib/Infra/detect_helper.php';
 
 // Manejar webhook de Telegram
 // solo se ejecuta si api.php es el entry point directo

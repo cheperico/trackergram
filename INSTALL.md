@@ -74,10 +74,11 @@ php -m | grep -E "(curl|json|mbstring|zip)"
 
 ## Paso 3: Descargar y Configurar trackerGram
 
-1. Copiá todos los archivos de trackerGram a tu servidor web
-2. Copiá la plantilla de configuración:
+1. Copiá todos los archivos de trackerGram a tu servidor web (vía SFTP/rsync). Si usas `cp -r` con `*`, los dotfiles (`.htaccess`, `.env.example`) no se copian — usa `rsync -av` (ver `.sftpignore`).
+2. Copiá las plantillas de configuración (opcionales, se generan solas si faltan):
    ```bash
    cp .env.example .env
+   cp config/setup.json.example config/setup.json  # opcional: el admin lo genera al crear la primera conexión
    ```
 3. Editá `.env` con las credenciales de admin y configuración global:
     ```env

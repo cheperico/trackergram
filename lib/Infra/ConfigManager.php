@@ -11,7 +11,7 @@ class ConfigManager
 
     public function __construct(?string $configPath = null)
     {
-        $this->configPath = $configPath ?? __DIR__ . '/config/setup.json';
+        $this->configPath = $configPath ?? dirname(__DIR__, 2) . '/config/setup.json';
     }
 
     // --- Carga y persistencia ---
@@ -120,7 +120,7 @@ class ConfigManager
 
     private function tryMigrateFromEnv(): void
     {
-        $envPath = __DIR__ . '/.env';
+        $envPath = dirname(__DIR__, 2) . '/.env';
         if (!file_exists($envPath)) {
             return;
         }

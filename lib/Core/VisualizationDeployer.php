@@ -78,7 +78,7 @@ class VisualizationDeployer
     public function __construct(TikiWikiClient $tikiClient)
     {
         $this->tikiClient = $tikiClient;
-        $this->templateBaseDir = __DIR__ . '/templates/visualization/';
+        $this->templateBaseDir = dirname(__DIR__, 2) . '/templates/visualization/';
     }
 
     /**

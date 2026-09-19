@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             exit;
         }
         try {
-            require_once __DIR__ . '/VisualizationDeployer.php';
+            require_once __DIR__ . '/lib/Core/VisualizationDeployer.php';
             $tikiClient = new TikiWikiClient(
                 apiUrl: $conn['tiki_api_url'],
                 token: $conn['tiki_api_token'],
@@ -140,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
 
         try {
-            require_once __DIR__ . '/VisualizationDeployer.php';
+            require_once __DIR__ . '/lib/Core/VisualizationDeployer.php';
             $tikiClient = new TikiWikiClient(
                 apiUrl: $conn['tiki_api_url'],
                 token: $conn['tiki_api_token'],

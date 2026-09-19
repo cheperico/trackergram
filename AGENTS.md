@@ -26,7 +26,8 @@
 
 | Directorio | Contenido |
 |---|---|
-| `config/` | `setup.json` multi-conexión (generado por ConfigManager, bloqueado por `.htaccess`), `.htaccess` |
+| `lib/` | **Programa** — clases agrupadas: `Client/` (TikiWiki/Telegram), `Core/` (MessageMapper, NormalizedMessage, VisualizationDeployer), `Infra/` (ConfigManager, CollectSessionManager, detect_helper, exceptions), `Handler/` (WebhookHandler) |
+| `config/` | `setup.json` multi-conexión (generado por ConfigManager, bloqueado por `.htaccess`), `setup.json.example` (plantilla vacía `{"version":2,"connections":{}}` para instalación nueva), `.htaccess` |
 | `lang/` | i18n del admin (`es.php`, `en.php`, `load.php` con `__()`/`_n()`) |
 | `templates/visualization/` | Templates base de visualización (compilados por VisualizationDeployer) |
 | `assets/` | `favicon.svg`, `icon.svg` |
@@ -36,7 +37,7 @@
 | `design/` | **📐 Diseños activos** — leer antes de arrancar una feature nueva |
 | `design/archived/` | 🗄️ Diseños implementados/consolidados — **nunca borrar** |
 | `docs/` | Guías de contribución (`CONTRIBUTING.md` — gestión de documentación) |
-| `.opencode/` | Configuración de opencode (agentes, skills) |
+| `.opencode/` | Configuración de opencode (agentes, skills) — **no se sube al dock** (`.sftpignore`) |
 | `tikipickit/` | PWA offline standalone (inconcluso, no destacar — ver `tikipickit/README.md`) |
 
 ### Entry Points HTTP
@@ -56,22 +57,22 @@
 | Archivo | Responsabilidad |
 |---|---|
 | `config.php` | Carga `.env`, define constantes globales, `log_message()`, `TRACKERGRAM_VERSION`, `TEMP_DIR`, `resolveHostToIp()` |
-| `NormalizedMessage.php` | Modelo intermedio único entre parsers y TikiWiki |
-| `TikiWikiClient.php` | API de TikiWiki (crear items, subir archivos, crear trackers, dedup vía `message_ids_*.json` cache, SSRF `CURLOPT_RESOLVE`, wiki pages) |
-| `TelegramClient.php` | API de Telegram (descargar archivos, `getMe`/`getChat`/`getWebhookInfo`/`setWebhook`) |
-| `MessageMapper.php` | Transforma mensajes → NormalizedMessage → campos TikiWiki (`strip_tags()` en `toWikiFields`) |
-| `WebhookHandler.php` | Orquesta: valida, resuelve topics, descarga media, dedup TOCTOU lock, álbumes atómicos, envía a TikiWiki |
-| `ConfigManager.php` | CRUD de conexiones multi-bot/wiki/tracker en `config/setup.json` (load con `LOCK_SH`, `LOCK_EX` en save) |
-| `VisualizationDeployer.php` | Deploy automático de visualización (compila template Smarty con placeholders → fieldIds, sube páginas wiki vía `POST /api/wiki`) |
-| `CollectSessionManager.php` | Sesiones `/gather` (colecta estructurada) con GC por inactividad |
-| `detect_helper.php` | Detección pasiva de chats (`chats_detectados.json`, `saveDetections`/`assignDetection`) |
-| `exceptions.php` | Excepciones de dominio (`TrackerGramException` y subclases) |
+| `lib/Core/NormalizedMessage.php` | Modelo intermedio único entre parsers y TikiWiki |
+| `lib/Client/TikiWikiClient.php` | API de TikiWiki (crear items, subir archivos, crear trackers, dedup vía `message_ids_*.json` cache, SSRF `CURLOPT_RESOLVE`, wiki pages) |
+| `lib/Client/TelegramClient.php` | API de Telegram (descargar archivos, `getMe`/`getChat`/`getWebhookInfo`/`setWebhook`) |
+| `lib/Core/MessageMapper.php` | Transforma mensajes → NormalizedMessage → campos TikiWiki (`strip_tags()` en `toWikiFields`) |
+| `lib/Handler/WebhookHandler.php` | Orquesta: valida, resuelve topics, descarga media, dedup TOCTOU lock, álbumes atómicos, envía a TikiWiki |
+| `lib/Infra/ConfigManager.php` | CRUD de conexiones multi-bot/wiki/tracker en `config/setup.json` (load con `LOCK_SH`, `LOCK_EX` en save) |
+| `lib/Core/VisualizationDeployer.php` | Deploy automático de visualización (compila template Smarty con placeholders → fieldIds, sube páginas wiki vía `POST /api/wiki`) |
+| `lib/Infra/CollectSessionManager.php` | Sesiones `/gather` (colecta estructurada) con GC por inactividad |
+| `lib/Infra/detect_helper.php` | Detección pasiva de chats (`chats_detectados.json`, `saveDetections`/`assignDetection`) |
+| `lib/Infra/exceptions.php` | Excepciones de dominio (`TrackerGramException` y subclases) |
 
-Frontend admin: `admin.css`, `admin.js`, `admin_import.js`. Soporte: `.env` (NO versionar), `.htaccess`, `config/setup.json` (auto-generado, bloqueado por `.htaccess` + `chmod 0600`), `debug.log` (rotación 10MB, fallback `tmp/debug_fallback.log`).
+Frontend admin: `admin.css`, `admin.js`, `admin_import.js`. Soporte: `.env` (NO versionar, ver `.env.example`), `.htaccess` (sí se deploya, con `*` no copia dotfiles → usar `rsync` ver `.sftpignore`), `config/setup.json` (auto-generado, bloqueado por `.htaccess` + `chmod 0600`, plantilla en `config/setup.json.example`), `debug.log` (rotación 10MB, fallback `tmp/debug_fallback.log`).
 
 ### Orden recomendado de lectura del código
 
-1. `config.php` → 2. `bootstrap.php` → 3. `NormalizedMessage.php` → 4. `api.php` → 5. `WebhookHandler.php` → 6. `MessageMapper.php` → 7. `TikiWikiClient.php` → 8. `TelegramClient.php` → 9. `import.php` → 10. `admin.php`
+1. `config.php` → 2. `bootstrap.php` → 3. `lib/Core/NormalizedMessage.php` → 4. `api.php` → 5. `lib/Handler/WebhookHandler.php` → 6. `lib/Core/MessageMapper.php` → 7. `lib/Client/TikiWikiClient.php` → 8. `lib/Client/TelegramClient.php` → 9. `import.php` → 10. `admin.php`
 
 ---
 
